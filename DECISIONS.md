@@ -12,3 +12,9 @@
 - **읽는 시간은 `reading-time`으로 빌드 시 계산** — CJK 글자 수를 반영하는 라이브러리. 최소 1분, 올림 처리.
 - **날짜 표기는 `Intl.DateTimeFormat('ko-KR', { dateStyle: 'long' })`** — "2026년 6월 10일" 형식. 빌드 시점에 정적으로 렌더되므로 런타임 의존 없음.
 - **샘플 글 발행일을 2026-06-08 ~ 06-10으로 분산** — 홈 목록의 최신순 정렬이 눈에 보이도록.
+
+리뷰(적대적 검증) 후 반영한 수정:
+
+- **표 가로 스크롤을 `table`의 `display: block` 대신 rehype 래퍼(`.table-wrap`)로 처리** — table에 비-table display를 주면 일부 브라우저 접근성 트리에서 표 시맨틱(행·셀 역할)이 제거되어 스크린리더 표 탐색이 깨진다. `src/plugins/rehype-table-wrap.mjs`가 빌드 시 모든 마크다운 표를 스크롤 컨테이너로 감싼다.
+- **verify.sh에 `trap` 정리 핸들러 추가** — 임시 검증 글 생성 후 빌드가 실패해도 `__verify_tmp.md`가 레포에 남아 다음 빌드에 발행되는 일이 없도록 EXIT 시 항상 삭제한다. 스펙 10장의 체크 항목·PASS 의미는 변경 없음.
+- **frontmatter `cover` 필드를 실제 렌더링에 연결** — 스키마에만 존재하던 cover를 글 상세 상단 이미지(`astro:assets` Image)와 `og:image`/`twitter:card`(summary_large_image)로 연결했다. 임시 글로 빌드 검증 후 제거. 홈 카드 썸네일은 목록의 정갈함을 유지하기 위해 넣지 않았다.

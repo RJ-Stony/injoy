@@ -13,6 +13,8 @@ ls dist/sitemap*.xml >/dev/null 2>&1 && echo "OK  sitemap"       || { echo "FAIL
 grep -rqi "Wanted Sans" dist        && echo "OK  font(Wanted Sans)" || { echo "FAIL font"; exit 1; }
 grep -rqi "2F6FED" dist             && echo "OK  accent color"      || echo "WARN accent color not found inline"
 # 마크다운 발행 워크플로우 확인 (임시 글 추가 후 빌드, 정리)
+# 중간에 실패해도 임시 글이 레포에 남지 않도록 종료 시 정리한다
+trap 'rm -f src/content/posts/__verify_tmp.md' EXIT
 cat > src/content/posts/__verify_tmp.md <<'EOF'
 ---
 title: "verify tmp"
