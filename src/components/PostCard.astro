@@ -1,0 +1,55 @@
+---
+import PostMeta from './PostMeta.astro';
+import { readingMinutes, type Post } from '../utils/post';
+
+interface Props {
+  post: Post;
+}
+
+const { post } = Astro.props;
+const href = `/posts/${post.id}/`;
+---
+
+<article class="post-card">
+  <PostMeta category={post.data.category} pubDate={post.data.pubDate} minutes={readingMinutes(post)} />
+  <h2 class="title">
+    <a href={href}>{post.data.title}</a>
+  </h2>
+  <p class="description">{post.data.description}</p>
+</article>
+
+<style>
+  .post-card {
+    padding: 1.75rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .post-card:last-of-type {
+    border-bottom: 0;
+  }
+
+  .title {
+    margin: 0.6rem 0 0.4rem;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.45;
+  }
+
+  .title a {
+    color: var(--text);
+    transition: color 0.15s ease;
+  }
+
+  .title a:hover {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .description {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.975rem;
+    line-height: 1.7;
+  }
+</style>

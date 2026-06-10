@@ -1,0 +1,167 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  /** OG 타입 — 글 상세는 'article', 그 외 'website' */
+  ogType?: 'website' | 'article';
+}
+
+const { title, description, ogType = 'website' } = Astro.props;
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+const siteName = 'Injoy';
+const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
+---
+
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalURL} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate" type="application/rss+xml" title={siteName} href={new URL('rss.xml', Astro.site)} />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+
+    <!-- Open Graph -->
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:locale" content="ko_KR" />
+    <meta name="twitter:card" content="summary" />
+
+    <!-- 본문·제목 : Wanted Sans (Variable) -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css"
+    />
+    <!-- 코드 : JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap"
+    />
+    <!-- 이모지 포인트 (선택) : Tossface -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/toss/tossface/dist/tossface.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">본문으로 건너뛰기</a>
+
+    <header class="site-header">
+      <div class="site-header-inner">
+        <a class="logo" href="/">Injoy</a>
+        <nav aria-label="주 메뉴">
+          <a href="/about/">About</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <p>© {new Date().getFullYear()} Injoy. 마크다운으로 쓰고, 즐겁게 기록합니다.</p>
+        <p><a href="/rss.xml">RSS</a></p>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style is:global>
+  @import '../styles/global.css';
+</style>
+
+<style>
+  .skip-link {
+    position: absolute;
+    top: -100%;
+    left: 1rem;
+    z-index: 100;
+    padding: 0.5rem 1rem;
+    background-color: var(--accent);
+    color: #fff;
+    border-radius: 0 0 8px 8px;
+  }
+
+  .skip-link:focus-visible {
+    top: 0;
+  }
+
+  .site-header {
+    border-bottom: 1px solid var(--border);
+    background-color: var(--bg);
+  }
+
+  .site-header-inner {
+    max-width: var(--width-wide);
+    margin-inline: auto;
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  .logo:hover {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .site-header nav {
+    display: flex;
+    gap: 1.25rem;
+  }
+
+  .site-header nav a {
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
+
+  .site-header nav a:hover {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  main {
+    max-width: var(--width-wide);
+    margin-inline: auto;
+    padding: 2.5rem 1.25rem 5rem;
+  }
+
+  .site-footer {
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+
+  .site-footer-inner {
+    max-width: var(--width-wide);
+    margin-inline: auto;
+    padding: 1.5rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .site-footer p {
+    margin: 0;
+  }
+</style>

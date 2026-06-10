@@ -1,0 +1,47 @@
+---
+/**
+ * 시그니처 메타 라인 — 카테고리 라벨 + 발행일 + 읽는 시간을 한 줄로.
+ * 글 카드와 글 상단에서 같은 모습으로 쓰인다.
+ */
+import { formatDate, isoDate } from '../utils/post';
+
+interface Props {
+  category: string;
+  pubDate: Date;
+  minutes: number;
+}
+
+const { category, pubDate, minutes } = Astro.props;
+---
+
+<div class="post-meta">
+  <span class="category">{category}</span>
+  <span class="divider" aria-hidden="true">·</span>
+  <time datetime={isoDate(pubDate)}>{formatDate(pubDate)}</time>
+  <span class="divider" aria-hidden="true">·</span>
+  <span>{minutes}분 읽기</span>
+</div>
+
+<style>
+  .post-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .category {
+    color: var(--accent);
+    background-color: var(--accent-weak);
+    font-weight: 600;
+    padding: 0.1em 0.6em;
+    border-radius: 999px;
+  }
+
+  .divider {
+    color: var(--border);
+  }
+</style>
