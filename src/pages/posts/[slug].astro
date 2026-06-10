@@ -1,5 +1,6 @@
 ---
 import { render } from 'astro:content';
+import { Image } from 'astro:assets';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PostMeta from '../../components/PostMeta.astro';
 import TableOfContents from '../../components/TableOfContents.astro';
@@ -13,14 +14,21 @@ export async function getStaticPaths() {
 const { post } = Astro.props;
 const { Content, headings } = await render(post);
 const minutes = readingMinutes(post);
+const cover = post.data.cover;
 ---
 
-<BaseLayout title={post.data.title} description={post.data.description} ogType="article">
+<BaseLayout
+  title={post.data.title}
+  description={post.data.description}
+  ogType="article"
+  ogImage={cover?.src}
+>
   <article class="post">
     <header class="post-header">
       <PostMeta category={post.data.category} pubDate={post.data.pubDate} minutes={minutes} />
       <h1>{post.data.title}</h1>
       <p class="description">{post.data.description}</p>
+      {cover && <Image class="cover" src={cover} alt="" loading="eager" />}
     </header>
 
     <TableOfContents headings={headings} />
@@ -100,6 +108,13 @@ const minutes = readingMinutes(post);
     margin: 0;
     color: var(--text-muted);
     line-height: 1.7;
+  }
+
+  .post-header .cover {
+    margin-top: 1.5rem;
+    border-radius: var(--radius);
+    width: 100%;
+    height: auto;
   }
 
   .post-footer {

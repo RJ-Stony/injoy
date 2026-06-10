@@ -4,9 +4,12 @@ interface Props {
   description: string;
   /** OG 타입 — 글 상세는 'article', 그 외 'website' */
   ogType?: 'website' | 'article';
+  /** OG 이미지 경로 (사이트 기준 절대 경로 또는 빌드된 에셋 경로) */
+  ogImage?: string;
 }
 
-const { title, description, ogType = 'website' } = Astro.props;
+const { title, description, ogType = 'website', ogImage } = Astro.props;
+const ogImageURL = ogImage ? new URL(ogImage, Astro.site) : undefined;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const siteName = 'Injoy';
 const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
@@ -33,7 +36,8 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
     <meta property="og:type" content={ogType} />
     <meta property="og:url" content={canonicalURL} />
     <meta property="og:locale" content="ko_KR" />
-    <meta name="twitter:card" content="summary" />
+    {ogImageURL && <meta property="og:image" content={ogImageURL} />}
+    <meta name="twitter:card" content={ogImageURL ? 'summary_large_image' : 'summary'} />
 
     <!-- 본문·제목 : Wanted Sans (Variable) -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
