@@ -2,6 +2,7 @@
 import { defineConfig } from 'astro/config';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
+import rehypeTableWrap from './src/plugins/rehype-table-wrap.mjs';
 
 // https://astro.build/config
 export default defineConfig({
@@ -10,6 +11,7 @@ export default defineConfig({
   output: 'static',
   integrations: [mdx(), sitemap()],
   markdown: {
+    rehypePlugins: [rehypeTableWrap],
     shikiConfig: {
       // 라이트/다크 듀얼 테마 — prefers-color-scheme에 따라 CSS에서 전환
       themes: {
