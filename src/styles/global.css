@@ -1,0 +1,294 @@
+/* ==========================================================================
+   Injoy — 전역 디자인 토큰 & 기본 스타일
+   스펙 4장의 토큰을 그대로 사용한다. 임의 변경 금지.
+   ========================================================================== */
+
+:root {
+  /* Light (기본) */
+  --bg: #ffffff;
+  --surface: #f6f7f9;
+  --text: #1a1b1e;
+  --text-muted: #6b7178;
+  --border: #e8eaed;
+  --accent: #2f6fed;
+  --accent-weak: #eaf1fe;
+  --code-bg: #f4f5f7;
+
+  /* 폰트 */
+  --font-sans: 'Wanted Sans Variable', 'Wanted Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'D2Coding', ui-monospace, monospace;
+  --font-emoji: 'Tossface';
+
+  /* 레이아웃 */
+  --width-content: 680px; /* 본문 읽기 폭 */
+  --width-wide: 720px;    /* 홈 카드 리스트 폭 */
+  --radius: 12px;
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181c;
+    --surface: #1e2127;
+    --text: #e8eaed;
+    --text-muted: #9aa0a6;
+    --border: #2a2d34;
+    --accent: #5b8def;
+    --accent-weak: #1e2a44;
+    --code-bg: #1b1e24;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   리셋 & 베이스
+   -------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.8;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+@media (min-width: 768px) {
+  body {
+    font-size: 18px;
+  }
+}
+
+img,
+svg,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+a:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* 모든 인터랙티브 요소에 보이는 포커스 */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* 움직임 줄이기 설정 존중 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 이모지 포인트 전용 — 본문 전체 적용 금지 */
+.tossface {
+  font-family: var(--font-emoji), var(--font-sans);
+}
+
+/* --------------------------------------------------------------------------
+   본문(prose) — 마크다운 렌더링 영역
+   -------------------------------------------------------------------------- */
+
+.prose {
+  font-size: inherit;
+  line-height: 1.8;
+}
+
+.prose > * + * {
+  margin-block-start: 1.4em;
+}
+
+.prose h2,
+.prose h3,
+.prose h4 {
+  line-height: 1.4;
+  scroll-margin-top: 5rem;
+}
+
+.prose h2 {
+  font-size: 1.5em;
+  font-weight: 700;
+  margin-block-start: 2.6em;
+  padding-block-start: 0.2em;
+}
+
+.prose h3 {
+  font-size: 1.2em;
+  font-weight: 600;
+  margin-block-start: 2em;
+}
+
+.prose h4 {
+  font-size: 1.05em;
+  font-weight: 600;
+  margin-block-start: 1.8em;
+}
+
+.prose p {
+  margin-block: 1.4em;
+}
+
+.prose ul,
+.prose ol {
+  padding-inline-start: 1.4em;
+}
+
+.prose li {
+  margin-block: 0.4em;
+}
+
+.prose li > ul,
+.prose li > ol {
+  margin-block: 0.4em;
+}
+
+.prose blockquote {
+  margin-inline: 0;
+  padding: 0.6em 1.2em;
+  border-inline-start: 3px solid var(--accent);
+  background-color: var(--surface);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  color: var(--text-muted);
+}
+
+.prose blockquote p {
+  margin-block: 0.4em;
+}
+
+.prose hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin-block: 3em;
+}
+
+.prose img {
+  border-radius: var(--radius);
+  display: block;
+}
+
+.prose figure {
+  margin-inline: 0;
+}
+
+.prose figcaption {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  text-align: center;
+  margin-block-start: 0.6em;
+}
+
+/* 표 (GFM) */
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92em;
+  display: block;
+  overflow-x: auto;
+}
+
+.prose th,
+.prose td {
+  border: 1px solid var(--border);
+  padding: 0.55em 0.9em;
+  text-align: left;
+  line-height: 1.6;
+}
+
+.prose th {
+  background-color: var(--surface);
+  font-weight: 600;
+}
+
+/* 인라인 코드 */
+.prose :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background-color: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.15em 0.4em;
+}
+
+/* 코드블록 (Shiki) */
+.prose pre {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  line-height: 1.7;
+  border-radius: var(--radius);
+  padding: 1.2em 1.4em;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+}
+
+.prose pre code {
+  font-family: inherit;
+  background: none;
+  padding: 0;
+}
+
+/* Shiki 듀얼 테마 — 다크 모드에서 다크 팔레트로 전환 */
+@media (prefers-color-scheme: dark) {
+  .astro-code,
+  .astro-code span {
+    color: var(--shiki-dark) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+  }
+}
+
+/* 코드블록 배경은 토큰으로 통일 (라이트/다크 공통) */
+.prose pre.astro-code {
+  background-color: var(--code-bg) !important;
+}
+
+/* 체크박스(task list) */
+.prose input[type='checkbox'] {
+  accent-color: var(--accent);
+  margin-inline-end: 0.4em;
+}
+
+.prose li:has(> input[type='checkbox']) {
+  list-style: none;
+  margin-inline-start: -1.4em;
+}
+
+/* 본문 링크는 은은한 밑줄 전환 */
+.prose a {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  text-underline-offset: 0.2em;
+}
+
+.prose a:hover {
+  text-decoration-color: var(--accent);
+}
