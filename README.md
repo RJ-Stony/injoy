@@ -8,23 +8,28 @@
 
 주요 기능
 
+- **브라우저에서 글쓰기(CRUD)** — `npm run write`로 에디터가 열리고, 글 생성·수정·삭제
+  모두 가능 (로컬 전용이라 방문자는 글을 쓸 수 없음)
 - 마크다운 파일 추가 = 발행 (frontmatter는 zod로 검증)
+- 마크다운 풀세트: GFM(표·체크리스트), 콜아웃, 각주, **수식(KaTeX)**,
+  **다이어그램(Mermaid)**, 이모지 숏코드(Tossface), 이미지 캡션, 코드 줄 강조/diff
 - 라이트/다크 자동(시스템) + 헤더 토글로 수동 전환
-- 코드 하이라이트(Shiki)·복사 버튼·줄 강조/diff 표기
-- 콜아웃(`> [!NOTE]`), 각주, GFM 표·체크리스트
+- 난이도 반영 읽기 시간(코드·수식·다이어그램 가중), 글별 조회수·전체 방문 수
+- 카드 썸네일(cover), 이전/다음 글 내비게이션, 태그 페이지
 - 자동 목차 — 좁은 화면은 본문 상단 카드, 와이드 화면은 우측 sticky 사이드바
-- RSS·사이트맵 자동 생성, 반응형(360px~)·접근성 기본기
+- RSS·사이트맵·robots.txt 자동, 반응형(360px~)·접근성 기본기, 고정 헤더
 
 ## 빠른 시작
 
 ```bash
 npm install
-npm run dev      # http://localhost:4321
+npm run write    # 블로그 + 글쓰기 에디터가 함께 열림
 ```
 
 | 명령 | 설명 |
 | --- | --- |
-| `npm run dev` | 로컬 개발 서버 (draft 글도 보임) |
+| `npm run write` | **글쓰기 모드** — dev 서버 + 에디터(`/admin/`) 동시 실행 |
+| `npm run dev` | 로컬 개발 서버만 (draft 글도 보임) |
 | `npm run new -- <slug> "제목"` | 새 글 스캐폴드 (draft 상태로 생성) |
 | `npm run build` | 프로덕션 빌드 → `dist/` |
 | `npm run preview` | 빌드 결과를 로컬에서 확인 |
@@ -34,16 +39,30 @@ Node 18 이상이 필요합니다.
 
 ## 글 쓰는 법 ✍️
 
-**`src/content/posts/`에 `.md` 파일을 추가하면 그게 곧 발행입니다.** 빌드 설정을
-수정하거나 어딘가에 등록할 필요가 없습니다.
+### 방법 1 — 브라우저에서 쓰기 (권장)
 
-### 1. 파일 만들기
+```bash
+npm run write
+```
+
+브라우저에 에디터가 열립니다. 글 목록에서 **새 글 작성·기존 글 수정·삭제**를 모두 할 수
+있고, 제목·요약·카테고리·태그·대표 이미지(썸네일)·draft 여부를 폼으로 입력합니다.
+이미지를 끌어다 놓으면 글 옆 `_images/`에 저장되고 자동 최적화됩니다.
+
+저장하면 `src/content/posts/`의 마크다운 파일로 기록되므로, 확인 후 커밋·푸시하면
+그게 곧 발행입니다.
+
+> [!IMPORTANT]
+> 에디터는 **내 컴퓨터에서만** 동작합니다. 프로덕션 빌드에서는 `/admin/`이 통째로
+> 제거되므로(빌드 시 자동, verify.sh가 검증) 배포된 사이트의 방문자는 글을 쓸 수 없습니다.
+
+### 방법 2 — 파일로 직접 쓰기
 
 ```bash
 npm run new -- my-first-post "첫 글입니다"   # 스캐폴드 한 줄로 시작
 ```
 
-또는 직접 만들어도 됩니다.
+또는 `src/content/posts/`에 `.md` 파일을 직접 만들어도 됩니다.
 
 ```text
 src/content/posts/my-first-post.md  →  https://rj-stony.github.io/injoy/posts/my-first-post/
@@ -97,14 +116,17 @@ draft: true
 
 ### 4. 본문에서 쓸 수 있는 것
 
-- GFM 문법: 표, 체크박스(`- [ ]`), 취소선(`~~`)
+- GFM 문법: 표, 체크박스(`- [ ]`), 취소선(`~~`), 자동 링크
 - 콜아웃: `> [!NOTE]` `[!TIP]` `[!IMPORTANT]` `[!WARNING]` `[!CAUTION]` (한국어 라벨로 렌더)
 - 각주: 본문에 `[^1]`, 아무 곳에나 `[^1]: 내용`
+- 수식: 인라인 `$E=mc^2$`, 블록 `$$ ... $$` (KaTeX)
+- 다이어그램: ```` ```mermaid ```` 코드블록 (플로차트·시퀀스 등, 다크 테마 연동)
+- 이모지: `:rocket:` 숏코드 → 🚀 (모든 이모지가 Tossface 글꼴로 표시)
 - 코드블록: 언어를 지정하면 Shiki 하이라이트 + 복사 버튼 (라이트/다크 자동 전환)
   - 줄 끝에 `// [!code highlight]` `// [!code ++]` `// [!code --]`로 줄 강조·diff 표기
 - `##`/`###` 제목은 목차에 자동 수집 (와이드 화면에선 우측 sticky 사이드바)
 - 이미지: `![alt](../../assets/image.png)` — 글 기준 상대 경로면 자동 최적화 + lazy 로딩.
-  `alt`를 꼭 적어 주세요
+  경로 뒤 `"따옴표"` 텍스트는 캡션이 됩니다. `alt`를 꼭 적어 주세요
 
 샘플은 발행되어 있는 세 글
 ([welcome](src/content/posts/welcome.md),
@@ -159,19 +181,27 @@ const BASE = '/injoy';                     // 하위 경로 (루트 배포면 '/
 
 ```text
 src/
-├── content/posts/      ← 글은 여기에 (.md 추가 = 발행)
+├── content/posts/      ← 글은 여기에 (.md 추가 = 발행, _images/는 업로드 이미지)
 ├── content.config.ts   ← frontmatter 스키마 (zod)
 ├── assets/             ← 글에서 쓰는 이미지 (자동 최적화)
 ├── layouts/            ← BaseLayout, MarkdownPage
-├── components/         ← PostCard, PostMeta, TableOfContents, ThemeToggle
+├── components/         ← PostCard, PostMeta, TableOfContents, ThemeToggle, ViewCount
 ├── pages/              ← 홈, 글 상세, about, 태그, rss.xml, 404
-├── plugins/            ← rehype 플러그인 (표 래퍼, base 링크)
+├── plugins/            ← rehype 플러그인 (표 래퍼, base 링크, 캡션, Tossface)
 ├── styles/global.css   ← 디자인 토큰·본문 스타일
 └── utils/              ← 글 목록·읽는 시간·날짜·withBase
+public/admin/           ← 글쓰기 에디터 (npm run write 전용, 배포 시 제거)
 scripts/new-post.mjs    ← 새 글 스캐폴드 (npm run new)
 scripts/verify.sh       ← 자체 점검 스크립트
 .github/workflows/      ← GitHub Pages 자동 배포
 ```
+
+## 조회수에 대하여
+
+글별 조회수와 전체 방문 수는 [Abacus](https://abacus.jasoncameron.dev)(무가입 카운터 API)로
+집계합니다. 로컬 미리보기에서는 수치를 올리지 않으며, API가 응답하지 않으면 표시 자체가
+조용히 생략되어 글 읽기에는 영향이 없습니다. 본격적인 방문 분석이 필요해지면
+GoatCounter·Cloudflare Analytics 같은 도구로 교체하는 것을 권합니다.
 
 ## 폰트 라이선스 주의 ⚠️
 

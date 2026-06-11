@@ -12,6 +12,14 @@ ls dist/sitemap*.xml >/dev/null 2>&1 && echo "OK  sitemap"       || { echo "FAIL
 # 디자인 토큰 흔적 확인 (빌드 CSS 안에 폰트·컬러)
 grep -rqi "Wanted Sans" dist        && echo "OK  font(Wanted Sans)" || { echo "FAIL font"; exit 1; }
 grep -rqi "2F6FED" dist             && echo "OK  accent color"      || echo "WARN accent color not found inline"
+# 글쓰기 화면(admin)은 배포 산출물에 절대 포함되면 안 된다
+test ! -d dist/admin               && echo "OK  admin stripped"     || { echo "FAIL admin leaked to dist"; exit 1; }
+test -f dist/robots.txt            && echo "OK  robots.txt"         || { echo "FAIL robots.txt"; exit 1; }
+# 마크다운 풀세트 흔적 확인
+grep -rqi "katex" dist/_astro       && echo "OK  katex css"          || { echo "FAIL katex css"; exit 1; }
+grep -q 'data-language="mermaid"' dist/posts/markdown-styleguide/index.html && echo "OK  mermaid block" || { echo "FAIL mermaid"; exit 1; }
+grep -q 'markdown-alert' dist/posts/markdown-styleguide/index.html  && echo "OK  callouts"          || { echo "FAIL callouts"; exit 1; }
+grep -q 'data-footnote-ref' dist/posts/markdown-styleguide/index.html && echo "OK  footnotes"       || { echo "FAIL footnotes"; exit 1; }
 # 마크다운 발행 워크플로우 확인 (임시 글 추가 후 빌드, 정리)
 # 중간에 실패해도 임시 글이 레포에 남지 않도록 종료 시 정리한다
 trap 'rm -f src/content/posts/__verify_tmp.md' EXIT

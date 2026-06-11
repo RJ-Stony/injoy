@@ -16,10 +16,14 @@ const { category, pubDate, minutes } = Astro.props;
 
 <div class="post-meta">
   <span class="category">{category}</span>
-  <span class="divider" aria-hidden="true">·</span>
-  <time datetime={isoDate(pubDate)}>{formatDate(pubDate)}</time>
-  <span class="divider" aria-hidden="true">·</span>
-  <span>{minutes}분 읽기</span>
+  <span class="item">
+    <span class="divider" aria-hidden="true">·</span>
+    <time datetime={isoDate(pubDate)}>{formatDate(pubDate)}</time>
+  </span>
+  <span class="item">
+    <span class="divider" aria-hidden="true">·</span>
+    <span>{minutes}분 읽기</span>
+  </span>
 </div>
 
 <style>
@@ -39,6 +43,14 @@ const { category, pubDate, minutes } = Astro.props;
     font-weight: 600;
     padding: 0.1em 0.6em;
     border-radius: 999px;
+  }
+
+  /* 줄바꿈 시 구분점이 항목과 함께 움직이도록 묶는다 */
+  .item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    white-space: nowrap;
   }
 
   .divider {

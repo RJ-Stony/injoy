@@ -30,3 +30,20 @@
 - **GitHub Pages 실배포: RJ-Stony/injoy** — `site=https://rj-stony.github.io`, `base=/injoy`. 컴포넌트 링크는 `withBase()`, 마크다운 본문 링크는 `rehype-base-links`(raw HTML의 href/src까지 처리)로 base를 일괄 적용. 데모 이미지는 `public/`에서 `src/assets`로 옮겨 Astro 이미지 파이프라인(자동 base·lazy·치수)을 태웠다. RSS 채널 링크에도 base 반영. 워크플로는 `withastro/action@v6`(릴리스 확인) + `actions/deploy-pages@v4`, Pages는 API로 build_type=workflow 활성화.
 - **한국어 윤문(/humanize-korean v1.5, fast 모드)** — 글 4편 전수 점검. welcome·about은 "AI 티 임계 미달, 무수정"(A, 6/6), how-to-write·markdown-styleguide는 각 변경률 4%(연결어미 쉼표·번역투 목적절·결산 피벗 어휘 등 S1~S2만 치환, A, 6/6). frontmatter·코드·표·링크는 diff로 무변경 검수 후 반영.
 - **시각 QA 실증** — 360/1440px × 라이트/다크(시스템·수동 모두), 토글 클릭, 콜아웃 5종, 사이드바 목차, 페이지 가로 오버플로 없음(코드블록 내부 스크롤만)을 preview 브라우저로 확인.
+
+3차 피드백(CMS·마크다운 풀세트·메타 기능·디자인 고정) 반영분:
+
+- **글쓰기 CMS는 "로컬 전용 Decap"** — 정적 GitHub Pages를 유지하면서 "나만 쓸 수 있는" 요구를 충족하는 구조. `npm run write`가 dev 서버 + decap-server(fs 모드)를 함께 띄우고, 에디터는 레포 파일을 직접 CRUD한다. 프로덕션 빌드는 `strip-admin` 통합이 dist/admin을 제거(verify.sh가 회귀 검증)하므로 방문자 쪽엔 글쓰기 진입점 자체가 없다. 클라우드 에디터(Decap GitHub OAuth)는 OAuth 앱·프록시 등 사용자 계정 작업이 필요해 보류 — 필요해지면 sveltia-cms-auth 워커 추가로 확장 가능.
+- **decap-server는 fs 모드** — git 모드는 저장할 때마다 자동 커밋이 생겨 의도치 않은 히스토리를 만든다. fs 모드는 파일만 쓰므로 "에디터로 쓰고, 검토 후 직접 커밋·푸시"라는 기존 발행 흐름과 일치. CRUD 사이클(생성→읽기→수정→삭제)을 API 레벨로 검증 완료.
+- **CMS 업로드 이미지는 `src/content/posts/_images/`** — 글에서 `./_images/...` 상대 경로로 참조되어 Astro 이미지 파이프라인(최적화·lazy·base)을 타고, 콘텐츠 글로브(`*.{md,mdx}`)에는 걸리지 않는다.
+- **수식은 remark-math + rehype-katex** — KaTeX CSS는 BaseLayout에서 전역 로드(수식 없는 페이지에도 ~20KB 추가되지만 단순함 우선). 긴 수식은 `.katex-display`에 가로 스크롤.
+- **다이어그램은 Mermaid 클라이언트 렌더** — 빌드 타임 렌더(rehype-mermaid)는 Playwright 의존이 무거워 CDN ESM 지연 로드를 선택. 다이어그램이 있는 글에서만 로드되고, 테마 토글·시스템 다크 변경 시 `injoy:theme-change` 이벤트로 재렌더된다.
+- **이모지는 remark-emoji(숏코드) + rehype-tossface(글리프 래핑)** — 본문 텍스트의 이모지만 `span.tossface`로 감싸 "Tossface는 이모지에만" 규칙을 빌드 타임에 강제. 코드 블록 내부는 제외.
+- **이미지 캡션은 title 문법** — `![alt](src "캡션")` → figure/figcaption 변환(rehype-figure).
+- **읽기 시간은 자체 계산식** — 한글 500자/분 + 영문 200단어/분 + 코드 줄당 4초 + 수식·다이어그램 개당 15초 + 이미지 개당 10초. reading-time 패키지 제거(난이도 가중을 표현 못 함).
+- **조회수는 Abacus(무가입 카운터)** — 글별 조회(헤더 메타)와 전체 방문(푸터, 세션당 1회). 로컬에선 get만 하고 hit하지 않아 수치 오염 방지, 실패 시 조용히 숨김. 계정 기반 분석(GoatCounter 등)은 사용자 가입이 필요해 비채택 — README에 교체 경로 안내.
+- **헤더는 sticky 고정** — 블러 반투명 배경, wide 페이지(글 상세)에서는 헤더·푸터 내부 폭을 본문 그리드(1080px)와 정렬. 목차 사이드바 top도 헤더 높이만큼 보정.
+- **이전/다음 글 내비게이션** — 발행 글 최신순 배열에서 양옆 글을 props로 전달. 540px 이하에서는 세로 스택.
+- **메타 라인 줄바꿈 다듬기** — 구분점(·)과 항목을 inline-flex로 묶어, 좁은 화면에서 구분점이 줄 끝에 홀로 남지 않게 했다.
+- **robots.txt 추가** — sitemap 절대 URL 포함.
+- **콘텐츠 캐시 주의** — decap-server로 워처 없이 파일을 만들었다 지우면 `.astro` 콘텐츠 스토어에 잔재가 남아 중복 id 경고가 날 수 있다. `.astro` 삭제 후 재빌드로 해소.
