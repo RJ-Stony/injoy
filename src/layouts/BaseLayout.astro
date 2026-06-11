@@ -1,4 +1,6 @@
 ---
+import ThemeToggle from '../components/ThemeToggle.astro';
+
 interface Props {
   title: string;
   description: string;
@@ -21,6 +23,16 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
+
+    <!-- FOUC 방지: 저장된 테마 선택을 첫 페인트 전에 적용 -->
+    <script is:inline>
+      (() => {
+        const stored = localStorage.getItem('theme');
+        if (stored === 'light' || stored === 'dark') {
+          document.documentElement.dataset.theme = stored;
+        }
+      })();
+    </script>
 
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
@@ -61,9 +73,12 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
     <header class="site-header">
       <div class="site-header-inner">
         <a class="logo" href="/">Injoy</a>
-        <nav aria-label="주 메뉴">
-          <a href="/about/">About</a>
-        </nav>
+        <div class="header-actions">
+          <nav aria-label="주 메뉴">
+            <a href="/about/">About</a>
+          </nav>
+          <ThemeToggle />
+        </div>
       </div>
     </header>
 
@@ -124,6 +139,12 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
   .logo:hover {
     color: var(--accent);
     text-decoration: none;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
   }
 
   .site-header nav {

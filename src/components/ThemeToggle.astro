@@ -1,0 +1,96 @@
+---
+/**
+ * 라이트/다크 수동 전환 토글.
+ * - 기본은 시스템 설정을 따르고, 클릭하면 명시 선택이 localStorage('theme')에 저장된다.
+ * - 현재 적용 중인 테마의 반대로 전환한다.
+ * - 아이콘은 CSS로 전환: 라이트에서는 달(→다크로), 다크에서는 해(→라이트로).
+ */
+---
+
+<button type="button" class="theme-toggle" aria-label="다크 모드로 전환">
+  <svg class="icon-moon" aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+  </svg>
+  <svg class="icon-sun" aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+  </svg>
+</button>
+
+<script>
+  const toggle = document.querySelector<HTMLButtonElement>('.theme-toggle');
+
+  const effectiveTheme = (): 'light' | 'dark' => {
+    const explicit = document.documentElement.dataset.theme;
+    if (explicit === 'light' || explicit === 'dark') return explicit;
+    return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  };
+
+  const updateLabel = () => {
+    toggle?.setAttribute(
+      'aria-label',
+      effectiveTheme() === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환',
+    );
+  };
+
+  updateLabel();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateLabel);
+
+  toggle?.addEventListener('click', () => {
+    const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+
+    document.documentElement.classList.add('theme-transition');
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem('theme', next);
+    updateLabel();
+
+    setTimeout(() => document.documentElement.classList.remove('theme-transition'), 300);
+  });
+</script>
+
+<style>
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background-color: var(--bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .theme-toggle:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+</style>
+
+<style is:global>
+  /* 적용 중인 테마에 따라 아이콘 전환 — 전역 셀렉터가 필요해 is:global */
+  .theme-toggle .icon-sun {
+    display: none;
+  }
+
+  :root[data-theme='dark'] .theme-toggle .icon-sun {
+    display: block;
+  }
+
+  :root[data-theme='dark'] .theme-toggle .icon-moon {
+    display: none;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .theme-toggle .icon-sun {
+      display: block;
+    }
+
+    :root:not([data-theme='light']) .theme-toggle .icon-moon {
+      display: none;
+    }
+  }
+</style>
