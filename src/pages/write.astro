@@ -1,0 +1,1067 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { withBase } from '../utils/url';
+import { EDGE_TYPES } from '../utils/graph';
+
+/**
+ * 인-블로그 글쓰기 에디터.
+ * 이 페이지 자체는 정적 HTML이라 누구나 열 수 있지만, 모든 동작은
+ * 브라우저 localStorage에 저장된 GitHub 토큰(나만 보유)으로만 가능하다.
+ * 발행 = GitHub API로 main에 커밋 → Actions가 자동 배포.
+ */
+const config = {
+  owner: 'RJ-Stony',
+  repo: 'injoy',
+  branch: 'main',
+  base: withBase('/'),
+  siteIndexUrl: withBase('/site-index.json'),
+  postsDir: 'src/content/posts',
+  edgesPath: 'src/data/edges.json',
+};
+
+const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
+  value,
+  label: v.label,
+}));
+---
+
+<BaseLayout title="글쓰기" description="Injoy 운영자 전용 글쓰기 공간." wide>
+  <meta slot="head" name="robots" content="noindex" />
+
+  <!-- 인증 전 -->
+  <section id="auth-card" class="card" hidden>
+    <h1>글쓰기 공간</h1>
+    <p>
+      여기는 운영자 전용 에디터예요. 글을 쓰고 <strong>발행</strong>을 누르면 GitHub에
+      커밋되고, 1~2분 안에 블로그에 올라갑니다. 동작하려면 이 기기에 GitHub 토큰을 한 번
+      저장해야 해요 — 토큰은 <strong>이 브라우저에만</strong> 남고 어디에도 전송되지 않습니다
+      (GitHub API 호출 제외).
+    </p>
+    <ol class="setup-steps">
+      <li>
+        <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">
+          GitHub fine-grained 토큰 만들기 ↗</a>
+        — Repository access를 <code>RJ-Stony/injoy</code>로 제한하고, Permissions에서
+        <code>Contents: Read and write</code>만 켜세요.
+      </li>
+      <li>발급된 토큰을 아래에 붙여넣고 저장.</li>
+    </ol>
+    <div class="token-row">
+      <input id="token-input" type="password" placeholder="github_pat_..." autocomplete="off" />
+      <button id="token-save" type="button" class="primary">이 기기에 저장</button>
+    </div>
+    <p id="auth-error" class="error" hidden></p>
+  </section>
+
+  <!-- 에디터 -->
+  <section id="editor" hidden>
+    <header class="editor-top">
+      <h1 id="editor-title">새 글</h1>
+      <div class="top-actions">
+        <select id="post-picker" aria-label="기존 글 불러오기">
+          <option value="">기존 글 수정…</option>
+        </select>
+        <button id="new-post" type="button">새 글</button>
+        <button id="delete-post" type="button" class="danger" hidden>삭제</button>
+      </div>
+    </header>
+
+    <div class="fm-grid">
+      <label>제목 <input id="fm-title" type="text" placeholder="글 제목" /></label>
+      <label>슬러그(주소) <input id="fm-slug" type="text" placeholder="my-post (영문 소문자·하이픈)" /></label>
+      <label class="span2">한 줄 요약 <input id="fm-description" type="text" placeholder="목록·검색·공유 미리보기에 쓰여요" /></label>
+      <label>카테고리 <input id="fm-category" type="text" value="개발" /></label>
+      <label>태그(콤마로 구분) <input id="fm-tags" type="text" placeholder="astro, blog" /></label>
+      <label>발행일 <input id="fm-date" type="date" /></label>
+      <label class="check"><input id="fm-draft" type="checkbox" checked /> 초안(사이트에 안 보임)</label>
+      <label class="span2 file">대표 이미지(썸네일)
+        <input id="fm-cover" type="file" accept="image/*" />
+        <span id="cover-name" class="muted"></span>
+      </label>
+    </div>
+
+    <div class="editor-pane">
+      <div class="pane">
+        <div class="pane-head">
+          <span>본문 (마크다운 · [[슬러그]]로 글 연결)</span>
+          <button id="insert-image" type="button">이미지 넣기</button>
+          <input id="body-image" type="file" accept="image/*" hidden />
+        </div>
+        <textarea id="fm-body" spellcheck="false" placeholder="여기부터 본문. ## 제목, 코드블록, [[다른-글]] 모두 됩니다."></textarea>
+      </div>
+      <div class="pane preview-pane">
+        <div class="pane-head"><span>간략 미리보기 — 콜아웃·수식·다이어그램은 발행 후 확인</span></div>
+        <div id="preview" class="prose"></div>
+      </div>
+    </div>
+
+    <section class="card sub">
+      <h2>연결 제안 <span class="muted">— 발행하면 그래프에 함께 기록돼요</span></h2>
+      <ul id="suggestions" class="suggestions"></ul>
+      <div class="manual-edge">
+        <select id="edge-target"><option value="">글 선택…</option></select>
+        <select id="edge-type">
+          {edgeTypeOptions.map((o) => <option value={o.value}>{o.label}</option>)}
+        </select>
+        <input id="edge-note" type="text" placeholder="메모(선택)" />
+        <button id="edge-add" type="button">연결 추가</button>
+      </div>
+    </section>
+
+    <section class="card sub">
+      <h2>점검(lint)</h2>
+      <ul id="lint-results" class="lint"></ul>
+    </section>
+
+    <div class="publish-row">
+      <button id="publish" type="button" class="primary big">발행 — 커밋하고 배포</button>
+      <span id="publish-status" role="status"></span>
+    </div>
+
+    <p class="settings muted">
+      <button id="token-clear" type="button" class="linklike">이 기기에서 토큰 지우기</button>
+    </p>
+  </section>
+
+  <script type="application/json" id="write-config" set:html={JSON.stringify(config)} />
+  <script type="application/json" id="edge-type-meta" set:html={JSON.stringify(edgeTypeOptions)} />
+</BaseLayout>
+
+<script>
+  // ---------- 설정·상태 ----------
+  const CFG = JSON.parse(document.getElementById('write-config')!.textContent!);
+  const TOKEN_KEY = 'injoy-gh-token';
+  const API = 'https://api.github.com';
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) =>
+    document.getElementById(id) as T;
+
+  const state = {
+    mode: 'new' as 'new' | 'edit',
+    editingSlug: null as string | null,
+    pendingFiles: new Map<string, string>(), // repo path -> base64
+    coverPath: null as string | null,
+    acceptedEdges: [] as { to: string; type: string; note?: string }[],
+    index: { posts: [] as any[], edges: [] as any[] },
+  };
+
+  const token = () => localStorage.getItem(TOKEN_KEY);
+
+  const gh = async (path: string, init: RequestInit = {}) => {
+    const res = await fetch(`${API}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token()}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        ...(init.headers ?? {}),
+      },
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`GitHub API ${res.status}: ${body.slice(0, 200)}`);
+    }
+    return res.status === 204 ? null : res.json();
+  };
+
+  // ---------- 인증 ----------
+  const showEditor = async () => {
+    $('auth-card').hidden = true;
+    $('editor').hidden = false;
+    await Promise.all([loadIndex(), loadPostList()]);
+    resetForm();
+  };
+
+  const init = async () => {
+    if (!token()) {
+      $('auth-card').hidden = false;
+      return;
+    }
+    try {
+      await gh(`/repos/${CFG.owner}/${CFG.repo}`);
+      await showEditor();
+    } catch {
+      localStorage.removeItem(TOKEN_KEY);
+      $('auth-card').hidden = false;
+      const err = $('auth-error');
+      err.textContent = '저장돼 있던 토큰이 더 이상 유효하지 않아요. 새 토큰을 저장해 주세요.';
+      err.hidden = false;
+    }
+  };
+
+  $('token-save').addEventListener('click', async () => {
+    const value = ($('token-input') as HTMLInputElement).value.trim();
+    if (!value) return;
+    localStorage.setItem(TOKEN_KEY, value);
+    try {
+      await gh(`/repos/${CFG.owner}/${CFG.repo}`);
+      await showEditor();
+    } catch (e) {
+      localStorage.removeItem(TOKEN_KEY);
+      const err = $('auth-error');
+      err.textContent = `토큰 확인 실패 — 권한(Contents RW)과 레포 지정을 확인하세요. ${e}`;
+      err.hidden = false;
+    }
+  });
+
+  $('token-clear').addEventListener('click', () => {
+    localStorage.removeItem(TOKEN_KEY);
+    location.reload();
+  });
+
+  // ---------- 인덱스·글 목록 ----------
+  async function loadIndex() {
+    try {
+      const res = await fetch(CFG.siteIndexUrl, { cache: 'no-store' });
+      state.index = await res.json();
+    } catch {
+      state.index = { posts: [], edges: [] };
+    }
+    const target = $('edge-target') as HTMLSelectElement;
+    target.length = 1;
+    for (const p of state.index.posts) {
+      target.add(new Option(p.title, p.slug));
+    }
+  }
+
+  async function loadPostList() {
+    const picker = $('post-picker') as HTMLSelectElement;
+    picker.length = 1;
+    try {
+      const list = await gh(`/repos/${CFG.owner}/${CFG.repo}/contents/${CFG.postsDir}?ref=${CFG.branch}`);
+      for (const f of list.filter((f: any) => f.type === 'file' && /\.mdx?$/.test(f.name))) {
+        picker.add(new Option(f.name.replace(/\.mdx?$/, ''), f.name));
+      }
+    } catch {
+      /* 목록 실패 시 새 글만 가능 */
+    }
+  }
+
+  // ---------- frontmatter 직렬화·파싱 ----------
+  const yamlEscape = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+  function buildFile(): { slug: string; content: string } {
+    const slug = ($('fm-slug') as HTMLInputElement).value.trim();
+    const tags = ($('fm-tags') as HTMLInputElement).value
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    const lines = [
+      '---',
+      `title: "${yamlEscape(($('fm-title') as HTMLInputElement).value.trim())}"`,
+      `description: "${yamlEscape(($('fm-description') as HTMLInputElement).value.trim())}"`,
+      `pubDate: ${($('fm-date') as HTMLInputElement).value}`,
+      `category: "${yamlEscape(($('fm-category') as HTMLInputElement).value.trim())}"`,
+      `tags: [${tags.map((t) => `"${yamlEscape(t)}"`).join(', ')}]`,
+      `draft: ${($('fm-draft') as HTMLInputElement).checked}`,
+    ];
+    if (state.coverPath) lines.push(`cover: "${state.coverPath}"`);
+    lines.push('---', '', ($('fm-body') as HTMLTextAreaElement).value.trimEnd(), '');
+    return { slug, content: lines.join('\n') };
+  }
+
+  function parseFile(raw: string) {
+    const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+    const fm = m?.[1] ?? '';
+    const body = (m?.[2] ?? raw).replace(/^\r?\n/, '');
+    const pick = (key: string) =>
+      fm.match(new RegExp(`^${key}:\\s*["']?(.*?)["']?\\s*$`, 'm'))?.[1] ?? '';
+    const tags = (fm.match(/^tags:\s*\[(.*)\]\s*$/m)?.[1] ?? '')
+      .split(',')
+      .map((t) => t.trim().replace(/^["']|["']$/g, ''))
+      .filter(Boolean);
+    return {
+      title: pick('title'),
+      description: pick('description'),
+      pubDate: pick('pubDate').slice(0, 10),
+      category: pick('category'),
+      tags,
+      draft: /^draft:\s*true/m.test(fm),
+      cover: pick('cover') || null,
+      body,
+    };
+  }
+
+  // ---------- 미리보기 ----------
+  let marked: any = null;
+  async function renderPreview() {
+    if (!marked) {
+      try {
+        ({ marked } = await import(
+          /* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/marked@16/lib/marked.esm.js'
+        ));
+      } catch {
+        $('preview').textContent = '(미리보기 모듈을 불러오지 못했어요)';
+        return;
+      }
+    }
+    let src = ($('fm-body') as HTMLTextAreaElement).value;
+    // [[위키링크]]를 미리보기에서도 링크로
+    src = src.replace(/\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]+?))?\]\]/g, (_w, slug, label) => {
+      const post = state.index.posts.find((p: any) => p.slug === slug.trim());
+      const text = label?.trim() || post?.title || slug;
+      return post ? `[${text}](${CFG.base}posts/${slug.trim()}/)` : `~~[[${slug}]]~~`;
+    });
+    $('preview').innerHTML = marked.parse(src);
+  }
+
+  let previewTimer: ReturnType<typeof setTimeout>;
+  $('fm-body').addEventListener('input', () => {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => {
+      renderPreview();
+      renderSuggestions();
+      runLint();
+    }, 400);
+  });
+
+  // ---------- 슬러그 자동 ----------
+  $('fm-title').addEventListener('input', () => {
+    const slugEl = $('fm-slug') as HTMLInputElement;
+    if (state.mode === 'edit' || slugEl.dataset.touched) return;
+    const ascii = ($('fm-title') as HTMLInputElement).value
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-');
+    if (ascii) slugEl.value = ascii;
+    runLint();
+  });
+  $('fm-slug').addEventListener('input', () => {
+    ($('fm-slug') as HTMLInputElement).dataset.touched = '1';
+    runLint();
+  });
+
+  // ---------- 이미지 업로드 (발행 시 같은 커밋에 포함) ----------
+  const fileToBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(',')[1]);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+
+  const safeName = (name: string) =>
+    name.toLowerCase().replace(/[^a-z0-9.-]+/g, '-').replace(/-+/g, '-');
+
+  $('fm-cover').addEventListener('change', async (ev) => {
+    const file = (ev.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const slug = ($('fm-slug') as HTMLInputElement).value.trim() || 'post';
+    const name = `${slug}-cover-${safeName(file.name)}`;
+    state.pendingFiles.set(`${CFG.postsDir}/_images/${name}`, await fileToBase64(file));
+    state.coverPath = `./_images/${name}`;
+    $('cover-name').textContent = `발행 시 업로드: ${name}`;
+  });
+
+  $('insert-image').addEventListener('click', () => $('body-image').click());
+  $('body-image').addEventListener('change', async (ev) => {
+    const file = (ev.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const slug = ($('fm-slug') as HTMLInputElement).value.trim() || 'post';
+    const name = `${slug}-${safeName(file.name)}`;
+    state.pendingFiles.set(`${CFG.postsDir}/_images/${name}`, await fileToBase64(file));
+    const ta = $('fm-body') as HTMLTextAreaElement;
+    const md = `\n![설명을 적어 주세요](./_images/${name})\n`;
+    ta.setRangeText(md, ta.selectionStart, ta.selectionStart, 'end');
+    ta.dispatchEvent(new Event('input'));
+  });
+
+  // ---------- 연결 제안 ----------
+  const bigrams = (s: string) => {
+    const grams = new Set<string>();
+    for (const word of s.toLowerCase().replace(/[^0-9a-z가-힣\s]/g, ' ').split(/\s+/)) {
+      if (word.length < 2) continue;
+      for (let i = 0; i < word.length - 1; i++) grams.add(word.slice(i, i + 2));
+    }
+    return grams;
+  };
+  const jaccard = (a: Set<string>, b: Set<string>) => {
+    if (!a.size || !b.size) return 0;
+    let inter = 0;
+    for (const g of a) if (b.has(g)) inter++;
+    return inter / (a.size + b.size - inter);
+  };
+
+  function suggestEdges() {
+    const slug = ($('fm-slug') as HTMLInputElement).value.trim();
+    const tags = ($('fm-tags') as HTMLInputElement).value.split(',').map((t) => t.trim()).filter(Boolean);
+    const text = `${($('fm-title') as HTMLInputElement).value} ${($('fm-description') as HTMLInputElement).value} ${($('fm-body') as HTMLTextAreaElement).value.slice(0, 1500)}`;
+    const mine = bigrams(text);
+    const existing = new Set(
+      state.index.edges.flatMap((e: any) => [`${e.from}→${e.to}`, `${e.to}→${e.from}`]),
+    );
+    return state.index.posts
+      .filter((p: any) => p.slug !== slug && !existing.has(`${slug}→${p.slug}`))
+      .map((p: any) => {
+        const sim = jaccard(mine, bigrams(`${p.title} ${p.description} ${p.tags.join(' ')}`));
+        const tagOverlap = p.tags.filter((t: string) => tags.includes(t)).length;
+        return { post: p, score: sim + tagOverlap * 0.15 };
+      })
+      .filter((s) => s.score >= 0.08)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+  }
+
+  function renderSuggestions() {
+    const ul = $('suggestions');
+    const picked = new Set(state.acceptedEdges.map((e) => e.to));
+    const items = suggestEdges();
+    ul.innerHTML = '';
+    if (items.length === 0 && state.acceptedEdges.length === 0) {
+      ul.innerHTML = '<li class="muted">아직 비슷한 글이 없어요. 본문을 쓰면 자동으로 제안됩니다.</li>';
+    }
+    for (const { post, score } of items) {
+      if (picked.has(post.slug)) continue;
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '+ 연결';
+      btn.addEventListener('click', () => {
+        state.acceptedEdges.push({ to: post.slug, type: 'related', note: '자동 제안(유사도)' });
+        renderSuggestions();
+      });
+      li.append(
+        Object.assign(document.createElement('span'), { textContent: post.title, className: 'sug-title' }),
+        Object.assign(document.createElement('span'), {
+          textContent: ` 유사도 ${(score * 100).toFixed(0)}% `,
+          className: 'muted',
+        }),
+        btn,
+      );
+      ul.appendChild(li);
+    }
+    for (const [i, e] of state.acceptedEdges.entries()) {
+      const p = state.index.posts.find((p: any) => p.slug === e.to);
+      const li = document.createElement('li');
+      li.className = 'accepted';
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.textContent = '빼기';
+      rm.addEventListener('click', () => {
+        state.acceptedEdges.splice(i, 1);
+        renderSuggestions();
+      });
+      li.append(
+        Object.assign(document.createElement('span'), {
+          textContent: `${labelOf(e.type)} → ${p?.title ?? e.to}`,
+          className: 'sug-title',
+        }),
+        rm,
+      );
+      ul.appendChild(li);
+    }
+  }
+
+  const EDGE_META = JSON.parse(document.getElementById('edge-type-meta')!.textContent!);
+  const labelOf = (t: string) => EDGE_META.find((m: any) => m.value === t)?.label ?? t;
+
+  $('edge-add').addEventListener('click', () => {
+    const to = ($('edge-target') as HTMLSelectElement).value;
+    if (!to) return;
+    state.acceptedEdges.push({
+      to,
+      type: ($('edge-type') as HTMLSelectElement).value,
+      note: ($('edge-note') as HTMLInputElement).value.trim() || undefined,
+    });
+    ($('edge-note') as HTMLInputElement).value = '';
+    renderSuggestions();
+  });
+
+  // ---------- lint ----------
+  function stripFences(body: string) {
+    const out: string[] = [];
+    let fence: string | null = null;
+    for (const line of body.split('\n')) {
+      const run = line.match(/^\s*(`{3,})/)?.[1];
+      if (fence) {
+        if (run && run.length >= fence.length) fence = null;
+        continue;
+      }
+      if (run) {
+        fence = run;
+        continue;
+      }
+      out.push(line);
+    }
+    return out.join('\n').replace(/`[^`\n]*`/g, ' ');
+  }
+
+  function runLint(): { errors: string[]; warnings: string[] } {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    const title = ($('fm-title') as HTMLInputElement).value.trim();
+    const slug = ($('fm-slug') as HTMLInputElement).value.trim();
+    const desc = ($('fm-description') as HTMLInputElement).value.trim();
+    const body = ($('fm-body') as HTMLTextAreaElement).value;
+
+    if (!title) errors.push('제목이 비어 있어요.');
+    if (!slug) errors.push('슬러그가 비어 있어요.');
+    else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) errors.push('슬러그는 영문 소문자·숫자·하이픈만 쓸 수 있어요.');
+    else if (state.mode === 'new' && state.index.posts.some((p: any) => p.slug === slug))
+      errors.push(`이미 같은 슬러그의 글이 있어요: ${slug}`);
+    if (!desc) errors.push('한 줄 요약이 비어 있어요.');
+    else if (desc.length > 160) warnings.push(`한 줄 요약이 길어요(${desc.length}자) — 160자 이하 권장.`);
+    if (!($('fm-date') as HTMLInputElement).value) errors.push('발행일을 선택하세요.');
+    if (!body.trim()) errors.push('본문이 비어 있어요.');
+
+    const prose = stripFences(body);
+    for (const m of prose.matchAll(/\[\[([^\[\]|\n]+?)(?:\|[^\[\]\n]+?)?\]\]/g)) {
+      const target = m[1].trim();
+      if (target !== slug && !state.index.posts.some((p: any) => p.slug === target))
+        warnings.push(`위키링크 [[${target}]] 대상 글을 찾을 수 없어요(초안이면 발행 후 연결됩니다).`);
+    }
+    if (/!\[\]\(/.test(body)) warnings.push('alt 텍스트가 빈 이미지가 있어요 — 설명을 적어 주세요.');
+    if (((body.match(/\$\$/g) ?? []).length % 2) === 1) warnings.push('$$ 수식 블록이 닫히지 않은 것 같아요.');
+    if (($('fm-draft') as HTMLInputElement).checked) warnings.push('draft 상태예요 — 발행해도 사이트에는 보이지 않습니다.');
+
+    const ul = $('lint-results');
+    ul.innerHTML = '';
+    for (const e of errors) ul.insertAdjacentHTML('beforeend', `<li class="err">✕ ${e}</li>`);
+    for (const w of warnings) ul.insertAdjacentHTML('beforeend', `<li class="warn">△ ${w}</li>`);
+    if (!errors.length && !warnings.length) ul.innerHTML = '<li class="ok">✓ 통과 — 발행할 준비가 됐어요.</li>';
+    return { errors, warnings };
+  }
+  ['fm-title', 'fm-description', 'fm-tags', 'fm-date', 'fm-category'].forEach((id) =>
+    $(id).addEventListener('input', runLint),
+  );
+  $('fm-draft').addEventListener('change', runLint);
+
+  // ---------- 발행 (Git Data API — 단일 커밋) ----------
+  const b64encodeUtf8 = (s: string) => {
+    const bytes = new TextEncoder().encode(s);
+    let bin = '';
+    bytes.forEach((b) => (bin += String.fromCharCode(b)));
+    return btoa(bin);
+  };
+  const b64decodeUtf8 = (b64: string) => {
+    const bin = atob(b64.replace(/\n/g, ''));
+    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  };
+
+  async function commitFiles(
+    files: { path: string; contentBase64: string }[],
+    deletions: string[],
+    message: string,
+  ): Promise<string> {
+    const repo = `/repos/${CFG.owner}/${CFG.repo}`;
+    const ref = await gh(`${repo}/git/ref/heads/${CFG.branch}`);
+    const baseSha = ref.object.sha;
+    const baseCommit = await gh(`${repo}/git/commits/${baseSha}`);
+
+    const tree: any[] = [];
+    for (const f of files) {
+      const blob = await gh(`${repo}/git/blobs`, {
+        method: 'POST',
+        body: JSON.stringify({ content: f.contentBase64, encoding: 'base64' }),
+      });
+      tree.push({ path: f.path, mode: '100644', type: 'blob', sha: blob.sha });
+    }
+    for (const path of deletions) {
+      tree.push({ path, mode: '100644', type: 'blob', sha: null });
+    }
+
+    const newTree = await gh(`${repo}/git/trees`, {
+      method: 'POST',
+      body: JSON.stringify({ base_tree: baseCommit.tree.sha, tree }),
+    });
+    const commit = await gh(`${repo}/git/commits`, {
+      method: 'POST',
+      body: JSON.stringify({ message, tree: newTree.sha, parents: [baseSha] }),
+    });
+    await gh(`${repo}/git/refs/heads/${CFG.branch}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ sha: commit.sha }),
+    });
+    return commit.sha;
+  }
+
+  async function fetchEdges() {
+    try {
+      const file = await gh(
+        `/repos/${CFG.owner}/${CFG.repo}/contents/${CFG.edgesPath}?ref=${CFG.branch}`,
+      );
+      return JSON.parse(b64decodeUtf8(file.content));
+    } catch (e) {
+      if (String(e).includes('404')) return { edges: [] }; // 아직 연결 파일이 없는 레포
+      throw e;
+    }
+  }
+  const edgesToString = (data: any) => JSON.stringify(data, null, 2) + '\n';
+
+  async function mergedEdgesFile(slug: string): Promise<string | null> {
+    if (state.acceptedEdges.length === 0) return null;
+    const data = await fetchEdges();
+    const existing = new Set(data.edges.map((e: any) => `${e.from}→${e.to}:${e.type}`));
+    for (const e of state.acceptedEdges) {
+      if (e.to === slug) continue;
+      if (existing.has(`${slug}→${e.to}:${e.type}`)) continue;
+      data.edges.push({ from: slug, to: e.to, type: e.type, ...(e.note ? { note: e.note } : {}) });
+    }
+    return edgesToString(data);
+  }
+
+  /** 삭제되는 글을 가리키는 연결을 함께 정리 — 남겨 두면 다음 빌드가 실패한다 */
+  async function edgesFileWithout(slug: string): Promise<string | null> {
+    const data = await fetchEdges();
+    const kept = data.edges.filter((e: any) => e.from !== slug && e.to !== slug);
+    if (kept.length === data.edges.length) return null;
+    return edgesToString({ ...data, edges: kept });
+  }
+
+  async function waitForDeploy(sha: string) {
+    const status = $('publish-status');
+    for (let i = 0; i < 40; i++) {
+      await new Promise((r) => setTimeout(r, 6000));
+      try {
+        const runs = await gh(
+          `/repos/${CFG.owner}/${CFG.repo}/actions/runs?head_sha=${sha}&per_page=1`,
+        );
+        const run = runs.workflow_runs?.[0];
+        if (!run) continue;
+        if (run.status !== 'completed') {
+          status.textContent = `배포 중… (${run.status})`;
+          continue;
+        }
+        return run.conclusion === 'success';
+      } catch {
+        /* 일시 오류 무시 */
+      }
+    }
+    return null;
+  }
+
+  $('publish').addEventListener('click', async () => {
+    const { errors, warnings } = runLint();
+    if (errors.length) {
+      $('publish-status').textContent = '점검 오류를 먼저 해결해 주세요.';
+      return;
+    }
+    if (warnings.length && !confirm(`경고 ${warnings.length}건이 있어요. 그래도 발행할까요?`)) return;
+
+    const btn = $('publish') as HTMLButtonElement;
+    btn.disabled = true;
+    const status = $('publish-status');
+    status.textContent = '커밋 만드는 중…';
+
+    try {
+      const { slug, content } = buildFile();
+      const isDraft = ($('fm-draft') as HTMLInputElement).checked;
+      const files: { path: string; contentBase64: string }[] = [
+        { path: `${CFG.postsDir}/${slug}.md`, contentBase64: b64encodeUtf8(content) },
+      ];
+      for (const [path, b64] of state.pendingFiles) files.push({ path, contentBase64: b64 });
+      // draft 글의 연결은 보류 — 그래프 검증이 발행 글만 알기 때문에 빌드가 깨진다.
+      // draft를 해제하고 다시 발행할 때 함께 저장하면 된다.
+      if (!isDraft) {
+        const edgesContent = await mergedEdgesFile(slug);
+        if (edgesContent) files.push({ path: CFG.edgesPath, contentBase64: b64encodeUtf8(edgesContent) });
+      } else if (state.acceptedEdges.length > 0) {
+        status.textContent = '초안이라 연결은 이번 커밋에 저장하지 않아요 (발행 시 함께 저장).';
+      }
+
+      const verb = state.mode === 'edit' ? '수정' : '발행';
+      const sha = await commitFiles(files, [], `post: ${($('fm-title') as HTMLInputElement).value.trim()} ${verb} (/write)`);
+
+      status.textContent = '커밋 완료 — 배포 기다리는 중…';
+      const ok = await waitForDeploy(sha);
+      if (ok === true) {
+        const url = `${CFG.base}posts/${slug}/`;
+        status.innerHTML = `✓ 발행 완료 — <a href="${url}">글 보러 가기</a>`;
+        state.pendingFiles.clear();
+        state.acceptedEdges = [];
+        state.mode = 'edit';
+        state.editingSlug = slug;
+        $('delete-post').hidden = false;
+        await Promise.all([loadIndex(), loadPostList()]);
+      } else if (ok === false) {
+        status.textContent = '✕ 배포 실패 — GitHub Actions 로그를 확인하세요.';
+      } else {
+        status.textContent = '커밋은 됐지만 배포 확인이 늦어지고 있어요 — Actions에서 확인하세요.';
+      }
+    } catch (e) {
+      status.textContent = `✕ 발행 실패: ${e}`;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ---------- 글 불러오기·삭제·초기화 ----------
+  $('post-picker').addEventListener('change', async (ev) => {
+    const filename = (ev.target as HTMLSelectElement).value;
+    if (!filename) return;
+    const file = await gh(
+      `/repos/${CFG.owner}/${CFG.repo}/contents/${CFG.postsDir}/${filename}?ref=${CFG.branch}`,
+    );
+    const parsed = parseFile(b64decodeUtf8(file.content));
+    state.mode = 'edit';
+    state.editingSlug = filename.replace(/\.mdx?$/, '');
+    state.pendingFiles.clear();
+    state.acceptedEdges = [];
+    state.coverPath = parsed.cover;
+
+    $('editor-title').textContent = `수정: ${parsed.title}`;
+    ($('fm-title') as HTMLInputElement).value = parsed.title;
+    const slugEl = $('fm-slug') as HTMLInputElement;
+    slugEl.value = state.editingSlug;
+    slugEl.disabled = true;
+    ($('fm-description') as HTMLInputElement).value = parsed.description;
+    ($('fm-category') as HTMLInputElement).value = parsed.category;
+    ($('fm-tags') as HTMLInputElement).value = parsed.tags.join(', ');
+    ($('fm-date') as HTMLInputElement).value = parsed.pubDate;
+    ($('fm-draft') as HTMLInputElement).checked = parsed.draft;
+    ($('fm-body') as HTMLTextAreaElement).value = parsed.body;
+    $('cover-name').textContent = parsed.cover ? `현재: ${parsed.cover}` : '';
+    $('delete-post').hidden = false;
+    renderPreview();
+    renderSuggestions();
+    runLint();
+  });
+
+  $('delete-post').addEventListener('click', async () => {
+    if (!state.editingSlug) return;
+    if (!confirm(`"${state.editingSlug}" 글을 정말 삭제할까요? 커밋으로 기록되어 되돌릴 수 있습니다.`)) return;
+    const status = $('publish-status');
+    try {
+      status.textContent = '삭제 커밋 만드는 중…';
+      const cleanedEdges = await edgesFileWithout(state.editingSlug);
+      await commitFiles(
+        cleanedEdges
+          ? [{ path: CFG.edgesPath, contentBase64: b64encodeUtf8(cleanedEdges) }]
+          : [],
+        [`${CFG.postsDir}/${state.editingSlug}.md`],
+        `post: ${state.editingSlug} 삭제 (/write)`,
+      );
+      resetForm(); // resetForm이 상태 문구를 비우므로 성공 메시지는 그 뒤에
+      status.textContent = '✓ 삭제 커밋 완료 — 곧 사이트에서 사라집니다 (관련 연결도 정리됨).';
+      await Promise.all([loadIndex(), loadPostList()]);
+    } catch (e) {
+      status.textContent = `✕ 삭제 실패: ${e}`;
+    }
+  });
+
+  function resetForm() {
+    state.mode = 'new';
+    state.editingSlug = null;
+    state.pendingFiles.clear();
+    state.acceptedEdges = [];
+    state.coverPath = null;
+    $('editor-title').textContent = '새 글';
+    ($('post-picker') as HTMLSelectElement).value = '';
+    const slugEl = $('fm-slug') as HTMLInputElement;
+    slugEl.disabled = false;
+    slugEl.value = '';
+    delete slugEl.dataset.touched;
+    for (const id of ['fm-title', 'fm-description', 'fm-tags']) ($(id) as HTMLInputElement).value = '';
+    ($('fm-category') as HTMLInputElement).value = '개발';
+    ($('fm-date') as HTMLInputElement).value = new Date().toISOString().slice(0, 10);
+    ($('fm-draft') as HTMLInputElement).checked = true;
+    ($('fm-body') as HTMLTextAreaElement).value = '';
+    $('cover-name').textContent = '';
+    $('delete-post').hidden = true;
+    $('publish-status').textContent = '';
+    renderPreview();
+    renderSuggestions();
+    runLint();
+  }
+
+  $('new-post').addEventListener('click', resetForm);
+
+  init();
+</script>
+
+<style>
+  .card {
+    max-width: var(--width-content);
+    margin-inline: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--surface);
+    padding: 1.6rem 1.8rem;
+  }
+
+  .card h1 {
+    margin: 0 0 0.6rem;
+    font-size: 1.5rem;
+    font-weight: 800;
+  }
+
+  .setup-steps {
+    padding-inline-start: 1.3em;
+    line-height: 1.8;
+  }
+
+  .token-row {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 1rem;
+  }
+
+  .token-row input {
+    flex: 1;
+  }
+
+  .error {
+    color: light-dark(#cf222e, #e5695e);
+    font-size: 0.9rem;
+  }
+
+  .editor-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding-block: 0.5rem 1.2rem;
+  }
+
+  .editor-top h1 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 800;
+  }
+
+  .top-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .fm-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem 1.2rem;
+    margin-bottom: 1.2rem;
+  }
+
+  .fm-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .fm-grid .span2 {
+    grid-column: span 2;
+  }
+
+  .fm-grid .check {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .fm-grid .file input[type='file'] {
+    border: 0;
+    padding: 0;
+  }
+
+  input[type='text'],
+  input[type='password'],
+  input[type='date'],
+  select,
+  textarea {
+    font: inherit;
+    color: var(--text);
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5em 0.8em;
+  }
+
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .editor-pane {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+    margin-bottom: 1.2rem;
+  }
+
+  @media (max-width: 900px) {
+    .editor-pane {
+      grid-template-columns: 1fr;
+    }
+
+    .fm-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .fm-grid .span2 {
+      grid-column: span 1;
+    }
+  }
+
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  #fm-body {
+    width: 100%;
+    min-height: 420px;
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
+    line-height: 1.7;
+    resize: vertical;
+  }
+
+  #preview {
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    min-height: 420px;
+    font-size: 0.95rem;
+    overflow-y: auto;
+    max-height: 70vh;
+  }
+
+  .card.sub {
+    max-width: none;
+    padding: 1.1rem 1.4rem;
+    margin-bottom: 1.2rem;
+  }
+
+  .card.sub h2 {
+    margin: 0 0 0.6rem;
+    font-size: 1rem;
+  }
+
+  .suggestions {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .suggestions li {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.35rem 0;
+  }
+
+  .suggestions .sug-title {
+    font-weight: 600;
+  }
+
+  .suggestions li.accepted {
+    color: var(--accent);
+  }
+
+  .manual-edge {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.8rem;
+  }
+
+  .manual-edge input {
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .lint {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    line-height: 1.9;
+    font-size: 0.9rem;
+  }
+
+  .lint .err {
+    color: light-dark(#cf222e, #e5695e);
+  }
+
+  .lint .warn {
+    color: light-dark(#9a6700, #d9a83c);
+  }
+
+  .lint .ok {
+    color: light-dark(#1a7f4f, #4ecb96);
+  }
+
+  button {
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text);
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.45em 1em;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+
+  button:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  button.primary {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  button.primary:hover {
+    color: #fff;
+    opacity: 0.92;
+  }
+
+  button.primary.big {
+    font-size: 1rem;
+    padding: 0.7em 1.6em;
+  }
+
+  button.danger {
+    color: light-dark(#cf222e, #e5695e);
+  }
+
+  button.danger:hover {
+    border-color: light-dark(#cf222e, #e5695e);
+  }
+
+  button.linklike {
+    border: 0;
+    background: none;
+    padding: 0;
+    font-weight: 400;
+    text-decoration: underline;
+    color: var(--text-muted);
+  }
+
+  .publish-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  #publish-status {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+
+  .muted {
+    color: var(--text-muted);
+    font-weight: 400;
+    font-size: 0.85em;
+  }
+
+  .settings {
+    margin-top: 2rem;
+  }
+</style>
