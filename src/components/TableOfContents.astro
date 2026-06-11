@@ -3,9 +3,11 @@ import type { MarkdownHeading } from 'astro';
 
 interface Props {
   headings: MarkdownHeading[];
+  /** box: 본문 상단 카드형(기본) / rail: 데스크톱 사이드바용 미니멀 레일 */
+  variant?: 'box' | 'rail';
 }
 
-const { headings } = Astro.props;
+const { headings, variant = 'box' } = Astro.props;
 // footnote-label은 각주 섹션이 자동 생성하는 제목이므로 목차에서 제외
 const items = headings.filter(
   (h) => (h.depth === 2 || h.depth === 3) && h.slug !== 'footnote-label',
@@ -14,7 +16,7 @@ const items = headings.filter(
 
 {
   items.length > 0 && (
-    <nav class="toc" aria-label="목차">
+    <nav class:list={['toc', variant]} aria-label="목차">
       <p class="toc-title">목차</p>
       <ul>
         {items.map((h) => (
@@ -29,12 +31,21 @@ const items = headings.filter(
 
 <style>
   .toc {
+    font-size: 0.9rem;
+    line-height: 1.7;
+  }
+
+  .toc.box {
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 1.1rem 1.4rem;
-    font-size: 0.9rem;
-    line-height: 1.7;
+  }
+
+  .toc.rail {
+    border-inline-start: 2px solid var(--border);
+    padding-inline-start: 1.1rem;
+    font-size: 0.85rem;
   }
 
   .toc-title {

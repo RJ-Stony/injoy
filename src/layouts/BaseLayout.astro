@@ -8,9 +8,11 @@ interface Props {
   ogType?: 'website' | 'article';
   /** OG 이미지 경로 (사이트 기준 절대 경로 또는 빌드된 에셋 경로) */
   ogImage?: string;
+  /** true면 본문 컨테이너를 넓혀 사이드바(목차 등)를 둘 수 있다 */
+  wide?: boolean;
 }
 
-const { title, description, ogType = 'website', ogImage } = Astro.props;
+const { title, description, ogType = 'website', ogImage, wide = false } = Astro.props;
 const ogImageURL = ogImage ? new URL(ogImage, Astro.site) : undefined;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const siteName = 'Injoy';
@@ -82,7 +84,7 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
       </div>
     </header>
 
-    <main id="main">
+    <main id="main" class:list={[{ wide }]}>
       <slot />
     </main>
 
@@ -167,6 +169,13 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
     max-width: var(--width-wide);
     margin-inline: auto;
     padding: 2.5rem 1.25rem 5rem;
+  }
+
+  /* 글 상세처럼 사이드바가 필요한 페이지는 와이드 화면에서만 넓어진다 */
+  @media (min-width: 1100px) {
+    main.wide {
+      max-width: 1080px;
+    }
   }
 
   .site-footer {

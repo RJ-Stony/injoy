@@ -22,7 +22,9 @@ const cover = post.data.cover;
   description={post.data.description}
   ogType="article"
   ogImage={cover?.src}
+  wide
 >
+  <div class="post-grid">
   <article class="post">
     <header class="post-header">
       <PostMeta category={post.data.category} pubDate={post.data.pubDate} minutes={minutes} />
@@ -31,7 +33,9 @@ const cover = post.data.cover;
       {cover && <Image class="cover" src={cover} alt="" loading="eager" />}
     </header>
 
-    <TableOfContents headings={headings} />
+    <div class="toc-inline">
+      <TableOfContents headings={headings} />
+    </div>
 
     <div class="prose">
       <Content />
@@ -51,6 +55,13 @@ const cover = post.data.cover;
       )
     }
   </article>
+
+  <aside class="toc-aside">
+    <div class="toc-sticky">
+      <TableOfContents headings={headings} variant="rail" />
+    </div>
+  </aside>
+  </div>
 </BaseLayout>
 
 <script>
@@ -88,12 +99,49 @@ const cover = post.data.cover;
 </script>
 
 <style>
+  .post-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+
   .post {
     max-width: var(--width-content);
+    width: 100%;
     margin-inline: auto;
     display: flex;
     flex-direction: column;
     gap: 2rem;
+  }
+
+  /* 좁은 화면: 인라인 목차, 사이드바 숨김 */
+  .toc-aside {
+    display: none;
+  }
+
+  /* 와이드 화면: 목차를 우측 sticky 사이드바로 */
+  @media (min-width: 1100px) {
+    .post-grid {
+      grid-template-columns: minmax(0, var(--width-content)) 220px;
+      justify-content: center;
+      justify-items: stretch;
+      column-gap: 3.5rem;
+    }
+
+    .toc-inline {
+      display: none;
+    }
+
+    .toc-aside {
+      display: block;
+    }
+
+    .toc-sticky {
+      position: sticky;
+      top: 2.5rem;
+      max-height: calc(100vh - 5rem);
+      overflow-y: auto;
+    }
   }
 
   .post-header h1 {
