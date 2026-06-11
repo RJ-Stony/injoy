@@ -66,6 +66,52 @@ const cover = post.data.cover;
 </BaseLayout>
 
 <script>
+  // ```mermaid 코드블록 → 다이어그램 렌더 (라이트/다크 테마 연동, CDN 지연 로드)
+  const mermaidBlocks = document.querySelectorAll<HTMLPreElement>(
+    '.prose pre.astro-code[data-language="mermaid"]',
+  );
+  if (mermaidBlocks.length > 0) {
+    const containers: HTMLDivElement[] = [];
+    for (const pre of mermaidBlocks) {
+      const div = document.createElement('div');
+      div.className = 'mermaid-diagram';
+      div.dataset.source = pre.textContent ?? '';
+      (pre.closest('.code-block') ?? pre).replaceWith(div);
+      containers.push(div);
+    }
+
+    const effectiveTheme = () => {
+      const explicit = document.documentElement.dataset.theme;
+      if (explicit === 'light' || explicit === 'dark') return explicit;
+      return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    };
+
+    let seq = 0;
+    const renderAll = async () => {
+      const { default: mermaid } = await import(
+        /* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs'
+      );
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'strict',
+        theme: effectiveTheme() === 'dark' ? 'dark' : 'neutral',
+        fontFamily: 'inherit',
+      });
+      for (const container of containers) {
+        try {
+          const { svg } = await mermaid.render(`injoy-mmd-${seq++}`, container.dataset.source ?? '');
+          container.innerHTML = svg;
+        } catch {
+          container.textContent = '다이어그램을 렌더링하지 못했어요.';
+        }
+      }
+    };
+
+    renderAll();
+    window.addEventListener('injoy:theme-change', renderAll);
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll);
+  }
+
   // 코드블록 복사 버튼 — 언어 지정 시 Shiki가 만든 pre.astro-code에 부착
   for (const pre of document.querySelectorAll<HTMLPreElement>('.prose pre')) {
     const code = pre.querySelector('code');
@@ -138,9 +184,10 @@ const cover = post.data.cover;
     }
 
     .toc-sticky {
+      /* sticky 헤더 높이만큼 내려서 고정 */
       position: sticky;
-      top: 2.5rem;
-      max-height: calc(100vh - 5rem);
+      top: 5.5rem;
+      max-height: calc(100vh - 7rem);
       overflow-y: auto;
     }
   }

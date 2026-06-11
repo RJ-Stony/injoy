@@ -127,6 +127,47 @@ const config = {
 };
 ```
 
+## 수식
+
+인라인 수식은 `$...$`로 쓴다. 질량-에너지 등가 $E = mc^2$ 처럼 문장 속에 자연스럽게 녹는다.
+블록 수식은 `$$`로 감싼다.
+
+$$
+\int_0^1 x^2 \, dx = \left[ \frac{x^3}{3} \right]_0^1 = \frac{1}{3}
+$$
+
+긴 수식은 가로 스크롤로 처리된다.
+
+$$
+f(x) = a_0 + \sum_{n=1}^{\infty} \left( a_n \cos \frac{n\pi x}{L} + b_n \sin \frac{n\pi x}{L} \right)
+$$
+
+## 다이어그램
+
+` ```mermaid ` 코드블록은 다이어그램으로 렌더링된다. 라이트/다크 테마도 함께 바뀐다.
+
+```mermaid
+flowchart LR
+    A[마크다운 작성] --> B{draft?}
+    B -- "false" --> C[빌드 & 배포]
+    B -- "true" --> D[로컬 미리보기]
+    D --> A
+```
+
+```mermaid
+sequenceDiagram
+    participant 나
+    participant Injoy
+    나->>Injoy: git push
+    Injoy->>Injoy: 빌드 (Actions)
+    Injoy-->>나: 발행 완료
+```
+
+## 이모지
+
+`:rocket:` 같은 숏코드는 이모지로 바뀌고 :rocket:, 직접 입력한 이모지도 🌱
+모두 Tossface 글꼴로 가지런히 표시된다 :sparkles:
+
 ## 표
 
 | 요소 | 문법 | 비고 |
@@ -140,8 +181,9 @@ const config = {
 
 이미지는 본문 폭에 맞춰 줄어들며 모서리가 둥글게 처리된다. `alt` 텍스트는 꼭 쓰자.
 글 파일 기준 상대 경로로 넣으면 Astro가 알아서 최적화하고 `loading="lazy"`를 붙인다.
+경로 뒤에 `"따옴표"`로 제목을 적으면 캡션이 된다.
 
-![Injoy의 디자인 토큰을 요약한 다이어그램 — 흰 배경, 블루 포인트, 680px 본문 폭](../../assets/markdown-demo.svg)
+![Injoy의 디자인 토큰을 요약한 다이어그램 — 흰 배경, 블루 포인트, 680px 본문 폭](../../assets/markdown-demo.svg "Injoy 디자인 토큰 한 장 요약 — 캡션은 이렇게 붙는다")
 
 ## 각주
 

@@ -426,6 +426,29 @@ a:hover {
   color: light-dark(#cf222e, #e5695e);
 }
 
+/* 수식 (KaTeX) — 긴 수식은 가로 스크롤 */
+.prose .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.3em;
+}
+
+/* 다이어그램 (Mermaid) */
+.prose .mermaid-diagram {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  padding: 1.2em;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.prose .mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
 /* 체크박스(task list) */
 .prose input[type='checkbox'] {
   accent-color: var(--accent);

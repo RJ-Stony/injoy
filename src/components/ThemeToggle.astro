@@ -43,6 +43,8 @@
     document.documentElement.dataset.theme = next;
     localStorage.setItem('theme', next);
     updateLabel();
+    // 테마에 반응해야 하는 스크립트(머메이드 다이어그램 등)에 알림
+    window.dispatchEvent(new CustomEvent('injoy:theme-change'));
 
     setTimeout(() => document.documentElement.classList.remove('theme-transition'), 300);
   });
