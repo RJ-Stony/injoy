@@ -4,6 +4,17 @@
 [Astro](https://astro.build) 기반이며, 순백 배경·큰 본문 타이포·절제된 블루 포인트의
 정갈한 디자인을 지향합니다.
 
+**라이브:** https://rj-stony.github.io/injoy/ (GitHub Pages, `main` 푸시마다 자동 배포)
+
+주요 기능
+
+- 마크다운 파일 추가 = 발행 (frontmatter는 zod로 검증)
+- 라이트/다크 자동(시스템) + 헤더 토글로 수동 전환
+- 코드 하이라이트(Shiki)·복사 버튼·줄 강조/diff 표기
+- 콜아웃(`> [!NOTE]`), 각주, GFM 표·체크리스트
+- 자동 목차 — 좁은 화면은 본문 상단 카드, 와이드 화면은 우측 sticky 사이드바
+- RSS·사이트맵 자동 생성, 반응형(360px~)·접근성 기본기
+
 ## 빠른 시작
 
 ```bash
@@ -14,6 +25,7 @@ npm run dev      # http://localhost:4321
 | 명령 | 설명 |
 | --- | --- |
 | `npm run dev` | 로컬 개발 서버 (draft 글도 보임) |
+| `npm run new -- <slug> "제목"` | 새 글 스캐폴드 (draft 상태로 생성) |
 | `npm run build` | 프로덕션 빌드 → `dist/` |
 | `npm run preview` | 빌드 결과를 로컬에서 확인 |
 | `bash scripts/verify.sh` | 빌드·산출물·발행 워크플로우 자체 점검 |
@@ -27,13 +39,21 @@ Node 18 이상이 필요합니다.
 
 ### 1. 파일 만들기
 
+```bash
+npm run new -- my-first-post "첫 글입니다"   # 스캐폴드 한 줄로 시작
+```
+
+또는 직접 만들어도 됩니다.
+
 ```text
-src/content/posts/my-first-post.md  →  https://내도메인/posts/my-first-post/
+src/content/posts/my-first-post.md  →  https://rj-stony.github.io/injoy/posts/my-first-post/
 ```
 
 - **파일명이 곧 주소(slug)** 가 됩니다. 영문 소문자와 하이픈을 권장합니다.
   (한글 파일명도 동작하지만 URL이 길게 인코딩됩니다.)
 - 본문에 컴포넌트를 넣고 싶으면 `.mdx` 확장자를 쓰면 됩니다.
+- `npm run new`로 만든 글은 `draft: true` 상태라 dev에서만 보입니다.
+  발행할 때 `draft: false`로 바꾸세요.
 
 ### 2. frontmatter 작성
 
@@ -78,9 +98,13 @@ draft: true
 ### 4. 본문에서 쓸 수 있는 것
 
 - GFM 문법: 표, 체크박스(`- [ ]`), 취소선(`~~`)
+- 콜아웃: `> [!NOTE]` `[!TIP]` `[!IMPORTANT]` `[!WARNING]` `[!CAUTION]` (한국어 라벨로 렌더)
+- 각주: 본문에 `[^1]`, 아무 곳에나 `[^1]: 내용`
 - 코드블록: 언어를 지정하면 Shiki 하이라이트 + 복사 버튼 (라이트/다크 자동 전환)
-- `##`/`###` 제목은 글 상단 목차에 자동 수집
-- 이미지: `![alt](./image.png)` — `alt`를 꼭 적어 주세요
+  - 줄 끝에 `// [!code highlight]` `// [!code ++]` `// [!code --]`로 줄 강조·diff 표기
+- `##`/`###` 제목은 목차에 자동 수집 (와이드 화면에선 우측 sticky 사이드바)
+- 이미지: `![alt](../../assets/image.png)` — 글 기준 상대 경로면 자동 최적화 + lazy 로딩.
+  `alt`를 꼭 적어 주세요
 
 샘플은 발행되어 있는 세 글
 ([welcome](src/content/posts/welcome.md),
@@ -98,74 +122,38 @@ RSS(`/rss.xml`)와 사이트맵(`/sitemap-index.xml`)은 빌드할 때마다 자
 
 ## 배포
 
-### 공통: `site` 값 교체
+### 현재 상태 — GitHub Pages (운영 중)
 
-배포 전에 [astro.config.mjs](astro.config.mjs)의 `site`를 실제 도메인으로 바꿔 주세요.
-RSS·사이트맵·canonical URL이 이 값을 사용합니다.
+이 레포는 이미 GitHub Pages로 배포되어 있습니다.
+
+- **주소:** https://rj-stony.github.io/injoy/
+- **방식:** [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
+  (`withastro/action@v6` + `actions/deploy-pages@v4`)이 `main` 푸시마다 빌드·배포
+- **설정:** 레포 Settings → Pages → Source = GitHub Actions (이미 설정됨)
+
+즉, **글을 커밋하고 `main`에 푸시하면 그게 곧 배포**입니다.
+
+### 도메인을 바꾸려면
+
+배포 주소는 [astro.config.mjs](astro.config.mjs) 상단의 상수 두 개가 결정합니다.
 
 ```js
-export default defineConfig({
-  site: 'https://your-domain.com',  // ← placeholder(injoy.example.com)를 교체
-  // ...
-});
+const SITE = 'https://rj-stony.github.io'; // 배포 도메인
+const BASE = '/injoy';                     // 하위 경로 (루트 배포면 '/')
 ```
 
-### 방법 1 — Vercel (권장, 가장 간단)
+- **다른 GitHub Pages 레포**: `SITE`/`BASE`를 새 주소에 맞게 수정
+- **사용자 페이지(`<유저명>.github.io` 레포)나 커스텀 도메인**: `SITE`만 바꾸고 `BASE = '/'`
+- RSS·사이트맵·canonical·내부 링크가 전부 이 값을 따라가므로 다른 파일은 손댈 필요 없습니다.
+  (컴포넌트는 `withBase()` 헬퍼, 마크다운 본문 링크는 `rehype-base-links` 플러그인이 처리)
 
-1. 레포를 GitHub에 푸시합니다.
-2. [vercel.com](https://vercel.com)에서 **Add New → Project** 로 레포를 연결합니다.
-3. 프레임워크가 **Astro로 자동 인식**됩니다. 설정 변경 없이 **Deploy**를 누르면 끝.
-4. 이후에는 `main` 브랜치에 푸시할 때마다 자동 배포됩니다.
+### 다른 곳에 배포하려면 — Vercel
 
-### 방법 2 — GitHub Pages
-
-1. `https://<유저명>.github.io/<레포명>` 으로 배포한다면 `astro.config.mjs`에
-   `site`와 `base`를 설정합니다.
-
-   ```js
-   export default defineConfig({
-     site: 'https://<유저명>.github.io',
-     base: '/<레포명>',
-     // ...
-   });
-   ```
-
-   사용자 페이지(`<유저명>.github.io` 레포)라면 `base`는 필요 없습니다.
-
-2. `.github/workflows/deploy.yml`을 추가합니다.
-
-   ```yaml
-   name: Deploy to GitHub Pages
-
-   on:
-     push:
-       branches: [main]
-     workflow_dispatch:
-
-   permissions:
-     contents: read
-     pages: write
-     id-token: write
-
-   jobs:
-     build:
-       runs-on: ubuntu-latest
-       steps:
-         - uses: actions/checkout@v4
-         - uses: withastro/action@v3
-     deploy:
-       needs: build
-       runs-on: ubuntu-latest
-       environment:
-         name: github-pages
-         url: ${{ steps.deployment.outputs.page_url }}
-       steps:
-         - id: deployment
-           uses: actions/deploy-pages@v4
-   ```
-
-3. 레포 **Settings → Pages → Source**를 **GitHub Actions**로 바꿉니다.
-4. `main`에 푸시하면 자동으로 빌드·배포됩니다.
+1. [vercel.com](https://vercel.com)에서 **Add New → Project**로 이 레포를 연결합니다.
+2. 프레임워크가 **Astro로 자동 인식**됩니다. 그대로 **Deploy**.
+3. `astro.config.mjs`에서 `SITE`를 Vercel 도메인으로 바꾸고 `BASE = '/'`로 수정합니다.
+4. 이후 `main` 푸시마다 자동 배포됩니다. (GitHub Pages 워크플로가 같이 돌지 않게 하려면
+   `.github/workflows/deploy.yml`을 삭제하세요.)
 
 ## 프로젝트 구조
 
@@ -173,12 +161,16 @@ export default defineConfig({
 src/
 ├── content/posts/      ← 글은 여기에 (.md 추가 = 발행)
 ├── content.config.ts   ← frontmatter 스키마 (zod)
+├── assets/             ← 글에서 쓰는 이미지 (자동 최적화)
 ├── layouts/            ← BaseLayout, MarkdownPage
-├── components/         ← PostCard, PostMeta, TableOfContents
-├── pages/              ← 홈, 글 상세, about, 태그, rss.xml
+├── components/         ← PostCard, PostMeta, TableOfContents, ThemeToggle
+├── pages/              ← 홈, 글 상세, about, 태그, rss.xml, 404
+├── plugins/            ← rehype 플러그인 (표 래퍼, base 링크)
 ├── styles/global.css   ← 디자인 토큰·본문 스타일
-└── utils/post.ts       ← 글 목록·읽는 시간·날짜 유틸
+└── utils/              ← 글 목록·읽는 시간·날짜·withBase
+scripts/new-post.mjs    ← 새 글 스캐폴드 (npm run new)
 scripts/verify.sh       ← 자체 점검 스크립트
+.github/workflows/      ← GitHub Pages 자동 배포
 ```
 
 ## 폰트 라이선스 주의 ⚠️
