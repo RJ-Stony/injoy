@@ -20,6 +20,9 @@ grep -rqi "katex" dist/_astro       && echo "OK  katex css"          || { echo "
 grep -q 'data-language="mermaid"' dist/posts/markdown-styleguide/index.html && echo "OK  mermaid block" || { echo "FAIL mermaid"; exit 1; }
 grep -q 'markdown-alert' dist/posts/markdown-styleguide/index.html  && echo "OK  callouts"          || { echo "FAIL callouts"; exit 1; }
 grep -q 'data-footnote-ref' dist/posts/markdown-styleguide/index.html && echo "OK  footnotes"       || { echo "FAIL footnotes"; exit 1; }
+# 인-블로그 에디터 — /write와 인덱스는 있어야 하고, 로컬 CMS(admin)는 없어야 한다
+test -f dist/write/index.html      && echo "OK  write page"         || { echo "FAIL write page"; exit 1; }
+test -f dist/site-index.json       && echo "OK  site index"         || { echo "FAIL site index"; exit 1; }
 # 지식 그래프 — 그래프 페이지·위키링크·연결 섹션
 test -f dist/graph/index.html      && echo "OK  graph page"         || { echo "FAIL graph page"; exit 1; }
 grep -q 'graph-canvas' dist/graph/index.html && echo "OK  graph canvas" || { echo "FAIL graph canvas"; exit 1; }
