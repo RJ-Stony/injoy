@@ -470,3 +470,15 @@ a:hover {
 .prose a:hover {
   text-decoration-color: var(--accent);
 }
+
+/* 위키링크([[슬러그]]) — 내부 글 연결임이 드러나는 점선 밑줄 */
+.prose a.wiki-link {
+  text-decoration-style: dotted;
+  text-decoration-color: var(--accent);
+  border-radius: 4px;
+}
+
+.prose a.wiki-link:hover {
+  background-color: var(--accent-weak);
+  text-decoration-style: solid;
+}

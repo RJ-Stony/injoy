@@ -1,5 +1,6 @@
 // @ts-check
 import { rm } from 'node:fs/promises';
+import { readdirSync, readFileSync } from 'node:fs';
 import { defineConfig } from 'astro/config';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
@@ -15,6 +16,19 @@ import rehypeTableWrap from './src/plugins/rehype-table-wrap.mjs';
 import rehypeBaseLinks from './src/plugins/rehype-base-links.mjs';
 import rehypeFigure from './src/plugins/rehype-figure.mjs';
 import rehypeTossface from './src/plugins/rehype-tossface.mjs';
+import remarkWikiLinks from './src/plugins/remark-wiki-links.mjs';
+
+// [[위키링크]]의 표시 텍스트로 쓸 글 제목 맵 (config 로드 시 1회 스캔 —
+// dev 중 글을 추가하면 dev 서버 재시작 후 제목이 반영된다)
+const postTitles = Object.fromEntries(
+  readdirSync('./src/content/posts')
+    .filter((f) => /\.(md|mdx)$/.test(f))
+    .map((f) => {
+      const src = readFileSync(`./src/content/posts/${f}`, 'utf8');
+      const title = src.match(/^title:\s*["']?(.+?)["']?\s*$/m)?.[1];
+      return [f.replace(/\.(md|mdx)$/, ''), title ?? f];
+    }),
+);
 
 // 배포 경로 — GitHub Pages 프로젝트 사이트. 다른 곳(Vercel 등)에 배포하면
 // site를 해당 도메인으로 바꾸고 base를 '/'로 (또는 줄을 삭제) 하면 된다.
@@ -86,6 +100,7 @@ export default defineConfig({
     remarkPlugins: [
       remarkMath, // $인라인$ / $$블록$$ 수식
       [remarkEmoji, { accessible: true }], // :rocket: 숏코드
+      [remarkWikiLinks, { titles: postTitles, base: BASE }], // [[슬러그]] 글 연결
     ],
     rehypePlugins: [
       [rehypeGithubAlerts, alertOptions],

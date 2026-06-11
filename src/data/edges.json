@@ -1,0 +1,22 @@
+{
+  "edges": [
+    {
+      "from": "how-to-write",
+      "to": "welcome",
+      "type": "extends",
+      "note": "welcome이 선언한 '발행 마찰 최소화' 원칙을 구체적인 절차로 풀어낸 글"
+    },
+    {
+      "from": "markdown-styleguide",
+      "to": "how-to-write",
+      "type": "supports",
+      "note": "글쓰기 가이드가 약속한 문법들이 실제로 어떻게 렌더되는지 보여 주는 근거"
+    },
+    {
+      "from": "markdown-styleguide",
+      "to": "welcome",
+      "type": "instantiates",
+      "note": "'정갈한 디자인' 다짐이 본문 요소 하나하나에 어떻게 구현됐는지 보여 주는 사례"
+    }
+  ]
+}

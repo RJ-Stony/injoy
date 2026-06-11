@@ -20,6 +20,11 @@ grep -rqi "katex" dist/_astro       && echo "OK  katex css"          || { echo "
 grep -q 'data-language="mermaid"' dist/posts/markdown-styleguide/index.html && echo "OK  mermaid block" || { echo "FAIL mermaid"; exit 1; }
 grep -q 'markdown-alert' dist/posts/markdown-styleguide/index.html  && echo "OK  callouts"          || { echo "FAIL callouts"; exit 1; }
 grep -q 'data-footnote-ref' dist/posts/markdown-styleguide/index.html && echo "OK  footnotes"       || { echo "FAIL footnotes"; exit 1; }
+# 지식 그래프 — 그래프 페이지·위키링크·연결 섹션
+test -f dist/graph/index.html      && echo "OK  graph page"         || { echo "FAIL graph page"; exit 1; }
+grep -q 'graph-canvas' dist/graph/index.html && echo "OK  graph canvas" || { echo "FAIL graph canvas"; exit 1; }
+grep -q 'class="wiki-link"' dist/posts/welcome/index.html && echo "OK  wiki-links" || { echo "FAIL wiki-links"; exit 1; }
+grep -q '연결된 글' dist/posts/welcome/index.html && echo "OK  connections" || { echo "FAIL connections"; exit 1; }
 # 마크다운 발행 워크플로우 확인 (임시 글 추가 후 빌드, 정리)
 # 중간에 실패해도 임시 글이 레포에 남지 않도록 종료 시 정리한다
 trap 'rm -f src/content/posts/__verify_tmp.md' EXIT

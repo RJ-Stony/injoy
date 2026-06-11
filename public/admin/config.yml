@@ -46,4 +46,47 @@ collections:
       - { name: tags, label: 태그, widget: list, required: false, default: [], hint: '쉼표로 구분해 입력' }
       - { name: draft, label: 초안 (체크하면 사이트에 안 보여요), widget: boolean, default: true, required: false }
       - { name: cover, label: 대표 이미지 (썸네일), widget: image, required: false }
-      - { name: body, label: 본문, widget: markdown }
+      - { name: body, label: 본문, widget: markdown, hint: '다른 글은 [[슬러그]]로 연결할 수 있어요 — 그래프에도 자동 반영' }
+
+  - name: graph
+    label: 연결(그래프)
+    files:
+      - name: edges
+        label: 글 연결
+        file: src/data/edges.json
+        fields:
+          - name: edges
+            label: 연결 목록
+            label_singular: 연결
+            widget: list
+            summary: '{{fields.from}} → {{fields.to}}'
+            fields:
+              - name: from
+                label: 시작 글
+                widget: relation
+                collection: posts
+                search_fields: [title]
+                value_field: '{{slug}}'
+                display_fields: [title]
+              - name: to
+                label: 대상 글
+                widget: relation
+                collection: posts
+                search_fields: [title]
+                value_field: '{{slug}}'
+                display_fields: [title]
+              - name: type
+                label: 관계 (시작 글이 대상 글을 —)
+                widget: select
+                default: related
+                options:
+                  - { label: '확장 — 대상 글 위에 쌓아 올림', value: extends }
+                  - { label: '뒷받침 — 대상 글의 근거가 됨', value: supports }
+                  - { label: '구체화 — 대상 글을 더 또렷하게 만듦', value: refines }
+                  - { label: '반박 — 대상 글에 반대함', value: contradicts }
+                  - { label: '사례 — 대상 글의 예시가 됨', value: instantiates }
+                  - { label: '관련 — 느슨하게 이어짐', value: related }
+              - name: note
+                label: 메모 (왜 연결했나)
+                widget: string
+                required: false

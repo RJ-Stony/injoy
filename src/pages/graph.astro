@@ -1,0 +1,534 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getGraph, edgeLabel } from '../utils/graph';
+import { withBase } from '../utils/url';
+
+const graph = await getGraph();
+
+// 클라이언트로 보내는 직렬화 데이터 — url에 배포 base를 미리 적용한다
+const data = {
+  nodes: graph.nodes.map((n) => ({ ...n, url: withBase(n.url) })),
+  edges: graph.edges,
+};
+
+const postNodes = graph.nodes.filter((n) => n.kind === 'post');
+const titleOf = new Map(postNodes.map((n) => [n.id, n.label]));
+const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
+---
+
+<BaseLayout
+  title="그래프"
+  description="Injoy의 글과 태그가 어떻게 연결되어 있는지 한눈에 보는 지식 그래프."
+>
+  <section class="graph-head">
+    <h1>그래프</h1>
+    <p class="lead">글은 쌓이기만 하지 않고 서로 연결됩니다. 노드를 끌어 보고, 눌러서 이동하세요.</p>
+    <p class="stats">
+      <span><strong>{graph.stats.posts}</strong> 글</span>
+      <span class="divider" aria-hidden="true">·</span>
+      <span><strong>{graph.stats.edges}</strong> 연결</span>
+      <span class="divider" aria-hidden="true">·</span>
+      <span><strong>{graph.stats.tags}</strong> 태그</span>
+    </p>
+  </section>
+
+  <div class="graph-wrap">
+    <canvas id="graph-canvas" aria-label="글 연결 그래프 — 아래 연결 목록에서 같은 내용을 읽을 수 있어요"></canvas>
+    <div id="graph-tooltip" hidden></div>
+  </div>
+
+  <ul class="legend" aria-label="범례">
+    <li><span class="dot post" aria-hidden="true"></span>글</li>
+    <li><span class="dot tag" aria-hidden="true"></span>태그</li>
+    <li><span class="line solid" aria-hidden="true"></span>명시적 연결</li>
+    <li><span class="line dashed" aria-hidden="true"></span>언급·태그</li>
+  </ul>
+
+  <details class="edge-list">
+    <summary>연결 목록으로 보기</summary>
+    <ul>
+      {
+        explicitEdges.map((e) => (
+          <li>
+            <a href={withBase(`/posts/${e.from}/`)}>{titleOf.get(e.from)}</a>
+            <span class="edge-type">{edgeLabel(e.type)} →</span>
+            <a href={withBase(`/posts/${e.to}/`)}>{titleOf.get(e.to)}</a>
+            {e.note && <span class="note">— {e.note}</span>}
+          </li>
+        ))
+      }
+    </ul>
+  </details>
+
+  <noscript>
+    <p class="noscript-note">
+      자바스크립트가 꺼져 있으면 그래프 대신 위의 "연결 목록으로 보기"를 이용하세요.
+    </p>
+  </noscript>
+</BaseLayout>
+
+<script is:inline define:vars={{ data }}>
+  (() => {
+    const canvas = document.getElementById('graph-canvas');
+    const tooltip = document.getElementById('graph-tooltip');
+    if (!canvas || !tooltip) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const focusId = new URLSearchParams(location.search).get('focus');
+
+    // 노드·엣지 준비
+    const nodes = data.nodes.map((n) => ({ ...n, x: 0, y: 0, vx: 0, vy: 0 }));
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const edges = data.edges
+      .map((e) => ({ ...e, a: byId.get(e.from), b: byId.get(e.to) }))
+      .filter((e) => e.a && e.b);
+    const neighbors = new Map(nodes.map((n) => [n.id, new Set()]));
+    edges.forEach((e) => {
+      neighbors.get(e.a.id).add(e.b.id);
+      neighbors.get(e.b.id).add(e.a.id);
+    });
+
+    let W = 0;
+    let H = 0;
+    const radius = (n) =>
+      n.kind === 'post' ? Math.min(9 + n.degree * 1.5, 17) : 5 + Math.min(n.degree, 3);
+
+    // CSS 토큰에서 색을 읽는다 — 테마가 바뀌면 다시 읽어 다시 그린다
+    const colors = {};
+    const readColors = () => {
+      const s = getComputedStyle(document.documentElement);
+      colors.accent = s.getPropertyValue('--accent').trim();
+      colors.accentWeak = s.getPropertyValue('--accent-weak').trim();
+      colors.text = s.getPropertyValue('--text').trim();
+      colors.muted = s.getPropertyValue('--text-muted').trim();
+      colors.border = s.getPropertyValue('--border').trim();
+      colors.surface = s.getPropertyValue('--surface').trim();
+    };
+
+    const resize = () => {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      W = rect.width;
+      H = Math.max(360, Math.min(560, Math.round(rect.width * 0.62)));
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.height = `${H}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    const seed = (n, i) => {
+      // 결정적 초기 배치(원형) — 새로고침마다 모양이 널뛰지 않게
+      const angle = (i / nodes.length) * Math.PI * 2;
+      const r = Math.min(W, H) * 0.32;
+      n.x = W / 2 + Math.cos(angle) * r * (n.kind === 'tag' ? 1.15 : 0.85);
+      n.y = H / 2 + Math.sin(angle) * r * (n.kind === 'tag' ? 1.15 : 0.85);
+    };
+
+    const tick = () => {
+      const REPULSION = 2600;
+      const SPRING = 0.012;
+      const REST = 110;
+      const GRAVITY = 0.012;
+      for (let i = 0; i < nodes.length; i++) {
+        const a = nodes[i];
+        for (let j = i + 1; j < nodes.length; j++) {
+          const b = nodes[j];
+          let dx = a.x - b.x;
+          let dy = a.y - b.y;
+          let d2 = dx * dx + dy * dy;
+          if (d2 < 1) d2 = 1;
+          const f = REPULSION / d2;
+          const d = Math.sqrt(d2);
+          dx /= d;
+          dy /= d;
+          a.vx += dx * f;
+          a.vy += dy * f;
+          b.vx -= dx * f;
+          b.vy -= dy * f;
+        }
+      }
+      for (const e of edges) {
+        const dx = e.b.x - e.a.x;
+        const dy = e.b.y - e.a.y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 1;
+        const rest = e.to.startsWith('tag:') ? REST * 0.6 : REST;
+        const f = (d - rest) * SPRING;
+        e.a.vx += (dx / d) * f;
+        e.a.vy += (dy / d) * f;
+        e.b.vx -= (dx / d) * f;
+        e.b.vy -= (dy / d) * f;
+      }
+      for (const n of nodes) {
+        n.vx += (W / 2 - n.x) * GRAVITY;
+        n.vy += (H / 2 - n.y) * GRAVITY;
+        if (n === dragging) {
+          n.vx = 0;
+          n.vy = 0;
+          continue;
+        }
+        n.vx *= 0.82;
+        n.vy *= 0.82;
+        n.x += n.vx;
+        n.y += n.vy;
+        const m = 24;
+        n.x = Math.max(m, Math.min(W - m, n.x));
+        n.y = Math.max(m, Math.min(H - m, n.y));
+      }
+    };
+
+    let hovered = null;
+    let dragging = null;
+
+    const highlightSet = () => {
+      const pivot = hovered ?? (focusTouched ? null : byId.get(focusId));
+      if (!pivot) return null;
+      const set = new Set([pivot.id, ...(neighbors.get(pivot.id) ?? [])]);
+      return { pivot, set };
+    };
+
+    let focusTouched = false;
+
+    const draw = () => {
+      ctx.clearRect(0, 0, W, H);
+      const hl = highlightSet();
+      const fade = (id) => (hl && !hl.set.has(id) ? 0.14 : 1);
+
+      for (const e of edges) {
+        const isTag = e.to.startsWith('tag:');
+        const dashed = e.type === 'mentions' || isTag;
+        const alpha = Math.min(fade(e.a.id), fade(e.b.id)) * (isTag ? 0.55 : 0.95);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle =
+          hl && hl.set.has(e.a.id) && hl.set.has(e.b.id) ? colors.accent : colors.border;
+        ctx.lineWidth = dashed ? 1 : 1.6;
+        ctx.setLineDash(dashed ? [4, 4] : []);
+        ctx.beginPath();
+        ctx.moveTo(e.a.x, e.a.y);
+        ctx.lineTo(e.b.x, e.b.y);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      for (const n of nodes) {
+        const r = radius(n);
+        ctx.save();
+        ctx.globalAlpha = fade(n.id);
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+        if (n.kind === 'post') {
+          ctx.fillStyle = colors.accent;
+          ctx.fill();
+          if ((hovered && hovered.id === n.id) || (!focusTouched && focusId === n.id)) {
+            ctx.strokeStyle = colors.accent;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, r + 4, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        } else {
+          ctx.fillStyle = colors.surface;
+          ctx.fill();
+          ctx.strokeStyle = colors.muted;
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+        }
+        // 라벨
+        ctx.fillStyle = n.kind === 'post' ? colors.text : colors.muted;
+        ctx.font = `${n.kind === 'post' ? 600 : 400} ${n.kind === 'post' ? 12.5 : 11.5}px ${getComputedStyle(document.body).fontFamily}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const label =
+          n.kind === 'post' && n.label.length > 16 ? `${n.label.slice(0, 15)}…` : n.label;
+        ctx.fillText(label, n.x, n.y + r + 5);
+        ctx.restore();
+      }
+    };
+
+    let running = false;
+    let calmFrames = 0;
+    const loop = () => {
+      tick();
+      draw();
+      const energy = nodes.reduce((s, n) => s + Math.abs(n.vx) + Math.abs(n.vy), 0);
+      calmFrames = energy < 0.5 ? calmFrames + 1 : 0;
+      if (calmFrames > 30 && !dragging) {
+        running = false;
+        return;
+      }
+      requestAnimationFrame(loop);
+    };
+    const wake = () => {
+      if (reduceMotion) {
+        for (let i = 0; i < 60; i++) tick();
+        draw();
+        return;
+      }
+      calmFrames = 0;
+      if (!running) {
+        running = true;
+        requestAnimationFrame(loop);
+      }
+    };
+
+    const nodeAt = (x, y) => {
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const n = nodes[i];
+        const r = radius(n) + 6;
+        if ((n.x - x) ** 2 + (n.y - y) ** 2 <= r * r) return n;
+      }
+      return null;
+    };
+
+    const pos = (ev) => {
+      const rect = canvas.getBoundingClientRect();
+      return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+    };
+
+    let moved = false;
+    canvas.addEventListener('pointerdown', (ev) => {
+      const { x, y } = pos(ev);
+      const n = nodeAt(x, y);
+      if (n) {
+        dragging = n;
+        moved = false;
+        focusTouched = true;
+        try {
+          canvas.setPointerCapture(ev.pointerId);
+        } catch {
+          /* 일부 환경의 합성 포인터는 캡처 불가 — 드래그 품질만 떨어질 뿐 동작엔 지장 없음 */
+        }
+        wake();
+      }
+    });
+    canvas.addEventListener('pointermove', (ev) => {
+      const { x, y } = pos(ev);
+      if (dragging) {
+        dragging.x = x;
+        dragging.y = y;
+        moved = true;
+        wake();
+        return;
+      }
+      const n = nodeAt(x, y);
+      if (n !== hovered) {
+        hovered = n;
+        focusTouched = focusTouched || n !== null;
+        canvas.style.cursor = n ? 'pointer' : 'default';
+        if (n) {
+          tooltip.textContent =
+            n.kind === 'post' ? `${n.label}${n.category ? ` · ${n.category}` : ''}` : n.label;
+          tooltip.hidden = false;
+          tooltip.style.left = `${Math.min(x + 14, W - 160)}px`;
+          tooltip.style.top = `${y + 14}px`;
+        } else {
+          tooltip.hidden = true;
+        }
+        if (reduceMotion) draw();
+        else wake();
+      } else if (n && !tooltip.hidden) {
+        tooltip.style.left = `${Math.min(x + 14, W - 160)}px`;
+        tooltip.style.top = `${y + 14}px`;
+      }
+    });
+    canvas.addEventListener('pointerup', (ev) => {
+      if (dragging && !moved) {
+        location.href = dragging.url;
+      }
+      dragging = null;
+      wake();
+    });
+    canvas.addEventListener('pointerleave', () => {
+      hovered = null;
+      tooltip.hidden = true;
+      if (reduceMotion) draw();
+    });
+
+    const restart = () => {
+      readColors();
+      resize();
+      nodes.forEach(seed);
+      if (reduceMotion) {
+        for (let i = 0; i < 400; i++) tick();
+        draw();
+      } else {
+        wake();
+      }
+    };
+
+    window.addEventListener('injoy:theme-change', () => {
+      readColors();
+      draw();
+    });
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      readColors();
+      draw();
+    });
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(restart, 150);
+    });
+
+    restart();
+
+    // 개발·테스트용 좌표 핸들 (외부 의존 없음)
+    window.__injoyGraph = { nodes };
+  })();
+</script>
+
+<style>
+  .graph-head {
+    padding: 1rem 0 1.5rem;
+  }
+
+  .graph-head h1 {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .graph-head .lead {
+    margin: 0.4rem 0 0;
+    color: var(--text-muted);
+  }
+
+  .stats {
+    margin: 0.8rem 0 0;
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+
+  .stats strong {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .stats .divider {
+    color: var(--border);
+  }
+
+  .graph-wrap {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--surface);
+    overflow: hidden;
+  }
+
+  #graph-canvas {
+    display: block;
+    width: 100%;
+    touch-action: none;
+  }
+
+  #graph-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.3em 0.7em;
+    font-size: 0.8rem;
+    color: var(--text);
+    box-shadow: 0 2px 10px rgb(0 0 0 / 8%);
+    max-width: 220px;
+  }
+
+  .legend {
+    margin: 0.9rem 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.2rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+
+  .legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+  }
+
+  .legend .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .legend .dot.post {
+    background-color: var(--accent);
+  }
+
+  .legend .dot.tag {
+    background-color: var(--surface);
+    border: 1.2px solid var(--text-muted);
+  }
+
+  .legend .line {
+    width: 18px;
+    border-top: 1.6px solid var(--text-muted);
+  }
+
+  .legend .line.dashed {
+    border-top-style: dashed;
+  }
+
+  .edge-list {
+    margin-top: 2rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.9rem 1.2rem;
+    font-size: 0.92rem;
+  }
+
+  .edge-list summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .edge-list summary:hover {
+    color: var(--accent);
+  }
+
+  .edge-list ul {
+    margin: 0.8rem 0 0.2rem;
+    padding-inline-start: 1.2em;
+  }
+
+  .edge-list li {
+    margin-block: 0.45em;
+    line-height: 1.7;
+  }
+
+  .edge-type {
+    display: inline-block;
+    margin-inline: 0.4em;
+    padding: 0.05em 0.6em;
+    border-radius: 999px;
+    background-color: var(--accent-weak);
+    color: var(--accent);
+    font-size: 0.8em;
+    font-weight: 600;
+  }
+
+  .edge-list .note {
+    color: var(--text-muted);
+    font-size: 0.88em;
+  }
+
+  .noscript-note {
+    margin-top: 1rem;
+    color: var(--text-muted);
+  }
+</style>

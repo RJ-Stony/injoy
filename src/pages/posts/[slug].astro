@@ -6,6 +6,7 @@ import PostMeta from '../../components/PostMeta.astro';
 import TableOfContents from '../../components/TableOfContents.astro';
 import ViewCount from '../../components/ViewCount.astro';
 import { getPublishedPosts, readingMinutes } from '../../utils/post';
+import { getConnections } from '../../utils/graph';
 import { withBase } from '../../utils/url';
 
 export async function getStaticPaths() {
@@ -20,6 +21,7 @@ const { post, newer, older } = Astro.props;
 const { Content, headings } = await render(post);
 const minutes = readingMinutes(post);
 const cover = post.data.cover;
+const connections = await getConnections(post.id);
 ---
 
 <BaseLayout
@@ -60,6 +62,26 @@ const cover = post.data.cover;
             ))}
           </ul>
         </footer>
+      )
+    }
+
+    {
+      connections.length > 0 && (
+        <section class="connections" aria-label="연결된 글">
+          <div class="connections-head">
+            <h2>연결된 글</h2>
+            <a class="to-graph" href={withBase(`/graph/?focus=${post.id}`)}>그래프에서 보기 →</a>
+          </div>
+          <ul>
+            {connections.map((c) => (
+              <li>
+                <span class:list={['edge-chip', c.type]}>{c.phrase}</span>
+                <a href={withBase(`/posts/${c.slug}/`)}>{c.title}</a>
+                {c.note && <p class="edge-note">{c.note}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
       )
     }
 
@@ -278,6 +300,86 @@ const cover = post.data.cover;
     color: var(--accent);
     border-color: var(--accent);
     text-decoration: none;
+  }
+
+  .connections {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--surface);
+    padding: 1.1rem 1.4rem;
+  }
+
+  .connections-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .connections h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .to-graph {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .to-graph:hover {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .connections ul {
+    margin: 0.8rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .connections li {
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .connections li:first-child {
+    border-top: 0;
+  }
+
+  .edge-chip {
+    display: inline-block;
+    margin-inline-end: 0.6em;
+    padding: 0.08em 0.7em;
+    border-radius: 999px;
+    background-color: var(--accent-weak);
+    color: var(--accent);
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .edge-chip.contradicts {
+    background-color: color-mix(in srgb, #cf222e 10%, var(--bg));
+    color: light-dark(#cf222e, #e5695e);
+  }
+
+  .connections li a {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .connections li a:hover {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .edge-note {
+    margin: 0.25rem 0 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.6;
   }
 
   .post-nav {

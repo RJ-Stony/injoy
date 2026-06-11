@@ -1,4 +1,5 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
+import { splitCode } from './md-text';
 
 export type Post = CollectionEntry<'posts'>;
 
@@ -21,10 +22,8 @@ export async function getPublishedPosts(): Promise<Post[]> {
  * - 이미지: 개당 10초
  */
 export function readingMinutes(post: Post): number {
-  const body = post.body ?? '';
-
-  const codeBlocks = body.match(/```[\s\S]*?```/g) ?? [];
-  let prose = body.replace(/```[\s\S]*?```/g, ' ');
+  const { prose: proseRaw, codeBlocks } = splitCode(post.body ?? '');
+  let prose = proseRaw;
 
   const mathBlocks = (prose.match(/\$\$[\s\S]*?\$\$/g) ?? []).length;
   prose = prose.replace(/\$\$[\s\S]*?\$\$/g, ' ');
@@ -37,9 +36,10 @@ export function readingMinutes(post: Post): number {
   const latinWords = (prose.replace(/[ᄀ-힯]/g, ' ').match(/[A-Za-z0-9]{2,}/g) ?? [])
     .length;
 
-  const mermaidCount = codeBlocks.filter((b) => b.startsWith('```mermaid')).length;
+  const isMermaid = (b: string) => /^\s*`{3,}\s*mermaid/.test(b);
+  const mermaidCount = codeBlocks.filter(isMermaid).length;
   const codeLines = codeBlocks
-    .filter((b) => !b.startsWith('```mermaid'))
+    .filter((b) => !isMermaid(b))
     .reduce((n, b) => n + Math.max(0, b.split('\n').length - 2), 0);
 
   const seconds =
