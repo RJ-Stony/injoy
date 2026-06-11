@@ -289,12 +289,21 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
     };
 
     let moved = false;
+    let dragStart = null; // { x, y, pointerId, slop }
     canvas.addEventListener('pointerdown', (ev) => {
+      // 주 버튼·주 포인터만 드래그/탐색 대상 (휠클릭·우클릭·멀티터치 제외)
+      if (ev.button !== 0 || ev.isPrimary === false) return;
       const { x, y } = pos(ev);
       const n = nodeAt(x, y);
       if (n) {
         dragging = n;
         moved = false;
+        dragStart = {
+          x,
+          y,
+          pointerId: ev.pointerId,
+          slop: ev.pointerType === 'touch' ? 10 : 5, // 탭 떨림 허용 범위
+        };
         focusTouched = true;
         try {
           canvas.setPointerCapture(ev.pointerId);
@@ -306,13 +315,16 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
     });
     canvas.addEventListener('pointermove', (ev) => {
       const { x, y } = pos(ev);
-      if (dragging) {
+      if (dragging && dragStart && ev.pointerId === dragStart.pointerId) {
+        // 슬롭 이내의 미세 이동은 탭으로 취급 — 노드도 밀리지 않게 보류
+        if (!moved && Math.hypot(x - dragStart.x, y - dragStart.y) < dragStart.slop) return;
+        moved = true;
         dragging.x = x;
         dragging.y = y;
-        moved = true;
         wake();
         return;
       }
+      if (dragging) return;
       const n = nodeAt(x, y);
       if (n !== hovered) {
         hovered = n;
@@ -335,12 +347,33 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
       }
     });
     canvas.addEventListener('pointerup', (ev) => {
+      if (dragStart && ev.pointerId !== dragStart.pointerId) return;
       if (dragging && !moved) {
         location.href = dragging.url;
       }
       dragging = null;
+      dragStart = null;
       wake();
     });
+    // 드래그가 시스템 제스처 등으로 끊겨도 상태가 고착되지 않게 (탐색은 하지 않음)
+    const endDrag = () => {
+      dragging = null;
+      dragStart = null;
+      wake();
+    };
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('lostpointercapture', endDrag);
+    // 세로 스크롤은 통과시키고, 노드를 잡았을 때만 제스처를 캔버스가 가져간다
+    canvas.addEventListener(
+      'touchstart',
+      (ev) => {
+        const t = ev.touches[0];
+        if (!t) return;
+        const rect = canvas.getBoundingClientRect();
+        if (nodeAt(t.clientX - rect.left, t.clientY - rect.top)) ev.preventDefault();
+      },
+      { passive: false },
+    );
     canvas.addEventListener('pointerleave', () => {
       hovered = null;
       tooltip.hidden = true;
@@ -370,7 +403,12 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
     let resizeTimer;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(restart, 150);
+      resizeTimer = setTimeout(() => {
+        // 모바일 주소창 접힘 등 높이만 변하는 resize에서는 배치를 보존한다
+        const w = canvas.parentElement.getBoundingClientRect().width;
+        if (Math.abs(w - W) < 1) return;
+        restart();
+      }, 150);
     });
 
     restart();
@@ -426,7 +464,8 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
   #graph-canvas {
     display: block;
     width: 100%;
-    touch-action: none;
+    /* 세로 스크롤은 허용 — 노드 드래그 시작 시에만 JS가 제스처를 가져간다 */
+    touch-action: pan-y;
   }
 
   #graph-tooltip {

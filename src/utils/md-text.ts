@@ -17,10 +17,11 @@ export function splitCode(body: string): SplitBody {
   let current: string[] = [];
 
   for (const line of body.split('\n')) {
-    const run = line.match(/^\s*(`{3,})/)?.[1];
+    // CommonMark 펜스: 들여쓰기 3칸 이하의 ``` 또는 ~~~ (4칸 이상은 코드가 아니라 들여쓴 텍스트)
+    const run = line.match(/^ {0,3}(`{3,}|~{3,})/)?.[1];
     if (fence) {
       current.push(line);
-      if (run && run.length >= fence.length) {
+      if (run && run[0] === fence[0] && run.length >= fence.length) {
         codeBlocks.push(current.join('\n'));
         current = [];
         fence = null;

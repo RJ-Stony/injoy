@@ -14,6 +14,10 @@ export default function remarkWikiLinks(options = {}) {
     if (!Array.isArray(node.children)) return;
 
     node.children = node.children.flatMap((child) => {
+      // 이미 링크인 노드 안의 [[..]]는 변환하지 않는다 (중첩 <a>는 invalid HTML)
+      if (child.type === 'link' || child.type === 'linkReference') {
+        return [child];
+      }
       if (child.type !== 'text') {
         transform(child, file);
         return [child];

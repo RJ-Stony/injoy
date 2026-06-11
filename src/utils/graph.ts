@@ -62,8 +62,9 @@ export interface Graph {
   stats: { posts: number; tags: number; edges: number };
 }
 
-/** 본문 위키링크 패턴: [[slug]] 또는 [[slug|표시 텍스트]] */
-export const WIKI_LINK_RE = /\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]+?))?\]\]/g;
+// 본문 위키링크 패턴 — remark 플러그인과 단일 출처 공유
+export { WIKI_LINK_RE } from '../plugins/wiki-link-pattern.mjs';
+import { WIKI_LINK_RE } from '../plugins/wiki-link-pattern.mjs';
 
 /** 본문에서 [[슬러그]] 언급을 수집한다 (코드블록 내부 제외). */
 function collectMentions(post: Post, validSlugs: Set<string>): GraphEdge[] {
@@ -96,8 +97,11 @@ export async function getGraph(): Promise<Graph> {
   }
 
   const mentions = posts.flatMap((p) => collectMentions(p, slugs));
-  // 같은 두 글 사이에 명시적 연결이 있으면 mentions는 중복이므로 생략
-  const explicitPairs = new Set(explicit.map((e) => `${e.from}→${e.to}`));
+  // 두 글 사이에 명시적 연결이 있으면(방향 무관) mentions는 약한 중복이므로 생략 —
+  // 안 그러면 글 상세 "연결된 글"에 같은 글이 두 번 나타난다
+  const explicitPairs = new Set(
+    explicit.flatMap((e) => [`${e.from}→${e.to}`, `${e.to}→${e.from}`]),
+  );
   const edges: GraphEdge[] = [
     ...explicit,
     ...mentions.filter((m) => !explicitPairs.has(`${m.from}→${m.to}`)),
