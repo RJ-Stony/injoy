@@ -8,6 +8,12 @@ import {
   transformerNotationHighlight,
 } from '@shikijs/transformers';
 import rehypeTableWrap from './src/plugins/rehype-table-wrap.mjs';
+import rehypeBaseLinks from './src/plugins/rehype-base-links.mjs';
+
+// 배포 경로 — GitHub Pages 프로젝트 사이트. 다른 곳(Vercel 등)에 배포하면
+// site를 해당 도메인으로 바꾸고 base를 '/'로 (또는 줄을 삭제) 하면 된다.
+const SITE = 'https://rj-stony.github.io';
+const BASE = '/injoy';
 
 // GitHub 스타일 콜아웃(> [!NOTE] 등)에 한국어 라벨과 아이콘 적용.
 // icon은 비워 두면 플러그인이 변환을 건너뛰므로 반드시 유효한 SVG여야 한다.
@@ -54,12 +60,16 @@ const alertOptions = {
 
 // https://astro.build/config
 export default defineConfig({
-  // 배포 시 실제 도메인으로 교체하세요. (README의 "배포" 절 참고)
-  site: 'https://injoy.example.com',
+  site: SITE,
+  base: BASE,
   output: 'static',
   integrations: [mdx(), sitemap()],
   markdown: {
-    rehypePlugins: [[rehypeGithubAlerts, alertOptions], rehypeTableWrap],
+    rehypePlugins: [
+      [rehypeGithubAlerts, alertOptions],
+      rehypeTableWrap,
+      [rehypeBaseLinks, { base: BASE }],
+    ],
     remarkRehype: {
       footnoteLabel: '각주',
       footnoteBackLabel: '본문으로 돌아가기',

@@ -139,8 +139,9 @@ const config = {
 ## 이미지
 
 이미지는 본문 폭에 맞춰 줄어들고, 모서리가 둥글게 처리된다. `alt` 텍스트는 꼭 쓰자.
+글 파일 기준 상대 경로로 넣으면 Astro가 알아서 최적화하고 `loading="lazy"`를 붙인다.
 
-<img src="/images/markdown-demo.svg" alt="Injoy의 디자인 토큰을 요약한 다이어그램 — 흰 배경, 블루 포인트, 680px 본문 폭" loading="lazy" width="640" height="360" />
+![Injoy의 디자인 토큰을 요약한 다이어그램 — 흰 배경, 블루 포인트, 680px 본문 폭](../../assets/markdown-demo.svg)
 
 ## 각주
 

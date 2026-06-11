@@ -5,6 +5,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import PostMeta from '../../components/PostMeta.astro';
 import TableOfContents from '../../components/TableOfContents.astro';
 import { getPublishedPosts, readingMinutes } from '../../utils/post';
+import { withBase } from '../../utils/url';
 
 export async function getStaticPaths() {
   const posts = await getPublishedPosts();
@@ -47,7 +48,7 @@ const cover = post.data.cover;
           <ul class="tag-list" aria-label="태그">
             {post.data.tags.map((tag) => (
               <li>
-                <a href={`/tags/${tag}/`}>#{tag}</a>
+                <a href={withBase(`/tags/${tag}/`)}>#{tag}</a>
               </li>
             ))}
           </ul>

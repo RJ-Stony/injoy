@@ -1,13 +1,14 @@
 ---
 import PostMeta from './PostMeta.astro';
 import { readingMinutes, type Post } from '../utils/post';
+import { withBase } from '../utils/url';
 
 interface Props {
   post: Post;
 }
 
 const { post } = Astro.props;
-const href = `/posts/${post.id}/`;
+const href = withBase(`/posts/${post.id}/`);
 ---
 
 <article class="post-card">
