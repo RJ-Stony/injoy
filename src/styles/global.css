@@ -318,6 +318,114 @@ a:hover {
   background-color: var(--code-bg) !important;
 }
 
+/* 콜아웃 (> [!NOTE] 류) — light-dark()는 :root의 color-scheme을 따라
+   시스템 설정·수동 토글 모두에 반응한다 */
+.prose .markdown-alert {
+  --alert-color: light-dark(#2f6fed, #5b8def);
+  border-inline-start: 3px solid var(--alert-color);
+  background-color: color-mix(in srgb, var(--alert-color) 6%, var(--bg));
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 0.9em 1.3em;
+}
+
+.prose .markdown-alert > :last-child {
+  margin-block-end: 0;
+}
+
+.prose .markdown-alert p {
+  margin-block: 0.4em;
+}
+
+.prose .markdown-alert .markdown-alert-title {
+  margin-block: 0 0.3em;
+  font-weight: 700;
+  font-size: 0.92em;
+  color: var(--alert-color);
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
+
+.prose .markdown-alert-note {
+  --alert-color: light-dark(#2f6fed, #5b8def);
+}
+
+.prose .markdown-alert-tip {
+  --alert-color: light-dark(#1a7f4f, #4ecb96);
+}
+
+.prose .markdown-alert-important {
+  --alert-color: light-dark(#8250df, #a98eea);
+}
+
+.prose .markdown-alert-warning {
+  --alert-color: light-dark(#9a6700, #d9a83c);
+}
+
+.prose .markdown-alert-caution {
+  --alert-color: light-dark(#cf222e, #e5695e);
+}
+
+/* 각주 */
+.prose .footnotes {
+  margin-block-start: 3em;
+  border-top: 1px solid var(--border);
+  padding-block-start: 1.2em;
+  font-size: 0.88em;
+  color: var(--text-muted);
+}
+
+.prose .footnotes .footnotes-title {
+  margin: 0 0 0.6em;
+  font-size: 1em;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.prose [data-footnote-ref] {
+  font-size: 0.85em;
+  text-decoration: none;
+  padding: 0 0.15em;
+}
+
+/* 코드블록 줄 표기 — [!code highlight] / [!code ++] / [!code --] */
+.astro-code .line.highlighted,
+.astro-code .line.diff {
+  position: relative;
+  display: inline-block;
+  width: calc(100% + 2.8em);
+  margin-inline: -1.4em;
+  padding-inline: 1.4em;
+}
+
+.astro-code .line.highlighted {
+  background-color: light-dark(rgba(47, 111, 237, 0.08), rgba(91, 141, 239, 0.14));
+}
+
+.astro-code .line.diff.add {
+  background-color: light-dark(rgba(26, 127, 79, 0.1), rgba(78, 203, 150, 0.13));
+}
+
+.astro-code .line.diff.remove {
+  background-color: light-dark(rgba(207, 34, 46, 0.08), rgba(229, 105, 94, 0.13));
+  opacity: 0.75;
+}
+
+.astro-code .line.diff::before {
+  position: absolute;
+  left: 0.55em;
+}
+
+.astro-code .line.diff.add::before {
+  content: '+';
+  color: light-dark(#1a7f4f, #4ecb96);
+}
+
+.astro-code .line.diff.remove::before {
+  content: '-';
+  color: light-dark(#cf222e, #e5695e);
+}
+
 /* 체크박스(task list) */
 .prose input[type='checkbox'] {
   accent-color: var(--accent);

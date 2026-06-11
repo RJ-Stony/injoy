@@ -25,6 +25,15 @@ src/content/posts/my-first-post.md  →  /posts/my-first-post/
 한글 파일명도 동작은 하지만, URL이 길게 인코딩되므로 영문 소문자와 하이픈을 권장한다.
 컴포넌트를 본문에 넣고 싶다면 `.mdx` 확장자를 쓰면 된다.
 
+직접 만들기 귀찮다면 스캐폴드 명령 한 줄로 시작할 수 있다.
+
+```bash
+npm run new -- my-first-post "첫 글입니다"
+```
+
+frontmatter가 채워진 파일이 `draft: true` 상태로 생성된다. 초안을 다듬은 뒤
+`draft: false`로 바꾸면 발행된다.
+
 ## 2. frontmatter 채우기
 
 파일 맨 위에 글의 메타 정보를 적는다. `---` 사이의 영역이 frontmatter다.
@@ -56,7 +65,8 @@ draft: false
 ## 3. 본문 쓰기
 
 frontmatter 아래부터는 노션에서 쓰듯 마크다운으로 쓰면 된다. 제목(`##`), 목록, 인용,
-표, 체크박스 같은 GFM 문법을 모두 지원한다. 어떻게 보이는지는
+표, 체크박스 같은 GFM 문법에 더해 콜아웃(`> [!NOTE]`), 각주(`[^1]`),
+코드 줄 강조·diff 표기(`// [!code highlight]`)까지 지원한다. 어떻게 보이는지는
 [마크다운 스타일 가이드](/posts/markdown-styleguide/)에서 확인할 수 있다.
 
 코드블록은 언어를 지정하면 자동으로 하이라이트되고, 복사 버튼이 붙는다.
