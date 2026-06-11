@@ -19,7 +19,6 @@
     "@shikijs/transformers": "^3.23.0",
     "astro": "^5.0.0",
     "katex": "^0.17.0",
-    "reading-time": "^1.5.0",
     "rehype-github-alerts": "^4.2.0",
     "rehype-katex": "^7.0.1",
     "remark-emoji": "^5.0.2",

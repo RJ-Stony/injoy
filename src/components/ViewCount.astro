@@ -1,0 +1,52 @@
+---
+/**
+ * 글 조회수 — Abacus(무가입 카운터 API)로 집계한다.
+ * 배포된 사이트에서만 카운트를 올리고(hit), 로컬 미리보기는 조회만 한다(get).
+ * API가 응답하지 않으면 조용히 숨겨져 본문 읽기에 영향을 주지 않는다.
+ */
+interface Props {
+  slug: string;
+}
+
+const { slug } = Astro.props;
+const safeKey = `post-${slug.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+---
+
+<span class="view-count" data-key={safeKey} hidden>
+  <span class="divider" aria-hidden="true">·</span>
+  <span class="value"></span>
+</span>
+
+<script>
+  const el = document.querySelector<HTMLElement>('.view-count');
+  if (el) {
+    const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
+    const mode = isLocal ? 'get' : 'hit';
+    fetch(`https://abacus.jasoncameron.dev/${mode}/injoy-rjstony/${el.dataset.key}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((data: { value: number }) => {
+        const value = el.querySelector('.value');
+        if (value && typeof data.value === 'number') {
+          value.textContent = `조회 ${data.value.toLocaleString('ko-KR')}`;
+          el.hidden = false;
+        }
+      })
+      .catch(() => {
+        /* 카운터 불가 시 표시 생략 */
+      });
+  }
+</script>
+
+<style>
+  .view-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+
+  .divider {
+    color: var(--border);
+  }
+</style>

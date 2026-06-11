@@ -4,6 +4,7 @@ description: "제목, 코드, 표, 인용, 이미지가 Injoy의 디자인에서
 pubDate: 2026-06-10
 category: "개발"
 tags: ["markdown", "design"]
+cover: "../../assets/markdown-demo.svg"
 draft: false
 ---
 

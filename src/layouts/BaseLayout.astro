@@ -98,11 +98,35 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
     <footer class="site-footer">
       <div class:list={['site-footer-inner', { wide }]}>
         <p>© {new Date().getFullYear()} Injoy. 마크다운으로 쓰고, 즐겁게 기록합니다.</p>
-        <p><a href={withBase('/rss.xml')}>RSS</a></p>
+        <p class="footer-links">
+          <span id="site-visits" hidden></span>
+          <a href={withBase('/rss.xml')}>RSS</a>
+        </p>
       </div>
     </footer>
   </body>
 </html>
+
+<script>
+  // 전체 방문 수 — 세션당 1회만 카운트하고(Abacus), 실패하면 조용히 숨긴다
+  const visits = document.getElementById('site-visits');
+  if (visits) {
+    const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
+    const counted = sessionStorage.getItem('injoy-visited') === '1';
+    const mode = isLocal || counted ? 'get' : 'hit';
+    fetch(`https://abacus.jasoncameron.dev/${mode}/injoy-rjstony/site-visits`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((data: { value: number }) => {
+        if (typeof data.value !== 'number') return;
+        if (!isLocal) sessionStorage.setItem('injoy-visited', '1');
+        visits.textContent = `방문 ${data.value.toLocaleString('ko-KR')}`;
+        visits.hidden = false;
+      })
+      .catch(() => {
+        /* 카운터 불가 시 표시 생략 */
+      });
+  }
+</script>
 
 <style is:global>
   @import '../styles/global.css';
@@ -218,5 +242,11 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
 
   .site-footer p {
     margin: 0;
+  }
+
+  .footer-links {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
   }
 </style>

@@ -4,15 +4,19 @@ import { Image } from 'astro:assets';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PostMeta from '../../components/PostMeta.astro';
 import TableOfContents from '../../components/TableOfContents.astro';
+import ViewCount from '../../components/ViewCount.astro';
 import { getPublishedPosts, readingMinutes } from '../../utils/post';
 import { withBase } from '../../utils/url';
 
 export async function getStaticPaths() {
-  const posts = await getPublishedPosts();
-  return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
+  const posts = await getPublishedPosts(); // 최신순 정렬
+  return posts.map((post, i) => ({
+    params: { slug: post.id },
+    props: { post, newer: posts[i - 1] ?? null, older: posts[i + 1] ?? null },
+  }));
 }
 
-const { post } = Astro.props;
+const { post, newer, older } = Astro.props;
 const { Content, headings } = await render(post);
 const minutes = readingMinutes(post);
 const cover = post.data.cover;
@@ -28,7 +32,10 @@ const cover = post.data.cover;
   <div class="post-grid">
   <article class="post">
     <header class="post-header">
-      <PostMeta category={post.data.category} pubDate={post.data.pubDate} minutes={minutes} />
+      <div class="meta-row">
+        <PostMeta category={post.data.category} pubDate={post.data.pubDate} minutes={minutes} />
+        <ViewCount slug={post.id} />
+      </div>
       <h1>{post.data.title}</h1>
       <p class="description">{post.data.description}</p>
       {cover && <Image class="cover" src={cover} alt="" loading="eager" />}
@@ -53,6 +60,29 @@ const cover = post.data.cover;
             ))}
           </ul>
         </footer>
+      )
+    }
+
+    {
+      (older || newer) && (
+        <nav class="post-nav" aria-label="이전·다음 글">
+          {older ? (
+            <a class="nav-card older" href={withBase(`/posts/${older.id}/`)}>
+              <span class="label">← 이전 글</span>
+              <span class="nav-title">{older.data.title}</span>
+            </a>
+          ) : (
+            <span class="nav-spacer" />
+          )}
+          {newer ? (
+            <a class="nav-card newer" href={withBase(`/posts/${newer.id}/`)}>
+              <span class="label">다음 글 →</span>
+              <span class="nav-title">{newer.data.title}</span>
+            </a>
+          ) : (
+            <span class="nav-spacer" />
+          )}
+        </nav>
       )
     }
   </article>
@@ -192,6 +222,13 @@ const cover = post.data.cover;
     }
   }
 
+  .meta-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5em;
+  }
+
   .post-header h1 {
     margin: 0.8rem 0 0.5rem;
     font-size: clamp(1.7rem, 5vw, 2.2rem);
@@ -241,6 +278,64 @@ const cover = post.data.cover;
     color: var(--accent);
     border-color: var(--accent);
     text-decoration: none;
+  }
+
+  .post-nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+  }
+
+  .nav-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.9rem 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--surface);
+    transition: border-color 0.15s ease;
+    min-width: 0;
+  }
+
+  .nav-card:hover {
+    border-color: var(--accent);
+    text-decoration: none;
+  }
+
+  .nav-card.newer {
+    text-align: right;
+    align-items: flex-end;
+  }
+
+  .nav-card .label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .nav-card .nav-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  @media (max-width: 540px) {
+    .post-nav {
+      grid-template-columns: 1fr;
+    }
+
+    .nav-card.newer {
+      text-align: left;
+      align-items: flex-start;
+    }
+
+    .nav-spacer {
+      display: none;
+    }
   }
 </style>
 
