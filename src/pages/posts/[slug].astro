@@ -143,11 +143,49 @@ const connections = await getConnections(post.id);
       const { default: mermaid } = await import(
         /* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs'
       );
+      // Injoy 디자인 토큰을 그대로 다이어그램 팔레트로 — 라이트/다크 모두 우리 톤
+      const css = getComputedStyle(document.documentElement);
+      const v = (name: string) => css.getPropertyValue(name).trim();
       mermaid.initialize({
         startOnLoad: false,
         securityLevel: 'strict',
-        theme: effectiveTheme() === 'dark' ? 'dark' : 'neutral',
-        fontFamily: 'inherit',
+        fontFamily: getComputedStyle(document.body).fontFamily,
+        theme: 'base',
+        themeVariables: {
+          darkMode: effectiveTheme() === 'dark',
+          background: v('--surface'),
+          fontSize: '14px',
+          textColor: v('--text'),
+          lineColor: v('--text-muted'),
+          // 노드(플로차트)
+          primaryColor: v('--accent-weak'),
+          primaryTextColor: v('--text'),
+          primaryBorderColor: v('--accent'),
+          secondaryColor: v('--surface'),
+          secondaryBorderColor: v('--border'),
+          secondaryTextColor: v('--text'),
+          tertiaryColor: v('--bg'),
+          tertiaryBorderColor: v('--border'),
+          edgeLabelBackground: v('--surface'),
+          clusterBkg: v('--bg'),
+          clusterBorder: v('--border'),
+          // 시퀀스
+          actorBkg: v('--accent-weak'),
+          actorBorder: v('--accent'),
+          actorTextColor: v('--text'),
+          actorLineColor: v('--text-muted'),
+          signalColor: v('--text'),
+          signalTextColor: v('--text'),
+          labelBoxBkgColor: v('--accent-weak'),
+          labelBoxBorderColor: v('--accent'),
+          labelTextColor: v('--text'),
+          loopTextColor: v('--text'),
+          noteBkgColor: v('--accent-weak'),
+          noteBorderColor: v('--accent'),
+          noteTextColor: v('--text'),
+          activationBkgColor: v('--accent-weak'),
+          activationBorderColor: v('--accent'),
+        },
       });
       for (const container of containers) {
         try {
