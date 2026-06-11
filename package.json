@@ -9,6 +9,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "new": "node scripts/new-post.mjs",
+    "write": "concurrently -k -n blog,cms \"astro dev --open /injoy/admin/\" \"cross-env MODE=fs PORT=8081 decap-server\"",
     "astro": "astro"
   },
   "dependencies": {
@@ -17,7 +18,16 @@
     "@astrojs/sitemap": "^3.0.0",
     "@shikijs/transformers": "^3.23.0",
     "astro": "^5.0.0",
+    "katex": "^0.17.0",
     "reading-time": "^1.5.0",
-    "rehype-github-alerts": "^4.2.0"
+    "rehype-github-alerts": "^4.2.0",
+    "rehype-katex": "^7.0.1",
+    "remark-emoji": "^5.0.2",
+    "remark-math": "^6.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3",
+    "cross-env": "^10.1.0",
+    "decap-server": "^3.9.0"
   }
 }

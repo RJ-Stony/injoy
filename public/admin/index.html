@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Injoy 글쓰기</title>
+    <link href="config.yml" type="text/yaml" rel="cms-config-url" />
+  </head>
+  <body>
+    <!--
+      이 페이지는 npm run write 로컬 전용이다.
+      프로덕션 빌드에서는 strip-admin 통합이 dist/admin을 통째로 제거하므로
+      배포된 사이트에는 존재하지 않는다 (방문자는 글을 쓸 수 없다).
+    -->
+    <script src="https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js"></script>
+  </body>
+</html>
