@@ -1,13 +1,17 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { withBase } from '../utils/url';
-import { EDGE_TYPES } from '../utils/graph';
+import { EDGE_TYPES, AUTO_EDGE_TYPES } from '../utils/graph';
 
 /**
  * 인-블로그 글쓰기 에디터.
  * 이 페이지 자체는 정적 HTML이라 누구나 열 수 있지만, 모든 동작은
  * 브라우저 localStorage에 저장된 GitHub 토큰(나만 보유)으로만 가능하다.
  * 발행 = GitHub API로 main에 커밋 → Actions가 자동 배포.
+ *
+ * 스타일은 의도적으로 is:global + .write-root 프리픽스를 쓴다 —
+ * 점검 결과·연결 제안·달력처럼 JS로 만들어지는 요소에는 Astro 스코프
+ * 클래스가 붙지 않아 스코프 스타일이 적용되지 않기 때문.
  */
 const config = {
   owner: 'RJ-Stony',
@@ -22,112 +26,206 @@ const config = {
 const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
   value,
   label: v.label,
+  criteria: v.criteria,
 }));
 ---
 
 <BaseLayout title="글쓰기" description="Injoy 운영자 전용 글쓰기 공간." wide>
   <meta slot="head" name="robots" content="noindex" />
 
-  <!-- 인증 전 -->
-  <section id="auth-card" class="card" hidden>
-    <h1>글쓰기 공간</h1>
-    <p>
-      여기는 운영자 전용 에디터예요. 글을 쓰고 <strong>발행</strong>을 누르면 GitHub에
-      커밋되고, 1~2분 안에 블로그에 올라갑니다. 동작하려면 이 기기에 GitHub 토큰을 한 번
-      저장해야 해요 — 토큰은 <strong>이 브라우저에만</strong> 남고 어디에도 전송되지 않습니다
-      (GitHub API 호출 제외).
-    </p>
-    <ol class="setup-steps">
-      <li>
-        <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">
-          GitHub fine-grained 토큰 만들기 ↗</a>
-        — Repository access를 <code>RJ-Stony/injoy</code>로 제한하고, Permissions에서
-        <code>Contents: Read and write</code>만 켜세요.
-      </li>
-      <li>발급된 토큰을 아래에 붙여넣고 저장.</li>
-    </ol>
-    <div class="token-row">
-      <input id="token-input" type="password" placeholder="github_pat_..." autocomplete="off" />
-      <button id="token-save" type="button" class="primary">이 기기에 저장</button>
-    </div>
-    <p id="auth-error" class="error" hidden></p>
-  </section>
-
-  <!-- 에디터 -->
-  <section id="editor" hidden>
-    <header class="editor-top">
-      <h1 id="editor-title">새 글</h1>
-      <div class="top-actions">
-        <select id="post-picker" aria-label="기존 글 불러오기">
-          <option value="">기존 글 수정…</option>
-        </select>
-        <button id="new-post" type="button">새 글</button>
-        <button id="delete-post" type="button" class="danger" hidden>삭제</button>
+  <div class="write-root">
+    <!-- 인증 전 -->
+    <section id="auth-card" class="card auth-card" hidden>
+      <h1>글쓰기 공간</h1>
+      <p>
+        여기는 운영자 전용 에디터예요. 글을 쓰고 <strong>발행</strong>을 누르면 GitHub에
+        커밋되고, 1~2분 안에 블로그에 올라가요. 동작하려면 이 기기에 GitHub 토큰을 한 번
+        저장해야 해요. 토큰은 <strong>이 브라우저에만</strong> 남고, GitHub API 호출 말고는
+        어디에도 전송되지 않아요.
+      </p>
+      <ol class="setup-steps">
+        <li>
+          <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">
+            GitHub fine-grained 토큰 만들기 ↗</a>
+          에서 Repository access를 <code>RJ-Stony/injoy</code>로 제한하고, Permissions에서
+          <code>Contents: Read and write</code>만 켜세요.
+        </li>
+        <li>발급된 토큰을 아래에 붙여넣고 저장하세요.</li>
+      </ol>
+      <div class="token-row">
+        <input id="token-input" type="password" placeholder="github_pat_..." autocomplete="off" />
+        <button id="token-save" type="button" class="primary">이 기기에 저장</button>
       </div>
-    </header>
+      <p id="auth-error" class="error" hidden></p>
+    </section>
 
-    <div class="fm-grid">
-      <label>제목 <input id="fm-title" type="text" placeholder="글 제목" /></label>
-      <label>슬러그(주소) <input id="fm-slug" type="text" placeholder="my-post (영문 소문자·하이픈)" /></label>
-      <label class="span2">한 줄 요약 <input id="fm-description" type="text" placeholder="목록·검색·공유 미리보기에 쓰여요" /></label>
-      <label>카테고리 <input id="fm-category" type="text" value="개발" /></label>
-      <label>태그(콤마로 구분) <input id="fm-tags" type="text" placeholder="astro, blog" /></label>
-      <label>발행일 <input id="fm-date" type="date" /></label>
-      <label class="check"><input id="fm-draft" type="checkbox" checked /> 초안(사이트에 안 보임)</label>
-      <label class="span2 file">대표 이미지(썸네일)
-        <input id="fm-cover" type="file" accept="image/*" />
-        <span id="cover-name" class="muted"></span>
-      </label>
-    </div>
+    <!-- 에디터 -->
+    <section id="editor" hidden>
+      <header class="editor-top">
+        <div class="editor-heading">
+          <h1 id="editor-title">새 글</h1>
+          <p class="editor-sub">마크다운으로 쓰고 발행을 누르면 1~2분 안에 블로그에 반영돼요.</p>
+        </div>
+        <div class="top-actions">
+          <span class="select-wrap">
+            <select id="post-picker" aria-label="기존 글 불러오기">
+              <option value="">기존 글 수정…</option>
+            </select>
+          </span>
+          <button id="new-post" type="button">새 글</button>
+          <button id="delete-post" type="button" class="danger" hidden>삭제</button>
+        </div>
+      </header>
 
-    <div class="editor-pane">
-      <div class="pane">
-        <div class="pane-head">
-          <span>본문 (마크다운 · [[슬러그]]로 글 연결)</span>
+      <section class="card section">
+        <h2 class="section-title">글 정보</h2>
+        <div class="fm-grid">
+          <label class="field">
+            <span class="field-name">제목</span>
+            <input id="fm-title" type="text" placeholder="글 제목" />
+          </label>
+          <label class="field">
+            <span class="field-name">슬러그(주소)</span>
+            <input id="fm-slug" type="text" placeholder="my-post (영문 소문자·하이픈)" />
+          </label>
+          <label class="field span2">
+            <span class="field-name">한 줄 요약</span>
+            <input id="fm-description" type="text" placeholder="목록·검색·공유 미리보기에 쓰여요" />
+          </label>
+          <label class="field">
+            <span class="field-name">카테고리</span>
+            <input id="fm-category" type="text" value="개발" />
+          </label>
+          <label class="field">
+            <span class="field-name">태그(쉼표로 구분)</span>
+            <input id="fm-tags" type="text" placeholder="astro, blog" />
+          </label>
+          <div class="field date-field">
+            <span class="field-name">발행일</span>
+            <input type="hidden" id="fm-date" />
+            <button
+              type="button"
+              id="date-trigger"
+              class="date-trigger"
+              aria-haspopup="dialog"
+              aria-expanded="false"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+              <span class="date-label">날짜 선택</span>
+            </button>
+            <div id="date-popover" class="date-popover" role="dialog" aria-label="발행일 선택" hidden></div>
+          </div>
+          <label class="field switch-field">
+            <span class="field-name">초안으로 저장</span>
+            <span class="switch-row">
+              <input id="fm-draft" type="checkbox" role="switch" checked />
+              <span class="switch-hint">켜 두면 사이트에 보이지 않아요</span>
+            </span>
+          </label>
+          <div class="field span2">
+            <span class="field-name">대표 이미지(썸네일)</span>
+            <div class="cover-row">
+              <button type="button" id="cover-pick">이미지 선택</button>
+              <img id="cover-thumb" class="cover-thumb" alt="" hidden />
+              <span id="cover-name" class="muted">아직 선택한 이미지가 없어요</span>
+              <button type="button" id="cover-remove" class="linklike" hidden>지우기</button>
+            </div>
+            <input id="fm-cover" type="file" accept="image/*" hidden />
+          </div>
+        </div>
+      </section>
+
+      <section class="card section">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">본문</h2>
+            <p class="section-sub">마크다운에 코드블록·수식·다이어그램·[[위키링크]]까지 그대로 써요.</p>
+          </div>
           <button id="insert-image" type="button">이미지 넣기</button>
           <input id="body-image" type="file" accept="image/*" hidden />
         </div>
-        <textarea id="fm-body" spellcheck="false" placeholder="여기부터 본문. ## 제목, 코드블록, [[다른-글]] 모두 됩니다."></textarea>
-      </div>
-      <div class="pane preview-pane">
-        <div class="pane-head"><span>간략 미리보기 — 콜아웃·수식·다이어그램은 발행 후 확인</span></div>
-        <div id="preview" class="prose"></div>
-      </div>
-    </div>
+        <div class="editor-pane">
+          <div class="pane">
+            <div class="pane-head">
+              <span>작성</span>
+              <span id="char-count" class="muted"></span>
+            </div>
+            <textarea
+              id="fm-body"
+              spellcheck="false"
+              placeholder="여기부터 본문. ## 제목, 코드블록, [[다른-글]] 모두 됩니다."></textarea>
+          </div>
+          <div class="pane">
+            <div class="pane-head">
+              <span>미리보기</span>
+              <span class="muted">발행했을 때 모습 그대로</span>
+            </div>
+            <div id="preview" class="prose"></div>
+          </div>
+        </div>
+      </section>
 
-    <section class="card sub">
-      <h2>연결 제안 <span class="muted">— 발행하면 그래프에 함께 기록돼요</span></h2>
-      <ul id="suggestions" class="suggestions"></ul>
-      <div class="manual-edge">
-        <select id="edge-target"><option value="">글 선택…</option></select>
-        <select id="edge-type">
-          {edgeTypeOptions.map((o) => <option value={o.value}>{o.label}</option>)}
-        </select>
-        <input id="edge-note" type="text" placeholder="메모(선택)" />
-        <button id="edge-add" type="button">연결 추가</button>
+      <section class="card section">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">연결</h2>
+            <p class="section-sub">발행하면 지식 그래프에 함께 기록돼요.</p>
+          </div>
+        </div>
+        <ul id="suggestions" class="suggestions"></ul>
+        <div class="manual-edge">
+          <span class="select-wrap">
+            <select id="edge-target" aria-label="연결할 글"><option value="">글 선택…</option></select>
+          </span>
+          <span class="select-wrap">
+            <select id="edge-type" aria-label="연결 타입">
+              {edgeTypeOptions.map((o) => <option value={o.value}>{o.label}</option>)}
+            </select>
+          </span>
+          <input id="edge-note" type="text" placeholder="메모(선택)" />
+          <button id="edge-add" type="button">연결 추가</button>
+        </div>
+        <p id="edge-hint" class="edge-hint"></p>
+        <details class="edge-guide">
+          <summary>어떤 타입을 골라야 할까요?</summary>
+          <ul>
+            {edgeTypeOptions.map((o) => (
+              <li>
+                <strong>{o.label}</strong>
+                <span>{o.criteria}</span>
+              </li>
+            ))}
+            <li>
+              <strong>{AUTO_EDGE_TYPES.mentions.label}</strong>
+              <span>{AUTO_EDGE_TYPES.mentions.criteria}</span>
+            </li>
+          </ul>
+        </details>
+      </section>
+
+      <section class="card section">
+        <h2 class="section-title">점검</h2>
+        <ul id="lint-results" class="lint"></ul>
+      </section>
+
+      <div class="publish-bar">
+        <span id="publish-status" role="status"></span>
+        <button id="publish" type="button" class="primary big">발행하기</button>
       </div>
+      <p class="settings">
+        <button id="token-clear" type="button" class="linklike">이 기기에서 토큰 지우기</button>
+      </p>
     </section>
-
-    <section class="card sub">
-      <h2>점검(lint)</h2>
-      <ul id="lint-results" class="lint"></ul>
-    </section>
-
-    <div class="publish-row">
-      <button id="publish" type="button" class="primary big">발행 — 커밋하고 배포</button>
-      <span id="publish-status" role="status"></span>
-    </div>
-
-    <p class="settings muted">
-      <button id="token-clear" type="button" class="linklike">이 기기에서 토큰 지우기</button>
-    </p>
-  </section>
+  </div>
 
   <script type="application/json" id="write-config" set:html={JSON.stringify(config)} />
   <script type="application/json" id="edge-type-meta" set:html={JSON.stringify(edgeTypeOptions)} />
 </BaseLayout>
 
 <script>
+  import { createPreviewRenderer, enhancePreview } from '../scripts/write-preview';
+  import { createDatePicker, todayISO } from '../scripts/date-picker';
+
   // ---------- 설정·상태 ----------
   const CFG = JSON.parse(document.getElementById('write-config')!.textContent!);
   const TOKEN_KEY = 'injoy-gh-token';
@@ -135,11 +233,17 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
   const $ = <T extends HTMLElement = HTMLElement>(id: string) =>
     document.getElementById(id) as T;
 
+  interface PendingFile {
+    b64: string;
+    dataUrl: string;
+  }
+
   const state = {
     mode: 'new' as 'new' | 'edit',
     editingSlug: null as string | null,
-    pendingFiles: new Map<string, string>(), // repo path -> base64
+    pendingFiles: new Map<string, PendingFile>(), // repo path -> 파일 내용
     coverPath: null as string | null,
+    coverPendingPath: null as string | null,
     acceptedEdges: [] as { to: string; type: string; note?: string }[],
     index: { posts: [] as any[], edges: [] as any[] },
   };
@@ -162,6 +266,13 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     }
     return res.status === 204 ? null : res.json();
   };
+
+  // ---------- 발행일 달력 ----------
+  const datePicker = createDatePicker({
+    input: $('fm-date') as HTMLInputElement,
+    trigger: $('date-trigger') as HTMLButtonElement,
+    panel: $('date-popover'),
+  });
 
   // ---------- 인증 ----------
   const showEditor = async () => {
@@ -198,17 +309,21 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     } catch (e) {
       localStorage.removeItem(TOKEN_KEY);
       const err = $('auth-error');
-      err.textContent = `토큰 확인 실패 — 권한(Contents RW)과 레포 지정을 확인하세요. ${e}`;
+      err.textContent = `토큰을 확인하지 못했어요. 권한(Contents 읽기·쓰기)과 레포 지정을 확인해 주세요. ${e}`;
       err.hidden = false;
     }
   });
 
   $('token-clear').addEventListener('click', () => {
+    if (!confirm('이 기기에서 발행 토큰을 지울까요? 헤더의 글쓰기 버튼도 함께 사라져요.')) return;
     localStorage.removeItem(TOKEN_KEY);
     location.reload();
   });
 
   // ---------- 인덱스·글 목록 ----------
+  /** 위키링크 미리보기용 슬러그 → 제목 (참조를 파이프라인과 공유 — 재생성 없이 갱신) */
+  const wikiTitles: Record<string, string> = {};
+
   async function loadIndex() {
     try {
       const res = await fetch(CFG.siteIndexUrl, { cache: 'no-store' });
@@ -216,10 +331,12 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     } catch {
       state.index = { posts: [], edges: [] };
     }
+    for (const key of Object.keys(wikiTitles)) delete wikiTitles[key];
     const target = $('edge-target') as HTMLSelectElement;
     target.length = 1;
     for (const p of state.index.posts) {
       target.add(new Option(p.title, p.slug));
+      wikiTitles[p.slug] = p.title;
     }
   }
 
@@ -281,38 +398,54 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     };
   }
 
-  // ---------- 미리보기 ----------
-  let marked: any = null;
+  // ---------- 미리보기 (빌드와 같은 파이프라인) ----------
+  const renderMarkdown = createPreviewRenderer({ base: CFG.base, titles: wikiTitles });
+  const RAW_BASE = `https://raw.githubusercontent.com/${CFG.owner}/${CFG.repo}/${CFG.branch}`;
+
+  /** ./_images/ 경로를 미리볼 수 있는 URL로 — 커밋 전 파일은 data URL, 레포 파일은 raw URL */
+  const resolveImage = (src: string): string | null => {
+    if (!src.startsWith('./_images/')) return null;
+    const name = src.slice('./_images/'.length);
+    const pending = state.pendingFiles.get(`${CFG.postsDir}/_images/${name}`);
+    if (pending) return pending.dataUrl;
+    return `${RAW_BASE}/${CFG.postsDir}/_images/${encodeURIComponent(name)}`;
+  };
+
+  let renderGen = 0;
   async function renderPreview() {
-    if (!marked) {
-      try {
-        ({ marked } = await import(
-          /* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/marked@16/lib/marked.esm.js'
-        ));
-      } catch {
-        $('preview').textContent = '(미리보기 모듈을 불러오지 못했어요)';
-        return;
-      }
+    const preview = $('preview');
+    const src = ($('fm-body') as HTMLTextAreaElement).value;
+    $('char-count').textContent = src.length ? `${src.length.toLocaleString('ko-KR')}자` : '';
+    const gen = ++renderGen;
+    if (!src.trim()) {
+      preview.innerHTML =
+        '<p class="preview-empty">본문을 쓰면 발행했을 때 모습이 여기에 그대로 보여요.</p>';
+      return;
     }
-    let src = ($('fm-body') as HTMLTextAreaElement).value;
-    // [[위키링크]]를 미리보기에서도 링크로
-    src = src.replace(/\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]+?))?\]\]/g, (_w, slug, label) => {
-      const post = state.index.posts.find((p: any) => p.slug === slug.trim());
-      const text = label?.trim() || post?.title || slug;
-      return post ? `[${text}](${CFG.base}posts/${slug.trim()}/)` : `~~[[${slug}]]~~`;
-    });
-    $('preview').innerHTML = marked.parse(src);
+    try {
+      const html = await renderMarkdown(src);
+      if (gen !== renderGen) return; // 그 사이 더 새로운 입력이 들어옴
+      preview.innerHTML = html;
+      await enhancePreview(preview, { resolveImage });
+    } catch (e) {
+      if (gen === renderGen) preview.textContent = `미리보기를 그리지 못했어요: ${e}`;
+    }
   }
 
   let previewTimer: ReturnType<typeof setTimeout>;
-  $('fm-body').addEventListener('input', () => {
+  const scheduleRefresh = () => {
     clearTimeout(previewTimer);
     previewTimer = setTimeout(() => {
       renderPreview();
       renderSuggestions();
       runLint();
     }, 400);
-  });
+  };
+  $('fm-body').addEventListener('input', scheduleRefresh);
+
+  // 테마가 바뀌면 다이어그램 팔레트도 따라가야 하므로 미리보기를 다시 그린다
+  window.addEventListener('injoy:theme-change', () => renderPreview());
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => renderPreview());
 
   // ---------- 슬러그 자동 ----------
   $('fm-title').addEventListener('input', () => {
@@ -332,10 +465,13 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
   });
 
   // ---------- 이미지 업로드 (발행 시 같은 커밋에 포함) ----------
-  const fileToBase64 = (file: File) =>
-    new Promise<string>((resolve, reject) => {
+  const fileData = (file: File) =>
+    new Promise<PendingFile>((resolve, reject) => {
       const r = new FileReader();
-      r.onload = () => resolve(String(r.result).split(',')[1]);
+      r.onload = () => {
+        const dataUrl = String(r.result);
+        resolve({ b64: dataUrl.split(',')[1], dataUrl });
+      };
       r.onerror = reject;
       r.readAsDataURL(file);
     });
@@ -343,27 +479,55 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
   const safeName = (name: string) =>
     name.toLowerCase().replace(/[^a-z0-9.-]+/g, '-').replace(/-+/g, '-');
 
+  function setCoverUI(thumbSrc: string | null, nameText: string, removable: boolean) {
+    const thumb = $('cover-thumb') as HTMLImageElement;
+    if (thumbSrc) {
+      thumb.src = thumbSrc;
+      thumb.hidden = false;
+    } else {
+      thumb.removeAttribute('src');
+      thumb.hidden = true;
+    }
+    $('cover-name').textContent = nameText;
+    $('cover-remove').hidden = !removable;
+  }
+
+  $('cover-pick').addEventListener('click', () => $('fm-cover').click());
   $('fm-cover').addEventListener('change', async (ev) => {
-    const file = (ev.target as HTMLInputElement).files?.[0];
+    const inputEl = ev.target as HTMLInputElement;
+    const file = inputEl.files?.[0];
     if (!file) return;
     const slug = ($('fm-slug') as HTMLInputElement).value.trim() || 'post';
     const name = `${slug}-cover-${safeName(file.name)}`;
-    state.pendingFiles.set(`${CFG.postsDir}/_images/${name}`, await fileToBase64(file));
+    if (state.coverPendingPath) state.pendingFiles.delete(state.coverPendingPath);
+    const path = `${CFG.postsDir}/_images/${name}`;
+    const data = await fileData(file);
+    state.pendingFiles.set(path, data);
+    state.coverPendingPath = path;
     state.coverPath = `./_images/${name}`;
-    $('cover-name').textContent = `발행 시 업로드: ${name}`;
+    setCoverUI(data.dataUrl, `발행 시 업로드: ${name}`, true);
+    inputEl.value = ''; // 같은 파일을 다시 골라도 change가 일어나게
+  });
+  $('cover-remove').addEventListener('click', () => {
+    if (state.coverPendingPath) state.pendingFiles.delete(state.coverPendingPath);
+    state.coverPendingPath = null;
+    state.coverPath = null;
+    setCoverUI(null, '아직 선택한 이미지가 없어요', false);
   });
 
   $('insert-image').addEventListener('click', () => $('body-image').click());
   $('body-image').addEventListener('change', async (ev) => {
-    const file = (ev.target as HTMLInputElement).files?.[0];
+    const inputEl = ev.target as HTMLInputElement;
+    const file = inputEl.files?.[0];
     if (!file) return;
     const slug = ($('fm-slug') as HTMLInputElement).value.trim() || 'post';
     const name = `${slug}-${safeName(file.name)}`;
-    state.pendingFiles.set(`${CFG.postsDir}/_images/${name}`, await fileToBase64(file));
+    state.pendingFiles.set(`${CFG.postsDir}/_images/${name}`, await fileData(file));
     const ta = $('fm-body') as HTMLTextAreaElement;
     const md = `\n![설명을 적어 주세요](./_images/${name})\n`;
     ta.setRangeText(md, ta.selectionStart, ta.selectionStart, 'end');
     ta.dispatchEvent(new Event('input'));
+    inputEl.value = '';
   });
 
   // ---------- 연결 제안 ----------
@@ -402,13 +566,16 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
       .slice(0, 3);
   }
 
+  const EDGE_META = JSON.parse(document.getElementById('edge-type-meta')!.textContent!);
+  const labelOf = (t: string) => EDGE_META.find((m: any) => m.value === t)?.label ?? t;
+
   function renderSuggestions() {
     const ul = $('suggestions');
     const picked = new Set(state.acceptedEdges.map((e) => e.to));
     const items = suggestEdges();
     ul.innerHTML = '';
     if (items.length === 0 && state.acceptedEdges.length === 0) {
-      ul.innerHTML = '<li class="muted">아직 비슷한 글이 없어요. 본문을 쓰면 자동으로 제안됩니다.</li>';
+      ul.innerHTML = '<li class="empty">아직 비슷한 글이 없어요. 본문을 쓰면 자동으로 제안돼요.</li>';
     }
     for (const { post, score } of items) {
       if (picked.has(post.slug)) continue;
@@ -423,7 +590,7 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
       li.append(
         Object.assign(document.createElement('span'), { textContent: post.title, className: 'sug-title' }),
         Object.assign(document.createElement('span'), {
-          textContent: ` 유사도 ${(score * 100).toFixed(0)}% `,
+          textContent: `유사도 ${(score * 100).toFixed(0)}%`,
           className: 'muted',
         }),
         btn,
@@ -434,6 +601,20 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
       const p = state.index.posts.find((p: any) => p.slug === e.to);
       const li = document.createElement('li');
       li.className = 'accepted';
+
+      // 수락한 연결의 타입은 바로 고칠 수 있게 — 기준은 아래 가이드 참고
+      const wrap = document.createElement('span');
+      wrap.className = 'select-wrap';
+      const sel = document.createElement('select');
+      sel.className = 'mini';
+      sel.setAttribute('aria-label', '연결 타입');
+      for (const m of EDGE_META) sel.add(new Option(m.label, m.value));
+      sel.value = e.type;
+      sel.addEventListener('change', () => {
+        e.type = sel.value;
+      });
+      wrap.appendChild(sel);
+
       const rm = document.createElement('button');
       rm.type = 'button';
       rm.textContent = '빼기';
@@ -441,19 +622,28 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
         state.acceptedEdges.splice(i, 1);
         renderSuggestions();
       });
+
       li.append(
+        wrap,
         Object.assign(document.createElement('span'), {
-          textContent: `${labelOf(e.type)} → ${p?.title ?? e.to}`,
+          textContent: p?.title ?? e.to,
           className: 'sug-title',
         }),
-        rm,
       );
+      if (e.note) {
+        li.append(Object.assign(document.createElement('span'), { textContent: e.note, className: 'muted' }));
+      }
+      li.append(rm);
       ul.appendChild(li);
     }
   }
 
-  const EDGE_META = JSON.parse(document.getElementById('edge-type-meta')!.textContent!);
-  const labelOf = (t: string) => EDGE_META.find((m: any) => m.value === t)?.label ?? t;
+  const updateEdgeHint = () => {
+    const t = ($('edge-type') as HTMLSelectElement).value;
+    $('edge-hint').textContent = EDGE_META.find((m: any) => m.value === t)?.criteria ?? '';
+  };
+  $('edge-type').addEventListener('change', updateEdgeHint);
+  updateEdgeHint();
 
   $('edge-add').addEventListener('click', () => {
     const to = ($('edge-target') as HTMLSelectElement).value;
@@ -467,7 +657,7 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     renderSuggestions();
   });
 
-  // ---------- lint ----------
+  // ---------- 점검 ----------
   function stripFences(body: string) {
     const out: string[] = [];
     let fence: string | null = null;
@@ -500,8 +690,8 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     else if (state.mode === 'new' && state.index.posts.some((p: any) => p.slug === slug))
       errors.push(`이미 같은 슬러그의 글이 있어요: ${slug}`);
     if (!desc) errors.push('한 줄 요약이 비어 있어요.');
-    else if (desc.length > 160) warnings.push(`한 줄 요약이 길어요(${desc.length}자) — 160자 이하 권장.`);
-    if (!($('fm-date') as HTMLInputElement).value) errors.push('발행일을 선택하세요.');
+    else if (desc.length > 160) warnings.push(`한 줄 요약이 길어요(${desc.length}자). 160자 이하를 권장해요.`);
+    if (!($('fm-date') as HTMLInputElement).value) errors.push('발행일을 선택해 주세요.');
     if (!body.trim()) errors.push('본문이 비어 있어요.');
 
     const prose = stripFences(body);
@@ -510,19 +700,22 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
       if (target !== slug && !state.index.posts.some((p: any) => p.slug === target))
         warnings.push(`위키링크 [[${target}]] 대상 글을 찾을 수 없어요(초안이면 발행 후 연결됩니다).`);
     }
-    if (/!\[\]\(/.test(body)) warnings.push('alt 텍스트가 빈 이미지가 있어요 — 설명을 적어 주세요.');
+    if (/!\[\]\(/.test(body)) warnings.push('alt 텍스트가 빈 이미지가 있어요. 설명을 적어 주세요.');
     if (((body.match(/\$\$/g) ?? []).length % 2) === 1) warnings.push('$$ 수식 블록이 닫히지 않은 것 같아요.');
-    if (($('fm-draft') as HTMLInputElement).checked) warnings.push('draft 상태예요 — 발행해도 사이트에는 보이지 않습니다.');
+    if (($('fm-draft') as HTMLInputElement).checked) warnings.push('초안 상태예요. 발행해도 사이트에는 보이지 않아요.');
 
     const ul = $('lint-results');
     ul.innerHTML = '';
     for (const e of errors) ul.insertAdjacentHTML('beforeend', `<li class="err">✕ ${e}</li>`);
     for (const w of warnings) ul.insertAdjacentHTML('beforeend', `<li class="warn">△ ${w}</li>`);
-    if (!errors.length && !warnings.length) ul.innerHTML = '<li class="ok">✓ 통과 — 발행할 준비가 됐어요.</li>';
+    if (!errors.length && !warnings.length) ul.innerHTML = '<li class="ok">✓ 모두 통과했어요. 발행할 준비가 됐어요.</li>';
     return { errors, warnings };
   }
   ['fm-title', 'fm-description', 'fm-tags', 'fm-date', 'fm-category'].forEach((id) =>
-    $(id).addEventListener('input', runLint),
+    $(id).addEventListener('input', () => {
+      runLint();
+      renderSuggestions();
+    }),
   );
   $('fm-draft').addEventListener('change', runLint);
 
@@ -634,7 +827,7 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
   $('publish').addEventListener('click', async () => {
     const { errors, warnings } = runLint();
     if (errors.length) {
-      $('publish-status').textContent = '점검 오류를 먼저 해결해 주세요.';
+      $('publish-status').textContent = '점검에서 막힌 항목을 먼저 해결해 주세요.';
       return;
     }
     if (warnings.length && !confirm(`경고 ${warnings.length}건이 있어요. 그래도 발행할까요?`)) return;
@@ -650,34 +843,35 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
       const files: { path: string; contentBase64: string }[] = [
         { path: `${CFG.postsDir}/${slug}.md`, contentBase64: b64encodeUtf8(content) },
       ];
-      for (const [path, b64] of state.pendingFiles) files.push({ path, contentBase64: b64 });
+      for (const [path, f] of state.pendingFiles) files.push({ path, contentBase64: f.b64 });
       // draft 글의 연결은 보류 — 그래프 검증이 발행 글만 알기 때문에 빌드가 깨진다.
       // draft를 해제하고 다시 발행할 때 함께 저장하면 된다.
       if (!isDraft) {
         const edgesContent = await mergedEdgesFile(slug);
         if (edgesContent) files.push({ path: CFG.edgesPath, contentBase64: b64encodeUtf8(edgesContent) });
       } else if (state.acceptedEdges.length > 0) {
-        status.textContent = '초안이라 연결은 이번 커밋에 저장하지 않아요 (발행 시 함께 저장).';
+        status.textContent = '초안이라 연결은 이번 커밋에 저장하지 않아요. 발행으로 전환할 때 함께 저장돼요.';
       }
 
       const verb = state.mode === 'edit' ? '수정' : '발행';
       const sha = await commitFiles(files, [], `post: ${($('fm-title') as HTMLInputElement).value.trim()} ${verb} (/write)`);
 
-      status.textContent = '커밋 완료 — 배포 기다리는 중…';
+      status.textContent = '커밋 완료, 배포를 기다리는 중…';
       const ok = await waitForDeploy(sha);
       if (ok === true) {
         const url = `${CFG.base}posts/${slug}/`;
-        status.innerHTML = `✓ 발행 완료 — <a href="${url}">글 보러 가기</a>`;
+        status.innerHTML = `✓ 발행 완료 · <a href="${url}">글 보러 가기</a>`;
         state.pendingFiles.clear();
+        state.coverPendingPath = null;
         state.acceptedEdges = [];
         state.mode = 'edit';
         state.editingSlug = slug;
         $('delete-post').hidden = false;
         await Promise.all([loadIndex(), loadPostList()]);
       } else if (ok === false) {
-        status.textContent = '✕ 배포 실패 — GitHub Actions 로그를 확인하세요.';
+        status.textContent = '✕ 배포에 실패했어요. GitHub Actions 로그를 확인해 주세요.';
       } else {
-        status.textContent = '커밋은 됐지만 배포 확인이 늦어지고 있어요 — Actions에서 확인하세요.';
+        status.textContent = '커밋은 됐지만 배포 확인이 늦어지고 있어요. Actions에서 직접 확인해 주세요.';
       }
     } catch (e) {
       status.textContent = `✕ 발행 실패: ${e}`;
@@ -699,6 +893,7 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     state.pendingFiles.clear();
     state.acceptedEdges = [];
     state.coverPath = parsed.cover;
+    state.coverPendingPath = null;
 
     $('editor-title').textContent = `수정: ${parsed.title}`;
     ($('fm-title') as HTMLInputElement).value = parsed.title;
@@ -708,10 +903,14 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     ($('fm-description') as HTMLInputElement).value = parsed.description;
     ($('fm-category') as HTMLInputElement).value = parsed.category;
     ($('fm-tags') as HTMLInputElement).value = parsed.tags.join(', ');
-    ($('fm-date') as HTMLInputElement).value = parsed.pubDate;
+    datePicker.set(parsed.pubDate);
     ($('fm-draft') as HTMLInputElement).checked = parsed.draft;
     ($('fm-body') as HTMLTextAreaElement).value = parsed.body;
-    $('cover-name').textContent = parsed.cover ? `현재: ${parsed.cover}` : '';
+    setCoverUI(
+      parsed.cover ? resolveImage(parsed.cover) : null,
+      parsed.cover ? `현재: ${parsed.cover}` : '아직 선택한 이미지가 없어요',
+      Boolean(parsed.cover),
+    );
     $('delete-post').hidden = false;
     renderPreview();
     renderSuggestions();
@@ -720,7 +919,7 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
 
   $('delete-post').addEventListener('click', async () => {
     if (!state.editingSlug) return;
-    if (!confirm(`"${state.editingSlug}" 글을 정말 삭제할까요? 커밋으로 기록되어 되돌릴 수 있습니다.`)) return;
+    if (!confirm(`"${state.editingSlug}" 글을 정말 삭제할까요? 커밋으로 기록되어 되돌릴 수 있어요.`)) return;
     const status = $('publish-status');
     try {
       status.textContent = '삭제 커밋 만드는 중…';
@@ -733,7 +932,7 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
         `post: ${state.editingSlug} 삭제 (/write)`,
       );
       resetForm(); // resetForm이 상태 문구를 비우므로 성공 메시지는 그 뒤에
-      status.textContent = '✓ 삭제 커밋 완료 — 곧 사이트에서 사라집니다 (관련 연결도 정리됨).';
+      status.textContent = '✓ 삭제 커밋 완료. 곧 사이트에서 사라져요(관련 연결도 함께 정리했어요).';
       await Promise.all([loadIndex(), loadPostList()]);
     } catch (e) {
       status.textContent = `✕ 삭제 실패: ${e}`;
@@ -746,6 +945,7 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     state.pendingFiles.clear();
     state.acceptedEdges = [];
     state.coverPath = null;
+    state.coverPendingPath = null;
     $('editor-title').textContent = '새 글';
     ($('post-picker') as HTMLSelectElement).value = '';
     const slugEl = $('fm-slug') as HTMLInputElement;
@@ -754,10 +954,10 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     delete slugEl.dataset.touched;
     for (const id of ['fm-title', 'fm-description', 'fm-tags']) ($(id) as HTMLInputElement).value = '';
     ($('fm-category') as HTMLInputElement).value = '개발';
-    ($('fm-date') as HTMLInputElement).value = new Date().toISOString().slice(0, 10);
+    datePicker.set(todayISO());
     ($('fm-draft') as HTMLInputElement).checked = true;
     ($('fm-body') as HTMLTextAreaElement).value = '';
-    $('cover-name').textContent = '';
+    setCoverUI(null, '아직 선택한 이미지가 없어요', false);
     $('delete-post').hidden = true;
     $('publish-status').textContent = '';
     renderPreview();
@@ -770,298 +970,708 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
   init();
 </script>
 
-<style>
-  .card {
-    max-width: var(--width-content);
-    margin-inline: auto;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background-color: var(--surface);
-    padding: 1.6rem 1.8rem;
-  }
+<style is:global>
+  /* ==========================================================================
+     /write 에디터 — JS 생성 요소(점검·제안·달력)까지 한 벌로 입히기 위해
+     전부 .write-root 아래의 전역 스타일로 정의한다.
+     ========================================================================== */
 
-  .card h1 {
-    margin: 0 0 0.6rem;
-    font-size: 1.5rem;
-    font-weight: 800;
-  }
-
-  .setup-steps {
-    padding-inline-start: 1.3em;
-    line-height: 1.8;
-  }
-
-  .token-row {
-    display: flex;
-    gap: 0.6rem;
-    margin-top: 1rem;
-  }
-
-  .token-row input {
-    flex: 1;
-  }
-
-  .error {
-    color: light-dark(#cf222e, #e5695e);
-    font-size: 0.9rem;
-  }
-
-  .editor-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-    padding-block: 0.5rem 1.2rem;
-  }
-
-  .editor-top h1 {
-    margin: 0;
-    font-size: 1.6rem;
-    font-weight: 800;
-  }
-
-  .top-actions {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-  }
-
-  .fm-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.8rem 1.2rem;
-    margin-bottom: 1.2rem;
-  }
-
-  .fm-grid label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    font-weight: 600;
-  }
-
-  .fm-grid .span2 {
-    grid-column: span 2;
-  }
-
-  .fm-grid .check {
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .fm-grid .file input[type='file'] {
-    border: 0;
-    padding: 0;
-  }
-
-  input[type='text'],
-  input[type='password'],
-  input[type='date'],
-  select,
-  textarea {
+  /* ---------- 컨트롤 공통 ---------- */
+  .write-root input[type='text'],
+  .write-root input[type='password'],
+  .write-root select,
+  .write-root textarea {
     font: inherit;
+    font-size: 0.92rem;
     color: var(--text);
     background-color: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 0.5em 0.8em;
+    transition: border-color 0.15s ease;
   }
 
-  input:focus-visible,
-  select:focus-visible,
-  textarea:focus-visible {
+  .write-root input[type='text']:hover,
+  .write-root input[type='password']:hover,
+  .write-root select:hover,
+  .write-root textarea:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  }
+
+  .write-root input:focus-visible,
+  .write-root select:focus-visible,
+  .write-root textarea:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
   }
 
-  .editor-pane {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.2rem;
-    margin-bottom: 1.2rem;
+  /* 셀렉트는 OS 화살표 대신 토큰 색 셰브론 */
+  .write-root .select-wrap {
+    position: relative;
+    display: inline-flex;
   }
 
-  @media (max-width: 900px) {
-    .editor-pane {
-      grid-template-columns: 1fr;
-    }
-
-    .fm-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .fm-grid .span2 {
-      grid-column: span 1;
-    }
+  .write-root .select-wrap select {
+    appearance: none;
+    padding-right: 2.1em;
+    cursor: pointer;
   }
 
-  .pane-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.6rem;
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-bottom: 0.4rem;
+  .write-root .select-wrap::after {
+    content: '';
+    position: absolute;
+    right: 0.85em;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    transform: translateY(-70%) rotate(45deg);
+    border-right: 1.6px solid var(--text-muted);
+    border-bottom: 1.6px solid var(--text-muted);
+    pointer-events: none;
   }
 
-  #fm-body {
-    width: 100%;
-    min-height: 420px;
-    font-family: var(--font-mono);
-    font-size: 0.88rem;
-    line-height: 1.7;
-    resize: vertical;
+  .write-root select.mini {
+    font-size: 0.82rem;
+    padding: 0.3em 1.9em 0.3em 0.7em;
   }
 
-  #preview {
-    border: 1px dashed var(--border);
-    border-radius: var(--radius);
-    padding: 1rem 1.2rem;
-    min-height: 420px;
-    font-size: 0.95rem;
-    overflow-y: auto;
-    max-height: 70vh;
-  }
-
-  .card.sub {
-    max-width: none;
-    padding: 1.1rem 1.4rem;
-    margin-bottom: 1.2rem;
-  }
-
-  .card.sub h2 {
-    margin: 0 0 0.6rem;
-    font-size: 1rem;
-  }
-
-  .suggestions {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .suggestions li {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.35rem 0;
-  }
-
-  .suggestions .sug-title {
-    font-weight: 600;
-  }
-
-  .suggestions li.accepted {
-    color: var(--accent);
-  }
-
-  .manual-edge {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    margin-top: 0.8rem;
-  }
-
-  .manual-edge input {
-    flex: 1;
-    min-width: 140px;
-  }
-
-  .lint {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    line-height: 1.9;
-    font-size: 0.9rem;
-  }
-
-  .lint .err {
-    color: light-dark(#cf222e, #e5695e);
-  }
-
-  .lint .warn {
-    color: light-dark(#9a6700, #d9a83c);
-  }
-
-  .lint .ok {
-    color: light-dark(#1a7f4f, #4ecb96);
-  }
-
-  button {
+  .write-root button {
     font: inherit;
     font-size: 0.88rem;
     font-weight: 600;
     color: var(--text);
     background-color: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.45em 1em;
+    border-radius: 10px;
+    padding: 0.5em 1em;
     cursor: pointer;
-    transition: border-color 0.15s ease, color 0.15s ease;
+    transition:
+      border-color 0.15s ease,
+      color 0.15s ease,
+      background-color 0.15s ease,
+      transform 0.12s ease;
   }
 
-  button:hover {
+  .write-root button:hover {
     border-color: var(--accent);
     color: var(--accent);
   }
 
-  button.primary {
+  .write-root button.primary {
     background-color: var(--accent);
     border-color: var(--accent);
     color: #fff;
   }
 
-  button.primary:hover {
+  .write-root button.primary:hover {
     color: #fff;
     opacity: 0.92;
   }
 
-  button.primary.big {
-    font-size: 1rem;
-    padding: 0.7em 1.6em;
+  .write-root button.primary:disabled {
+    opacity: 0.55;
+    cursor: progress;
   }
 
-  button.danger {
+  .write-root button.primary.big {
+    font-size: 0.98rem;
+    padding: 0.72em 1.8em;
+    border-radius: 12px;
+  }
+
+  .write-root button.danger {
     color: light-dark(#cf222e, #e5695e);
   }
 
-  button.danger:hover {
+  .write-root button.danger:hover {
     border-color: light-dark(#cf222e, #e5695e);
   }
 
-  button.linklike {
+  .write-root button.linklike {
     border: 0;
     background: none;
     padding: 0;
     font-weight: 400;
+    font-size: 0.85rem;
     text-decoration: underline;
+    text-underline-offset: 0.2em;
     color: var(--text-muted);
   }
 
-  .publish-row {
+  .write-root button.linklike:hover {
+    color: var(--accent);
+  }
+
+  .write-root .muted {
+    color: var(--text-muted);
+    font-weight: 400;
+    font-size: 0.84em;
+  }
+
+  /* ---------- 카드 ---------- */
+  .write-root .card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--surface);
+  }
+
+  .write-root .auth-card {
+    max-width: var(--width-content);
+    margin-inline: auto;
+    padding: 1.8rem 2rem;
+  }
+
+  .write-root .auth-card h1 {
+    margin: 0 0 0.6rem;
+    font-size: 1.5rem;
+    font-weight: 800;
+  }
+
+  .write-root .setup-steps {
+    padding-inline-start: 1.3em;
+    line-height: 1.8;
+  }
+
+  .write-root .token-row {
     display: flex;
-    align-items: center;
+    gap: 0.6rem;
+    margin-top: 1rem;
+  }
+
+  .write-root .token-row input {
+    flex: 1;
+  }
+
+  .write-root .error {
+    color: light-dark(#cf222e, #e5695e);
+    font-size: 0.9rem;
+  }
+
+  /* ---------- 에디터 상단 ---------- */
+  .write-root .editor-top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
     gap: 1rem;
+    flex-wrap: wrap;
+    padding-block: 0.4rem 1.4rem;
+  }
+
+  .write-root .editor-top h1 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .write-root .editor-sub {
+    margin: 0.25rem 0 0;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+  }
+
+  .write-root .top-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
     flex-wrap: wrap;
   }
 
-  #publish-status {
+  /* ---------- 섹션 카드 ---------- */
+  .write-root .section {
+    padding: 1.4rem 1.6rem;
+    margin-bottom: 1.1rem;
+  }
+
+  .write-root .section-title {
+    margin: 0;
+    font-size: 1.02rem;
+    font-weight: 700;
+  }
+
+  .write-root .section-sub {
+    margin: 0.2rem 0 0;
+    font-size: 0.84rem;
+    color: var(--text-muted);
+  }
+
+  .write-root .section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  .write-root .section > .section-title {
+    margin-bottom: 0.9rem;
+  }
+
+  /* ---------- 글 정보 폼 ---------- */
+  .write-root .fm-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem 1.4rem;
+  }
+
+  .write-root .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .write-root .field-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .write-root .fm-grid .span2 {
+    grid-column: span 2;
+  }
+
+  /* 초안 스위치 */
+  .write-root .switch-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 38px;
+  }
+
+  .write-root .switch-hint {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+
+  .write-root input[type='checkbox'][role='switch'] {
+    appearance: none;
+    width: 42px;
+    height: 24px;
+    margin: 0;
+    border-radius: 999px;
+    background-color: var(--border);
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 0.15s ease;
+  }
+
+  .write-root input[type='checkbox'][role='switch']::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: #fff;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 25%);
+    transition: transform 0.15s ease;
+  }
+
+  .write-root input[type='checkbox'][role='switch']:checked {
+    background-color: var(--accent);
+  }
+
+  .write-root input[type='checkbox'][role='switch']:checked::after {
+    transform: translateX(18px);
+  }
+
+  /* 썸네일 선택 */
+  .write-root .cover-row {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+  }
+
+  .write-root .cover-thumb {
+    width: 56px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+
+  /* ---------- 발행일 달력 ---------- */
+  .write-root .date-field {
+    position: relative;
+  }
+
+  .write-root .date-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55em;
+    width: 100%;
+    justify-content: flex-start;
+    font-weight: 500;
+    font-size: 0.92rem;
+    padding: 0.5em 0.9em;
+  }
+
+  .write-root .date-trigger svg {
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .write-root .date-trigger:hover {
+    color: var(--text);
+  }
+
+  .write-root .date-trigger:hover svg {
+    color: var(--accent);
+  }
+
+  .write-root .date-popover {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 286px;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.9rem;
+    box-shadow: 0 12px 32px rgb(0 0 0 / 14%);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .write-root .date-popover:not([hidden]) {
+      animation: dp-pop 0.14s ease-out;
+    }
+  }
+
+  @keyframes dp-pop {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .write-root .dp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+
+  .write-root .dp-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  .write-root .dp-nav {
+    border: 0;
+    background: none;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 8px;
+    font-size: 1.05rem;
+    color: var(--text-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .write-root .dp-nav:hover {
+    background-color: var(--surface);
+    color: var(--accent);
+    border: 0;
+  }
+
+  .write-root .dp-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+
+  .write-root .dp-dow {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-align: center;
+    padding-block: 0.35em;
+  }
+
+  .write-root .dp-day {
+    aspect-ratio: 1;
+    border: 0;
+    background: none;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text);
+    padding: 0;
+  }
+
+  .write-root .dp-day:hover {
+    background-color: var(--accent-weak);
+    color: var(--accent);
+    border: 0;
+  }
+
+  .write-root .dp-day.today {
+    box-shadow: inset 0 0 0 1.5px var(--accent);
+  }
+
+  .write-root .dp-day.selected {
+    background-color: var(--accent);
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .write-root .dp-day.selected:hover {
+    background-color: var(--accent);
+    color: #fff;
+  }
+
+  .write-root .dp-foot {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.55rem;
+  }
+
+  .write-root .dp-today {
+    border: 0;
+    background: none;
+    padding: 0.25em 0.7em;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    color: var(--accent);
+  }
+
+  .write-root .dp-today:hover {
+    background-color: var(--accent-weak);
+    border: 0;
+  }
+
+  /* ---------- 본문·미리보기 ---------- */
+  .write-root .editor-pane {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+  }
+
+  .write-root .pane {
+    min-width: 0;
+  }
+
+  .write-root .pane-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0.45rem;
+  }
+
+  .write-root #fm-body {
+    width: 100%;
+    min-height: 500px;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    line-height: 1.8;
+    padding: 1.1rem 1.2rem;
+    border-radius: 12px;
+    resize: vertical;
+  }
+
+  .write-root #preview {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--bg);
+    padding: 1.1rem 1.4rem;
+    min-height: 500px;
+    max-height: 76vh;
+    overflow-y: auto;
+    font-size: 0.95rem;
+  }
+
+  .write-root #preview > :first-child {
+    margin-block-start: 0;
+  }
+
+  .write-root .preview-empty {
+    color: var(--text-muted);
     font-size: 0.9rem;
+  }
+
+  /* ---------- 연결 ---------- */
+  .write-root .suggestions {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .write-root .suggestions li {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.5rem 0.2rem;
+    font-size: 0.9rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .write-root .suggestions li:first-child {
+    border-top: 0;
+  }
+
+  .write-root .suggestions li.empty {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+  }
+
+  .write-root .suggestions .sug-title {
+    font-weight: 600;
+  }
+
+  .write-root .suggestions li.accepted .sug-title {
+    color: var(--accent);
+  }
+
+  .write-root .suggestions button {
+    font-size: 0.8rem;
+    padding: 0.3em 0.8em;
+  }
+
+  .write-root .manual-edge {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.9rem;
+  }
+
+  .write-root .manual-edge select {
+    font-size: 0.88rem;
+  }
+
+  .write-root .manual-edge input {
+    flex: 1;
+    min-width: 150px;
+    font-size: 0.88rem;
+  }
+
+  .write-root .edge-hint {
+    margin: 0.6rem 0 0;
+    font-size: 0.82rem;
     color: var(--text-muted);
   }
 
-  .muted {
-    color: var(--text-muted);
-    font-weight: 400;
-    font-size: 0.85em;
+  .write-root .edge-guide {
+    margin-top: 0.9rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.8rem;
   }
 
-  .settings {
-    margin-top: 2rem;
+  .write-root .edge-guide summary {
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .write-root .edge-guide summary:hover {
+    color: var(--accent);
+  }
+
+  .write-root .edge-guide ul {
+    margin: 0.7rem 0 0.2rem;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .write-root .edge-guide li {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    gap: 0.7rem;
+    font-size: 0.85rem;
+    line-height: 1.65;
+  }
+
+  .write-root .edge-guide strong {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .write-root .edge-guide span {
+    color: var(--text-muted);
+  }
+
+  /* ---------- 점검 ---------- */
+  .write-root .lint {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    line-height: 2;
+    font-size: 0.88rem;
+  }
+
+  .write-root .lint .err {
+    color: light-dark(#cf222e, #e5695e);
+  }
+
+  .write-root .lint .warn {
+    color: light-dark(#9a6700, #d9a83c);
+  }
+
+  .write-root .lint .ok {
+    color: light-dark(#1a7f4f, #4ecb96);
+  }
+
+  /* ---------- 발행 (우측 하단) ---------- */
+  .write-root .publish-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1.1rem;
+    flex-wrap: wrap;
+    margin-top: 0.4rem;
+  }
+
+  .write-root #publish-status {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    text-align: right;
+  }
+
+  .write-root .settings {
+    margin: 1.3rem 0 0;
+    text-align: right;
+  }
+
+  /* ---------- 반응형 ---------- */
+  @media (max-width: 900px) {
+    .write-root .editor-pane {
+      grid-template-columns: 1fr;
+    }
+
+    .write-root .fm-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .write-root .fm-grid .span2 {
+      grid-column: span 1;
+    }
+
+    .write-root #fm-body,
+    .write-root #preview {
+      min-height: 320px;
+    }
+
+    .write-root .section {
+      padding: 1.1rem 1.2rem;
+    }
   }
 </style>
