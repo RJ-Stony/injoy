@@ -76,16 +76,18 @@ collections:
                 value_field: '{{slug}}'
                 display_fields: [title]
               - name: type
-                label: 관계 (시작 글이 대상 글을 —)
+                label: 관계 (시작 글이 대상 글에 갖는 관계)
                 widget: select
                 default: related
                 options:
-                  - { label: '확장 — 대상 글 위에 쌓아 올림', value: extends }
-                  - { label: '뒷받침 — 대상 글의 근거가 됨', value: supports }
-                  - { label: '구체화 — 대상 글을 더 또렷하게 만듦', value: refines }
-                  - { label: '반박 — 대상 글에 반대함', value: contradicts }
-                  - { label: '사례 — 대상 글의 예시가 됨', value: instantiates }
-                  - { label: '관련 — 느슨하게 이어짐', value: related }
+                  - { label: '확장 · 대상 글의 다음 이야기', value: extends }
+                  - { label: '뒷받침 · 대상 글이 맞다는 증거', value: supports }
+                  - { label: '구체화 · 같은 주장의 더 날카로운 버전', value: refines }
+                  - { label: '사례 · 대상 글 원칙의 실전 예시', value: instantiates }
+                  - { label: '선행 · 대상 글이 읽기 전 준비물', value: requires }
+                  - { label: '계기 · 대상 글이 이 글의 출발점', value: triggered-by }
+                  - { label: '반박 · 대상 글에 동의하지 않음', value: contradicts }
+                  - { label: '관련 · 함께 읽으면 좋음(마지막 선택지)', value: related }
               - name: note
                 label: 메모 (왜 연결했나)
                 widget: string

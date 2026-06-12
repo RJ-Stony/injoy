@@ -10,19 +10,70 @@ import { splitCode } from './md-text';
  * 존재하지 않는 슬러그를 가리키면 빌드가 실패한다(끊어진 연결 방지).
  */
 
-/** 명시적 엣지 타입 (고정) — 방향: from이 to에 대해 갖는 관계 */
+/**
+ * 명시적 엣지 타입 (고정) — 방향: from이 to에 대해 갖는 관계.
+ * criteria는 "어떤 글을 이 타입으로 연결하는가"의 판단 기준 —
+ * /write 에디터의 연결 가이드와 /graph의 타입 안내가 같은 문장을 공유한다.
+ */
 export const EDGE_TYPES = {
-  extends: { label: '확장', out: '이 글이 확장하는 글', in: '이 글을 확장한 글' },
-  supports: { label: '뒷받침', out: '이 글이 뒷받침하는 글', in: '이 글을 뒷받침하는 글' },
-  refines: { label: '구체화', out: '이 글이 구체화하는 글', in: '이 글을 구체화한 글' },
-  contradicts: { label: '반박', out: '이 글이 반박하는 글', in: '이 글을 반박하는 글' },
-  instantiates: { label: '사례', out: '이 글이 사례로 보여주는 글', in: '이 글의 사례인 글' },
-  related: { label: '관련', out: '관련 글', in: '관련 글' },
+  extends: {
+    label: '확장',
+    out: '이 글이 확장하는 글',
+    in: '이 글을 확장한 글',
+    criteria: '대상 글의 주장을 이어받아 한 걸음 더 나아간 글. "그 글의 다음 이야기"에 해당해요.',
+  },
+  supports: {
+    label: '뒷받침',
+    out: '이 글이 뒷받침하는 글',
+    in: '이 글을 뒷받침하는 글',
+    criteria: '대상 글의 주장에 근거·데이터·구현 경험을 보태는 글. "그 글이 맞다는 증거"예요.',
+  },
+  refines: {
+    label: '구체화',
+    out: '이 글이 구체화하는 글',
+    in: '이 글을 구체화한 글',
+    criteria: '대상 글의 주장을 더 정밀하게 다듬은 글. "같은 주장의 더 날카로운 버전"이에요.',
+  },
+  instantiates: {
+    label: '사례',
+    out: '이 글이 사례로 보여주는 글',
+    in: '이 글의 사례인 글',
+    criteria: '대상 글의 일반 원칙이 실제 상황에 적용된 모습을 보여 주는 글이에요.',
+  },
+  requires: {
+    label: '선행',
+    out: '먼저 읽으면 좋은 글',
+    in: '이 글을 전제로 하는 글',
+    criteria: '대상 글을 먼저 읽어야 이 글이 제대로 이해돼요. "읽기 전 준비물"인 관계예요.',
+  },
+  'triggered-by': {
+    label: '계기',
+    out: '이 글의 계기가 된 글',
+    in: '이 글에서 시작된 글',
+    criteria: '대상 글에서 다룬 경험이나 사건이 이 글을 쓰게 된 출발점이에요.',
+  },
+  contradicts: {
+    label: '반박',
+    out: '이 글이 반박하는 글',
+    in: '이 글을 반박하는 글',
+    criteria: '대상 글의 주장에 동의하지 않거나 결론을 뒤집는 글. 두 글의 긴장 관계를 드러내요.',
+  },
+  related: {
+    label: '관련',
+    out: '관련 글',
+    in: '관련 글',
+    criteria: '어느 타입에도 딱 맞지 않지만 함께 읽으면 좋은 글. 마지막 선택지로만 써요.',
+  },
 } as const;
 
 /** 자동 수집 타입 */
 export const AUTO_EDGE_TYPES = {
-  mentions: { label: '언급', out: '이 글이 언급한 글', in: '이 글을 언급한 글' },
+  mentions: {
+    label: '언급',
+    out: '이 글이 언급한 글',
+    in: '이 글을 언급한 글',
+    criteria: '본문의 [[위키링크]]에서 자동으로 수집돼요. 직접 고를 일은 없어요.',
+  },
 } as const;
 
 export type ExplicitEdgeType = keyof typeof EDGE_TYPES;

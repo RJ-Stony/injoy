@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { getGraph, edgeLabel } from '../utils/graph';
+import { getGraph, edgeLabel, EDGE_TYPES, AUTO_EDGE_TYPES } from '../utils/graph';
 import { withBase } from '../utils/url';
 
 const graph = await getGraph();
@@ -33,7 +33,7 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
   </section>
 
   <div class="graph-wrap">
-    <canvas id="graph-canvas" aria-label="글 연결 그래프 — 아래 연결 목록에서 같은 내용을 읽을 수 있어요"></canvas>
+    <canvas id="graph-canvas" aria-label="글 연결 그래프. 아래 연결 목록에서 같은 내용을 읽을 수 있어요"></canvas>
     <div id="graph-tooltip" hidden></div>
   </div>
 
@@ -53,10 +53,28 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
             <a href={withBase(`/posts/${e.from}/`)}>{titleOf.get(e.from)}</a>
             <span class="edge-type">{edgeLabel(e.type)} →</span>
             <a href={withBase(`/posts/${e.to}/`)}>{titleOf.get(e.to)}</a>
-            {e.note && <span class="note">— {e.note}</span>}
+            {e.note && <span class="note">· {e.note}</span>}
           </li>
         ))
       }
+    </ul>
+  </details>
+
+  <details class="edge-list">
+    <summary>연결 타입 안내</summary>
+    <ul class="type-guide">
+      {
+        Object.values(EDGE_TYPES).map((t) => (
+          <li>
+            <span class="edge-type">{t.label}</span>
+            <span class="note">{t.criteria}</span>
+          </li>
+        ))
+      }
+      <li>
+        <span class="edge-type">{AUTO_EDGE_TYPES.mentions.label}</span>
+        <span class="note">{AUTO_EDGE_TYPES.mentions.criteria}</span>
+      </li>
     </ul>
   </details>
 
@@ -564,6 +582,22 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
   .edge-list .note {
     color: var(--text-muted);
     font-size: 0.88em;
+  }
+
+  .type-guide {
+    list-style: none;
+    padding-inline-start: 0 !important;
+  }
+
+  .type-guide li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6em;
+  }
+
+  .type-guide .edge-type {
+    margin-inline: 0;
+    flex-shrink: 0;
   }
 
   .noscript-note {
