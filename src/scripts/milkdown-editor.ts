@@ -38,13 +38,41 @@ import '@milkdown/kit/prose/tables/style/tables.css';
  * (전역 escape를 끄면 표 셀·링크의 정상 이스케이프까지 망가지므로 노드 단위만.)
  */
 const CALLOUT_KEYWORDS = alertOptions.alerts.map((a: { keyword: string }) => a.keyword).join('|');
-const CALLOUT_ESCAPED = new RegExp(`^(\\s*>\\s*)\\\\\\[(!(?:${CALLOUT_KEYWORDS}))\\]`, 'gm');
+// 한 줄 단위(per-line) 콜아웃 마커 복원 — 코드 영역은 호출부에서 건너뛴다.
+const CALLOUT_LINE = new RegExp(`^(\\s*>\\s*)\\\\\\[(!(?:${CALLOUT_KEYWORDS}))\\]`);
 
+/** 인라인 코드(`...`) 밖에서만 위키링크 여는/닫는 괄호의 이스케이프를 되돌린다. */
+function restoreWikiOutsideInlineCode(text: string): string {
+  return text
+    .split(/(`+[^`]*`+)/) // 홀수 인덱스 = 인라인 코드 스팬(그대로 보존)
+    .map((seg, i) => (i % 2 === 1 ? seg : seg.replace(/\\\[\\\[/g, '[[').replace(/\\\]\\\]/g, ']]')))
+    .join('');
+}
+
+/**
+ * remark-stringify가 줄머리 `[`를 `\[`로 이스케이프한 것을 되돌리되,
+ * 코드펜스·인라인 코드 안은 절대 건드리지 않는다(코드는 verbatim이라
+ * 사용자가 쓴 정규식·이스케이프 예시가 손상되면 안 됨).
+ */
 export function normalizeMarkdown(md: string): string {
-  return md
-    .replace(/\\\[\\\[/g, '[[') // 위키링크 여는 괄호 복원
-    .replace(/\\\]\\\]/g, ']]') // (혹시 닫는 괄호도 이스케이프된 경우)
-    .replace(CALLOUT_ESCAPED, '$1[$2]'); // 콜아웃 마커 복원
+  const lines = md.split('\n');
+  let fence: string | null = null;
+  return lines
+    .map((line) => {
+      const fenceTok = line.match(/^\s*(`{3,}|~{3,})/)?.[1];
+      if (fence) {
+        // 코드펜스 내부 — 닫는 펜스를 만나기 전까지 전부 그대로
+        if (fenceTok && fenceTok[0] === fence[0] && fenceTok.length >= fence.length) fence = null;
+        return line;
+      }
+      if (fenceTok) {
+        fence = fenceTok;
+        return line;
+      }
+      // 코드 밖 라인: 위키링크 복원(인라인 코드 제외) + 콜아웃 마커 복원
+      return restoreWikiOutsideInlineCode(line).replace(CALLOUT_LINE, '$1[$2]');
+    })
+    .join('\n');
 }
 
 /**
@@ -215,6 +243,9 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
     },
     insertMarkdown(markdown: string) {
       editor.action(insert(markdown));
+      // insert는 동기로 dispatch되지만 listener는 200ms 디바운스라, 삽입 직후
+      // 발행하면 mirror에 누락된다. setMarkdown처럼 즉시 한 번 동기화한다.
+      opts.onChange(normalizeMarkdown(editor.action(getMarkdown())));
     },
     getMarkdown() {
       return normalizeMarkdown(editor.action(getMarkdown()));
