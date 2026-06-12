@@ -23,8 +23,26 @@ import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { history } from '@milkdown/kit/plugin/history';
 import { math, katexOptionsCtx } from '@milkdown/plugin-math';
 import { replaceAll, insert, getMarkdown } from '@milkdown/kit/utils';
+import { alertOptions } from '../utils/callout-config.mjs';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
+
+/**
+ * remark-stringify는 줄머리 `[`를 `\[`로 이스케이프한다. 그래서 위키링크
+ * `[[slug]]` → `\[\[slug]]`, 콜아웃 `> [!NOTE]` → `> \[!NOTE]`가 되어 빌드
+ * 파이프라인(remark-wiki-links, rehype-github-alerts)이 못 알아본다.
+ * 직렬화 출력에서 이 두 가지만 키워드 화이트리스트로 정확히 되돌린다.
+ * (전역 escape를 끄면 표 셀·링크의 정상 이스케이프까지 망가지므로 노드 단위만.)
+ */
+const CALLOUT_KEYWORDS = alertOptions.alerts.map((a: { keyword: string }) => a.keyword).join('|');
+const CALLOUT_ESCAPED = new RegExp(`^(\\s*>\\s*)\\\\\\[(!(?:${CALLOUT_KEYWORDS}))\\]`, 'gm');
+
+export function normalizeMarkdown(md: string): string {
+  return md
+    .replace(/\\\[\\\[/g, '[[') // 위키링크 여는 괄호 복원
+    .replace(/\\\]\\\]/g, ']]') // (혹시 닫는 괄호도 이스케이프된 경우)
+    .replace(CALLOUT_ESCAPED, '$1[$2]'); // 콜아웃 마커 복원
+}
 
 export interface EditorHandle {
   /** 본문 전체를 마크다운으로 교체 (글 불러오기·초기화) */
@@ -68,7 +86,7 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
       // 잘못된 LaTeX가 에디터를 죽이지 않게 (붉은 에러 표시로 대체)
       ctx.set(katexOptionsCtx.key, { throwOnError: false });
       ctx.get(listenerCtx).markdownUpdated((_ctx, markdown, prevMarkdown) => {
-        if (markdown !== prevMarkdown) opts.onChange(markdown);
+        if (markdown !== prevMarkdown) opts.onChange(normalizeMarkdown(markdown));
       });
     })
     .use(commonmark)
@@ -84,13 +102,13 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
     setMarkdown(markdown: string) {
       editor.action(replaceAll(markdown));
       // replaceAll이 listener를 못 깨우는 경우를 대비해 한 번 더 동기화 (idempotent)
-      opts.onChange(editor.action(getMarkdown()));
+      opts.onChange(normalizeMarkdown(editor.action(getMarkdown())));
     },
     insertMarkdown(markdown: string) {
       editor.action(insert(markdown));
     },
     getMarkdown() {
-      return editor.action(getMarkdown());
+      return normalizeMarkdown(editor.action(getMarkdown()));
     },
     focus() {
       void view();
