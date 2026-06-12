@@ -1,7 +1,9 @@
 ---
 import 'katex/dist/katex.min.css';
+import { Image } from 'astro:assets';
 import ThemeToggle from '../components/ThemeToggle.astro';
 import { withBase } from '../utils/url';
+import profile from '../assets/profile.jpg';
 
 interface Props {
   title: string;
@@ -41,7 +43,9 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalURL} />
-    <link rel="icon" type="image/svg+xml" href={withBase('/favicon.svg')} />
+    <link rel="icon" type="image/png" sizes="32x32" href={withBase('/favicon-32.png')} />
+    <link rel="icon" type="image/png" sizes="64x64" href={withBase('/favicon-64.png')} />
+    <link rel="apple-touch-icon" href={withBase('/apple-touch-icon.png')} />
     <link
       rel="alternate"
       type="application/rss+xml"
@@ -83,7 +87,10 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
 
     <header class="site-header">
       <div class:list={['site-header-inner', { wide }]}>
-        <a class="logo" href={withBase('/')}>Injoy</a>
+        <a class="logo" href={withBase('/')}>
+          <Image class="logo-avatar" src={profile} alt="" width={64} height={64} loading="eager" />
+          <span>Injoy</span>
+        </a>
         <div class="header-actions">
           <nav aria-label="주 메뉴">
             <a href={withBase('/graph/')}>그래프</a>
@@ -195,15 +202,32 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
   }
 
   .logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
     font-size: 1.25rem;
     font-weight: 800;
     letter-spacing: -0.02em;
     color: var(--text);
   }
 
+  .logo-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    /* 흰 배경 위에서 사진이 둥둥 뜨지 않게 토큰 색 얇은 링 */
+    box-shadow: 0 0 0 1px var(--border);
+    transition: box-shadow 0.15s ease;
+  }
+
   .logo:hover {
     color: var(--accent);
     text-decoration: none;
+  }
+
+  .logo:hover .logo-avatar {
+    box-shadow: 0 0 0 2px var(--accent);
   }
 
   .header-actions {
