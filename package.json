@@ -16,6 +16,8 @@
     "@astrojs/mdx": "^4.0.0",
     "@astrojs/rss": "^4.0.0",
     "@astrojs/sitemap": "^3.0.0",
+    "@milkdown/kit": "^7.21.2",
+    "@milkdown/plugin-math": "^7.5.9",
     "@shikijs/transformers": "^3.23.0",
     "astro": "^5.0.0",
     "katex": "^0.17.0",

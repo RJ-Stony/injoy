@@ -139,30 +139,27 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
         <div class="section-head">
           <div>
             <h2 class="section-title">본문</h2>
-            <p class="section-sub">마크다운에 코드블록·수식·다이어그램·[[위키링크]]까지 그대로 써요.</p>
+            <p class="section-sub">노션처럼 쓰면 바로 보여요. 이미지는 복사해서 붙여넣어도 됩니다.</p>
           </div>
-          <button id="insert-image" type="button">이미지 넣기</button>
+          <div class="body-actions">
+            <span id="char-count" class="muted"></span>
+            <button id="insert-image" type="button">이미지 넣기</button>
+          </div>
           <input id="body-image" type="file" accept="image/*" hidden />
         </div>
-        <div class="editor-pane">
-          <div class="pane">
-            <div class="pane-head">
-              <span>작성</span>
-              <span id="char-count" class="muted"></span>
-            </div>
-            <textarea
-              id="fm-body"
-              spellcheck="false"
-              placeholder="여기부터 본문. ## 제목, 코드블록, [[다른-글]] 모두 됩니다."></textarea>
-          </div>
-          <div class="pane">
-            <div class="pane-head">
-              <span>미리보기</span>
-              <span class="muted">발행했을 때 모습 그대로</span>
-            </div>
-            <div id="preview" class="prose"></div>
-          </div>
+
+        <!-- 노션식 에디터가 마운트되는 곳. 로드 전에는 안내 문구를 보여 준다. -->
+        <div id="md-editor" class="md-editor" aria-label="본문 편집기">
+          <p class="md-loading muted">에디터를 불러오는 중…</p>
         </div>
+
+        <!-- 숨은 mirror: 에디터 내용을 마크다운으로 받아 발행·점검 로직이 그대로 읽는다 -->
+        <textarea id="fm-body" spellcheck="false" hidden></textarea>
+
+        <details class="precise-preview">
+          <summary>발행 결과 정밀 미리보기 (콜아웃·수식·다이어그램까지 빌드와 동일하게 확인)</summary>
+          <div id="preview" class="prose"></div>
+        </details>
       </section>
 
       <section class="card section">
@@ -225,6 +222,7 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
 <script>
   import { createPreviewRenderer, enhancePreview } from '../scripts/write-preview';
   import { createDatePicker, todayISO } from '../scripts/date-picker';
+  import type { EditorHandle } from '../scripts/milkdown-editor';
 
   // ---------- 설정·상태 ----------
   const CFG = JSON.parse(document.getElementById('write-config')!.textContent!);
@@ -274,10 +272,51 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     panel: $('date-popover'),
   });
 
+  // ---------- 본문 에디터(Milkdown) ----------
+  // 본문 편집 표면. 내용이 바뀌면 마크다운을 숨은 textarea(#fm-body)로 흘려보내고,
+  // 기존 발행·점검 로직은 그 textarea만 읽는다. ProseMirror는 무거우므로 인증
+  // 통과 후 dynamic import로만 로드한다(방문자 비용 0, SSR 회피).
+  let mdEditor: EditorHandle | null = null;
+
+  /** 에디터 → mirror textarea 동기화. 기존 input 파이프라인을 그대로 깨운다. */
+  const syncMirror = (markdown: string) => {
+    const ta = $('fm-body') as HTMLTextAreaElement;
+    if (ta.value === markdown) return;
+    ta.value = markdown;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  async function mountBodyEditor() {
+    if (mdEditor) return;
+    const host = $('md-editor');
+    try {
+      const { mountEditor } = await import('../scripts/milkdown-editor');
+      host.innerHTML = '';
+      mdEditor = await mountEditor(host, { onChange: syncMirror, initialValue: '' });
+      // 개발·테스트용 핸들 (graph.astro의 __injoyGraph와 같은 선례). 운영자 전용 페이지.
+      (window as any).__injoyEditor = mdEditor;
+    } catch (e) {
+      host.innerHTML = '';
+      host.append(
+        Object.assign(document.createElement('p'), {
+          className: 'md-loading error',
+          textContent: `에디터를 불러오지 못했어요: ${e}`,
+        }),
+      );
+    }
+  }
+
+  /** 본문을 마크다운으로 채운다(에디터가 있으면 에디터로, 없으면 textarea로 폴백). */
+  const setBody = (markdown: string) => {
+    if (mdEditor) mdEditor.setMarkdown(markdown);
+    else syncMirror(markdown);
+  };
+
   // ---------- 인증 ----------
   const showEditor = async () => {
     $('auth-card').hidden = true;
     $('editor').hidden = false;
+    await mountBodyEditor();
     await Promise.all([loadIndex(), loadPostList()]);
     resetForm();
   };
@@ -416,6 +455,10 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     const preview = $('preview');
     const src = ($('fm-body') as HTMLTextAreaElement).value;
     $('char-count').textContent = src.length ? `${src.length.toLocaleString('ko-KR')}자` : '';
+    // 정밀 미리보기 패널이 닫혀 있으면 무거운 렌더(Shiki·Mermaid)를 건너뛴다.
+    // 에디터 자체가 이미 노션식 미리보기이므로, 이 패널은 펼쳤을 때만 그린다.
+    const panel = document.querySelector('.precise-preview') as HTMLDetailsElement | null;
+    if (panel && !panel.open) return;
     const gen = ++renderGen;
     if (!src.trim()) {
       preview.innerHTML =
@@ -515,18 +558,26 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     setCoverUI(null, '아직 선택한 이미지가 없어요', false);
   });
 
+  /** 첨부 이미지를 pendingFiles에 등록하고 본문에 넣을 마크다운을 돌려준다. */
+  async function stageImage(file: File): Promise<string> {
+    const slug = ($('fm-slug') as HTMLInputElement).value.trim() || 'post';
+    const name = `${slug}-${safeName(file.name)}`;
+    state.pendingFiles.set(`${CFG.postsDir}/_images/${name}`, await fileData(file));
+    return `![설명을 적어 주세요](./_images/${name})`;
+  }
+
   $('insert-image').addEventListener('click', () => $('body-image').click());
   $('body-image').addEventListener('change', async (ev) => {
     const inputEl = ev.target as HTMLInputElement;
     const file = inputEl.files?.[0];
     if (!file) return;
-    const slug = ($('fm-slug') as HTMLInputElement).value.trim() || 'post';
-    const name = `${slug}-${safeName(file.name)}`;
-    state.pendingFiles.set(`${CFG.postsDir}/_images/${name}`, await fileData(file));
-    const ta = $('fm-body') as HTMLTextAreaElement;
-    const md = `\n![설명을 적어 주세요](./_images/${name})\n`;
-    ta.setRangeText(md, ta.selectionStart, ta.selectionStart, 'end');
-    ta.dispatchEvent(new Event('input'));
+    const md = await stageImage(file);
+    if (mdEditor) mdEditor.insertMarkdown(md);
+    else {
+      const ta = $('fm-body') as HTMLTextAreaElement;
+      ta.setRangeText(`\n${md}\n`, ta.selectionStart, ta.selectionStart, 'end');
+      ta.dispatchEvent(new Event('input'));
+    }
     inputEl.value = '';
   });
 
@@ -905,7 +956,7 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     ($('fm-tags') as HTMLInputElement).value = parsed.tags.join(', ');
     datePicker.set(parsed.pubDate);
     ($('fm-draft') as HTMLInputElement).checked = parsed.draft;
-    ($('fm-body') as HTMLTextAreaElement).value = parsed.body;
+    setBody(parsed.body);
     setCoverUI(
       parsed.cover ? resolveImage(parsed.cover) : null,
       parsed.cover ? `현재: ${parsed.cover}` : '아직 선택한 이미지가 없어요',
@@ -956,7 +1007,7 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     ($('fm-category') as HTMLInputElement).value = '개발';
     datePicker.set(todayISO());
     ($('fm-draft') as HTMLInputElement).checked = true;
-    ($('fm-body') as HTMLTextAreaElement).value = '';
+    setBody('');
     setCoverUI(null, '아직 선택한 이미지가 없어요', false);
     $('delete-post').hidden = true;
     $('publish-status').textContent = '';
@@ -966,6 +1017,13 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
   }
 
   $('new-post').addEventListener('click', resetForm);
+
+  // 정밀 미리보기를 펼치면 그때 한 번 그린다(닫혀 있을 땐 렌더 생략).
+  document
+    .querySelector('.precise-preview')
+    ?.addEventListener('toggle', (ev) => {
+      if ((ev.target as HTMLDetailsElement).open) renderPreview();
+    });
 
   init();
 </script>
@@ -1453,47 +1511,162 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     border: 0;
   }
 
-  /* ---------- 본문·미리보기 ---------- */
-  .write-root .editor-pane {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.2rem;
-  }
-
-  .write-root .pane {
-    min-width: 0;
-  }
-
-  .write-root .pane-head {
+  /* ---------- 본문 에디터(Milkdown) ---------- */
+  .write-root .body-actions {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.6rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    margin-bottom: 0.45rem;
+    align-items: center;
+    gap: 0.8rem;
   }
 
-  .write-root #fm-body {
-    width: 100%;
-    min-height: 500px;
-    font-family: var(--font-sans);
-    font-size: 0.95rem;
-    line-height: 1.8;
-    padding: 1.1rem 1.2rem;
-    border-radius: 12px;
-    resize: vertical;
-  }
-
-  .write-root #preview {
+  .write-root .md-editor {
     border: 1px solid var(--border);
     border-radius: 12px;
     background-color: var(--bg);
-    padding: 1.1rem 1.4rem;
-    min-height: 500px;
-    max-height: 76vh;
-    overflow-y: auto;
+    min-height: 460px;
+    transition: border-color 0.15s ease;
+  }
+
+  .write-root .md-editor:focus-within {
+    border-color: var(--accent);
+  }
+
+  .write-root .md-loading {
+    padding: 1.2rem;
+    font-size: 0.9rem;
+  }
+
+  .write-root .md-loading.error {
+    color: light-dark(#cf222e, #e5695e);
+  }
+
+  /* ProseMirror 본문 — 발행된 글(.prose)과 같은 톤으로 보이게 토큰으로 조판 */
+  .write-root .milkdown {
+    height: 100%;
+  }
+
+  .write-root .injoy-md.ProseMirror {
+    outline: none;
+    padding: 1.2rem 1.4rem;
+    min-height: 460px;
+    font-family: var(--font-sans);
+    font-size: 0.98rem;
+    line-height: 1.8;
+    color: var(--text);
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+
+  .write-root .injoy-md.ProseMirror > :first-child {
+    margin-block-start: 0;
+  }
+
+  .write-root .injoy-md.ProseMirror :is(h1, h2, h3, h4) {
+    font-weight: 700;
+    line-height: 1.4;
+    margin-block: 1.6em 0.6em;
+  }
+
+  .write-root .injoy-md.ProseMirror h1 { font-size: 1.6em; }
+  .write-root .injoy-md.ProseMirror h2 { font-size: 1.4em; }
+  .write-root .injoy-md.ProseMirror h3 { font-size: 1.18em; }
+  .write-root .injoy-md.ProseMirror h4 { font-size: 1.05em; }
+
+  .write-root .injoy-md.ProseMirror p { margin-block: 0.9em; }
+
+  .write-root .injoy-md.ProseMirror :is(ul, ol) {
+    padding-inline-start: 1.4em;
+  }
+
+  .write-root .injoy-md.ProseMirror li { margin-block: 0.3em; }
+
+  .write-root .injoy-md.ProseMirror blockquote {
+    margin-inline: 0;
+    padding: 0.4em 1.1em;
+    border-inline-start: 3px solid var(--accent);
+    background-color: var(--surface);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    color: var(--text-muted);
+  }
+
+  .write-root .injoy-md.ProseMirror :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+    background-color: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.1em 0.35em;
+  }
+
+  .write-root .injoy-md.ProseMirror pre {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+    line-height: 1.7;
+    background-color: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1em 1.2em;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .write-root .injoy-md.ProseMirror img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius);
+  }
+
+  .write-root .injoy-md.ProseMirror hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin-block: 2em;
+  }
+
+  .write-root .injoy-md.ProseMirror table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.92em;
+  }
+
+  .write-root .injoy-md.ProseMirror :is(th, td) {
+    border: 1px solid var(--border);
+    padding: 0.45em 0.8em;
+  }
+
+  .write-root .injoy-md.ProseMirror th {
+    background-color: var(--surface);
+    font-weight: 600;
+  }
+
+  /* placeholder(빈 문단 안내)는 milkdown이 data-attr로 처리 */
+  .write-root .injoy-md.ProseMirror .ProseMirror-selectednode {
+    outline: 2px solid var(--accent);
+  }
+
+  /* ---------- 정밀 미리보기(접이식) ---------- */
+  .write-root .precise-preview {
+    margin-top: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--surface);
+    padding: 0.8rem 1rem;
+  }
+
+  .write-root .precise-preview > summary {
+    cursor: pointer;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .write-root .precise-preview > summary:hover {
+    color: var(--accent);
+  }
+
+  .write-root #preview {
+    margin-top: 0.9rem;
+    border-radius: 10px;
+    background-color: var(--bg);
+    padding: 1rem 1.2rem;
     font-size: 0.95rem;
   }
 
@@ -1653,10 +1826,6 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
 
   /* ---------- 반응형 ---------- */
   @media (max-width: 900px) {
-    .write-root .editor-pane {
-      grid-template-columns: 1fr;
-    }
-
     .write-root .fm-grid {
       grid-template-columns: 1fr;
     }
@@ -1665,8 +1834,8 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
       grid-column: span 1;
     }
 
-    .write-root #fm-body,
-    .write-root #preview {
+    .write-root .md-editor,
+    .write-root .injoy-md.ProseMirror {
       min-height: 320px;
     }
 
