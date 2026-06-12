@@ -36,6 +36,9 @@ export async function renderMermaidDiagrams(containers: HTMLElement[]): Promise<
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: 'strict',
+    // 구문 오류 시 mermaid가 본문에 "Syntax error" 그래픽을 끼워 넣지 않게 막는다
+    // (안 막으면 /write 미리보기에서 잘못된 구문이 푸터 밑에 에러 SVG로 샌다)
+    suppressErrorRendering: true,
     fontFamily: getComputedStyle(document.body).fontFamily,
     theme: 'base',
     themeVariables: {
@@ -76,11 +79,27 @@ export async function renderMermaidDiagrams(containers: HTMLElement[]): Promise<
   });
 
   for (const container of containers) {
+    const source = container.dataset.source ?? '';
     try {
-      const { svg } = await mermaid.render(`injoy-mmd-${seq++}`, container.dataset.source ?? '');
+      // parse()는 DOM을 건드리지 않고 구문만 검사한다 — 잘못된 구문이면 여기서 걸러
+      // render()를 부르지 않으므로 에러 그래픽이 본문에 새어 나오지 않는다
+      const valid = await mermaid.parse(source, { suppressErrors: true });
+      if (!valid) {
+        container.classList.add('diagram-error');
+        container.textContent = '다이어그램 구문을 확인해 주세요.';
+        continue;
+      }
+      const { svg } = await mermaid.render(`injoy-mmd-${seq++}`, source);
+      container.classList.remove('diagram-error');
       container.innerHTML = svg;
     } catch {
+      container.classList.add('diagram-error');
       container.textContent = '다이어그램을 렌더링하지 못했어요.';
     }
+  }
+
+  // 혹시 mermaid가 남긴 임시 렌더 노드가 있으면 정리한다 (body 끝에 붙는 잔여물 방지)
+  for (const orphan of document.querySelectorAll('body > [id^="dinjoy-mmd-"], body > [id^="injoy-mmd-"]')) {
+    orphan.remove();
   }
 }

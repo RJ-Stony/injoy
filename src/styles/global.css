@@ -504,6 +504,14 @@ a:hover {
   height: auto;
 }
 
+/* 다이어그램 구문이 잘못됐을 때의 안내 — 에러 SVG 대신 차분한 문구 */
+.prose .mermaid-diagram.diagram-error {
+  display: block;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
 /* 체크박스(task list) */
 .prose input[type='checkbox'] {
   accent-color: var(--accent);

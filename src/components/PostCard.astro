@@ -24,7 +24,7 @@ const cover = post.data.cover;
   {
     cover && (
       <a class="thumb" href={href} tabindex="-1" aria-hidden="true">
-        <Image src={cover} alt="" width={320} />
+        <Image src={cover} alt="" width={360} height={203} />
       </a>
     )
   }
@@ -56,8 +56,10 @@ const cover = post.data.cover;
   }
 
   .thumb img {
-    width: 128px;
-    height: 88px;
+    /* 커버는 16:9 — 같은 비율로 보여 양옆이 잘리지 않게 한다 */
+    width: 160px;
+    aspect-ratio: 16 / 9;
+    height: auto;
     object-fit: cover;
     transition: transform 0.2s ease;
   }
@@ -68,8 +70,7 @@ const cover = post.data.cover;
 
   @media (max-width: 480px) {
     .thumb img {
-      width: 96px;
-      height: 72px;
+      width: 116px;
     }
   }
 
