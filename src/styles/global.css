@@ -417,6 +417,34 @@ a:hover {
   padding: 0 0.15em;
 }
 
+/* 각주 되돌아가기(↩) — 기본 글리프는 기기마다(데스크톱 이모지 / 모바일 텍스트)
+   제각각이라, 원본 글리프를 숨기고 토큰 색 커스텀 아이콘으로 통일한다. */
+.prose .data-footnote-backref {
+  font-size: 0;
+  text-decoration: none;
+  margin-inline-start: 0.4em;
+  vertical-align: middle;
+}
+
+.prose .data-footnote-backref::after {
+  content: '';
+  display: inline-block;
+  width: 0.95rem;
+  height: 0.95rem;
+  background-color: var(--accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23000'%20stroke-width='2.4'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M11%209%207%2013l4%204'/%3E%3Cpath%20d='M7%2013h7a4%204%200%200%200%200-8h-3'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23000'%20stroke-width='2.4'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M11%209%207%2013l4%204'/%3E%3Cpath%20d='M7%2013h7a4%204%200%200%200%200-8h-3'/%3E%3C/svg%3E") center / contain no-repeat;
+  transition: opacity 0.15s ease;
+}
+
+.prose .data-footnote-backref:hover {
+  text-decoration: none;
+}
+
+.prose .data-footnote-backref:hover::after {
+  opacity: 0.6;
+}
+
 /* 각주 점프 — 위로 갈 때는 sticky 헤더에 가리지 않게 띄우고,
    도착 지점은 잠깐 비춰서 "여기로 왔다"가 한눈에 보이게 한다 */
 .prose [data-footnote-ref],
