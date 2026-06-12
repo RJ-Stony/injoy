@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { withBase } from '../utils/url';
 import { EDGE_TYPES, AUTO_EDGE_TYPES } from '../utils/graph';
+import { alertOptions } from '../utils/callout-config.mjs';
 
 /**
  * 인-블로그 글쓰기 에디터.
@@ -28,6 +29,9 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
   label: v.label,
   criteria: v.criteria,
 }));
+
+// 툴바 콜아웃 삽입용 — 빌드 콜아웃 설정과 단일 출처 공유
+const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, title: a.title }));
 ---
 
 <BaseLayout title="글쓰기" description="Injoy 운영자 전용 글쓰기 공간." wide>
@@ -143,9 +147,29 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
           </div>
           <div class="body-actions">
             <span id="char-count" class="muted"></span>
-            <button id="insert-image" type="button">이미지 넣기</button>
           </div>
           <input id="body-image" type="file" accept="image/*" hidden />
+        </div>
+
+        <!-- 삽입 툴바: 문법을 외우지 않아도 버튼으로 블록을 넣는다 (모바일에서도 동작) -->
+        <div class="md-toolbar" role="toolbar" aria-label="삽입 도구">
+          <button type="button" data-md="heading" title="제목">제목</button>
+          <button type="button" data-md="quote" title="인용">인용</button>
+          <button type="button" data-pop="callout" title="콜아웃" aria-haspopup="true">콜아웃 ▾</button>
+          <button type="button" data-pop="code" title="코드블록" aria-haspopup="true">코드 ▾</button>
+          <button type="button" data-md="math" title="수식">수식</button>
+          <button type="button" data-pop="mermaid" title="다이어그램" aria-haspopup="true">다이어그램 ▾</button>
+          <button type="button" data-md="table" title="표">표</button>
+          <button type="button" data-md="list" title="목록">목록</button>
+          <button type="button" data-md="check" title="체크리스트">체크</button>
+          <button type="button" data-md="divider" title="구분선">구분선</button>
+          <button type="button" data-pop="wiki" title="글 연결" aria-haspopup="true">글 연결 ▾</button>
+          <button type="button" data-pop="emoji" title="이모지" aria-haspopup="true">이모지 ▾</button>
+          <button type="button" data-md="footnote" title="각주">각주</button>
+          <button type="button" id="toolbar-image" title="이미지">이미지</button>
+          <button type="button" data-pop="latex" title="수식 도움말" aria-haspopup="true">수식 도움 ▾</button>
+          <!-- 팝오버: 툴바 기준(position:relative) 절대배치 — JS가 위치·내용 채움 -->
+          <div id="md-popover" class="md-popover" role="menu" hidden></div>
         </div>
 
         <!-- 노션식 에디터가 마운트되는 곳. 로드 전에는 안내 문구를 보여 준다. -->
@@ -217,6 +241,7 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
 
   <script type="application/json" id="write-config" set:html={JSON.stringify(config)} />
   <script type="application/json" id="edge-type-meta" set:html={JSON.stringify(edgeTypeOptions)} />
+  <script type="application/json" id="callout-meta" set:html={JSON.stringify(calloutOptions)} />
 </BaseLayout>
 
 <script>
@@ -575,7 +600,7 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     return `./_images/${name}`;
   }
 
-  $('insert-image').addEventListener('click', () => $('body-image').click());
+  // 이미지 넣기는 툴바의 '이미지' 버튼(#toolbar-image)이 #body-image를 연다.
   $('body-image').addEventListener('change', async (ev) => {
     const inputEl = ev.target as HTMLInputElement;
     const file = inputEl.files?.[0];
@@ -1034,6 +1059,241 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     ?.addEventListener('toggle', (ev) => {
       if ((ev.target as HTMLDetailsElement).open) renderPreview();
     });
+
+  // ---------- 삽입 툴바 ----------
+  const CALLOUT_META = JSON.parse(document.getElementById('callout-meta')!.textContent!) as {
+    keyword: string;
+    title: string;
+  }[];
+
+  /** 커서 위치에 마크다운 삽입(에디터 없으면 textarea 폴백). */
+  const insertBlock = (md: string) => {
+    if (mdEditor) {
+      mdEditor.insertMarkdown(md);
+      mdEditor.focus();
+    } else {
+      const ta = $('fm-body') as HTMLTextAreaElement;
+      ta.setRangeText(`\n${md}\n`, ta.selectionStart, ta.selectionStart, 'end');
+      ta.dispatchEvent(new Event('input'));
+    }
+  };
+
+  // data-md 버튼: 정해진 마크다운 조각을 삽입
+  const SNIPPETS: Record<string, string> = {
+    heading: '## 제목',
+    quote: '> 인용문',
+    math: '$$\na^2 + b^2 = c^2\n$$',
+    table: '| 머리 1 | 머리 2 |\n| --- | --- |\n| 값 1 | 값 2 |',
+    list: '- 항목 1\n- 항목 2',
+    check: '- [ ] 할 일',
+    divider: '---',
+    footnote: '각주를 답니다[^1]\n\n[^1]: 각주 내용을 적어요.',
+  };
+
+  // mermaid 예시 갤러리
+  const MERMAID_EXAMPLES: { label: string; code: string }[] = [
+    { label: '순서도', code: 'flowchart LR\n  A[시작] --> B{조건}\n  B -- 예 --> C[처리]\n  B -- 아니오 --> D[종료]' },
+    { label: '시퀀스', code: 'sequenceDiagram\n  participant 나\n  participant 서버\n  나->>서버: 요청\n  서버-->>나: 응답' },
+    { label: 'ER 다이어그램', code: 'erDiagram\n  USER ||--o{ POST : writes\n  POST ||--o{ COMMENT : has\n  USER {\n    int id\n    string name\n  }' },
+    { label: '클래스', code: 'classDiagram\n  class Animal {\n    +String name\n    +eat()\n  }\n  Animal <|-- Dog' },
+    { label: '상태', code: 'stateDiagram-v2\n  [*] --> 대기\n  대기 --> 진행: 시작\n  진행 --> 완료: 끝\n  완료 --> [*]' },
+    { label: '간트', code: 'gantt\n  title 일정\n  section 준비\n  기획 :a1, 2026-06-01, 7d\n  설계 :after a1, 5d' },
+    { label: '파이', code: 'pie title 비율\n  "개발" : 50\n  "회고" : 30\n  "데이터" : 20' },
+  ];
+
+  // 코드블록 언어 (검색 가능)
+  const CODE_LANGS = ['text', 'js', 'ts', 'tsx', 'jsx', 'json', 'html', 'css', 'astro', 'bash', 'shell', 'python', 'go', 'rust', 'java', 'c', 'cpp', 'kotlin', 'swift', 'ruby', 'php', 'sql', 'yaml', 'toml', 'markdown', 'diff', 'mermaid'];
+
+  // 이모지 피커 (검색 가능) — :숏코드: 텍스트를 넣는다(빌드에서 글리프로 변환)
+  const EMOJIS: { code: string; glyph: string; kw: string }[] = [
+    { code: 'smile', glyph: '😄', kw: '웃음 미소' }, { code: 'rocket', glyph: '🚀', kw: '로켓 발사' },
+    { code: 'sparkles', glyph: '✨', kw: '반짝 새로움' }, { code: 'seedling', glyph: '🌱', kw: '새싹 시작' },
+    { code: 'fire', glyph: '🔥', kw: '불 인기' }, { code: 'tada', glyph: '🎉', kw: '축하 완료' },
+    { code: 'bulb', glyph: '💡', kw: '아이디어 팁' }, { code: 'memo', glyph: '📝', kw: '메모 기록' },
+    { code: 'pushpin', glyph: '📌', kw: '핀 고정' }, { code: 'white_check_mark', glyph: '✅', kw: '체크 완료' },
+    { code: 'warning', glyph: '⚠️', kw: '경고 주의' }, { code: 'heart', glyph: '❤️', kw: '하트 좋아요' },
+    { code: '+1', glyph: '👍', kw: '따봉 좋아요' }, { code: 'eyes', glyph: '👀', kw: '눈 주목' },
+    { code: 'dog', glyph: '🐶', kw: '강아지 개' }, { code: 'star', glyph: '⭐', kw: '별 즐겨찾기' },
+    { code: 'zap', glyph: '⚡', kw: '번개 빠름' }, { code: 'wrench', glyph: '🔧', kw: '도구 수정' },
+    { code: 'books', glyph: '📚', kw: '책 공부' }, { code: 'coffee', glyph: '☕', kw: '커피 휴식' },
+    { code: 'thinking', glyph: '🤔', kw: '고민 생각' }, { code: 'tada', glyph: '🎊', kw: '파티' },
+    { code: 'rainbow', glyph: '🌈', kw: '무지개' }, { code: 'package', glyph: '📦', kw: '패키지 배포' },
+  ];
+
+  // LaTeX 치트시트
+  const LATEX_SNIPPETS: { label: string; code: string }[] = [
+    { label: '분수', code: '\\frac{a}{b}' }, { label: '제곱', code: 'x^{2}' },
+    { label: '아래첨자', code: 'x_{i}' }, { label: '루트', code: '\\sqrt{x}' },
+    { label: '합', code: '\\sum_{i=1}^{n}' }, { label: '적분', code: '\\int_{a}^{b}' },
+    { label: '극한', code: '\\lim_{x \\to 0}' }, { label: '벡터', code: '\\vec{v}' },
+    { label: '그리스 α', code: '\\alpha' }, { label: '그리스 π', code: '\\pi' },
+    { label: '곱하기', code: '\\times' }, { label: '나누기', code: '\\div' },
+    { label: '≤', code: '\\leq' }, { label: '≥', code: '\\geq' }, { label: '≠', code: '\\neq' },
+    { label: '화살표', code: '\\rightarrow' }, { label: '무한대', code: '\\infty' },
+  ];
+
+  const popover = $('md-popover');
+  let popoverAnchor: HTMLElement | null = null;
+
+  const closePopover = () => {
+    popover.hidden = true;
+    popover.innerHTML = '';
+    popoverAnchor?.setAttribute('aria-expanded', 'false');
+    popoverAnchor = null;
+  };
+
+  const positionPopover = (anchor: HTMLElement) => {
+    const tb = anchor.closest('.md-toolbar') as HTMLElement;
+    const a = anchor.getBoundingClientRect();
+    const base = tb.getBoundingClientRect();
+    popover.style.left = `${Math.max(0, Math.min(a.left - base.left, base.width - 260))}px`;
+    popover.style.top = `${a.bottom - base.top + 6}px`;
+  };
+
+  /** 검색창 + 항목 리스트로 팝오버를 구성한다. */
+  const buildList = (
+    items: { text: string; hint?: string; onPick: () => void }[],
+    searchable: boolean,
+    placeholder = '검색…',
+  ) => {
+    popover.innerHTML = '';
+    let search: HTMLInputElement | null = null;
+    if (searchable) {
+      search = document.createElement('input');
+      search.type = 'text';
+      search.className = 'md-pop-search';
+      search.placeholder = placeholder;
+      popover.appendChild(search);
+    }
+    const listEl = document.createElement('div');
+    listEl.className = 'md-pop-list';
+    popover.appendChild(listEl);
+
+    const render = (q: string) => {
+      listEl.innerHTML = '';
+      const ql = q.trim().toLowerCase();
+      const shown = items.filter((it) => !ql || `${it.text} ${it.hint ?? ''}`.toLowerCase().includes(ql));
+      if (shown.length === 0) {
+        listEl.innerHTML = '<p class="md-pop-empty">결과가 없어요.</p>';
+        return;
+      }
+      for (const it of shown) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'md-pop-item';
+        b.innerHTML = `<span>${it.text}</span>${it.hint ? `<span class="md-pop-hint">${it.hint}</span>` : ''}`;
+        b.addEventListener('click', () => {
+          it.onPick();
+          closePopover();
+        });
+        listEl.appendChild(b);
+      }
+    };
+    render('');
+    if (search) {
+      search.addEventListener('input', () => render(search!.value));
+      setTimeout(() => search!.focus(), 0);
+    }
+  };
+
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const openPopover = (kind: string, anchor: HTMLElement) => {
+    if (popoverAnchor === anchor) return closePopover();
+    closePopover();
+    popoverAnchor = anchor;
+    anchor.setAttribute('aria-expanded', 'true');
+
+    if (kind === 'callout') {
+      buildList(
+        CALLOUT_META.map((c) => ({
+          text: c.title,
+          hint: c.keyword,
+          onPick: () => insertBlock(`> [!${c.keyword}]\n> 내용을 적어요.`),
+        })),
+        false,
+      );
+    } else if (kind === 'code') {
+      buildList(
+        CODE_LANGS.map((lang) => ({
+          text: lang,
+          onPick: () => insertBlock('```' + lang + '\n코드\n```'),
+        })),
+        true,
+        '언어 검색…',
+      );
+    } else if (kind === 'mermaid') {
+      buildList(
+        MERMAID_EXAMPLES.map((m) => ({
+          text: m.label,
+          onPick: () => insertBlock('```mermaid\n' + m.code + '\n```'),
+        })),
+        false,
+      );
+    } else if (kind === 'emoji') {
+      buildList(
+        EMOJIS.map((e) => ({
+          text: `${e.glyph} :${e.code}:`,
+          hint: e.kw,
+          onPick: () => insertBlock(`:${e.code}:`),
+        })),
+        true,
+        '이모지 검색…',
+      );
+    } else if (kind === 'latex') {
+      buildList(
+        LATEX_SNIPPETS.map((l) => ({
+          text: l.label,
+          hint: l.code,
+          onPick: () => insertBlock('$' + l.code + '$'),
+        })),
+        true,
+        '수식 기호 검색…',
+      );
+    } else if (kind === 'wiki') {
+      const posts = state.index.posts ?? [];
+      if (posts.length === 0) {
+        popover.innerHTML = '<p class="md-pop-empty">연결할 발행 글이 아직 없어요.</p>';
+      } else {
+        buildList(
+          posts.map((p: any) => ({
+            text: escapeHtml(p.title),
+            hint: p.slug,
+            onPick: () => insertBlock(`[[${p.slug}]]`),
+          })),
+          true,
+          '글 제목·슬러그 검색…',
+        );
+      }
+    }
+
+    positionPopover(anchor);
+    popover.hidden = false;
+  };
+
+  document.querySelector('.md-toolbar')?.addEventListener('click', (ev) => {
+    const btn = (ev.target as HTMLElement).closest('button') as HTMLButtonElement | null;
+    if (!btn) return;
+    if (btn.id === 'toolbar-image') return $('body-image').click();
+    const md = btn.dataset.md;
+    if (md) {
+      insertBlock(SNIPPETS[md] ?? '');
+      return;
+    }
+    const pop = btn.dataset.pop;
+    if (pop) openPopover(pop, btn);
+  });
+
+  // 팝오버 바깥 클릭·ESC로 닫기
+  document.addEventListener('pointerdown', (ev) => {
+    if (popover.hidden) return;
+    const t = ev.target as Node;
+    if (!popover.contains(t) && t !== popoverAnchor && !popoverAnchor?.contains(t)) closePopover();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && !popover.hidden) closePopover();
+  });
 
   init();
 </script>
@@ -1526,6 +1786,106 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     display: flex;
     align-items: center;
     gap: 0.8rem;
+  }
+
+  /* 삽입 툴바 — 모바일에선 가로 스크롤, 넓은 화면에선 줄바꿈 */
+  .write-root .md-toolbar {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-bottom: 0;
+    border-radius: 12px 12px 0 0;
+    background-color: var(--surface);
+  }
+
+  .write-root .md-toolbar button {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.35em 0.7em;
+    border-radius: 8px;
+    background-color: var(--bg);
+    white-space: nowrap;
+  }
+
+  /* 툴바가 붙으면 에디터 위 모서리는 직각으로 이어 붙인다 */
+  .write-root .md-toolbar + .md-editor,
+  .write-root .md-toolbar ~ .md-editor {
+    border-radius: 0 0 12px 12px;
+  }
+
+  .write-root .md-popover {
+    position: absolute;
+    z-index: 45;
+    width: 260px;
+    max-width: calc(100vw - 2rem);
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgb(0 0 0 / 14%);
+    padding: 0.5rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .write-root .md-popover:not([hidden]) {
+      animation: dp-pop 0.13s ease-out;
+    }
+  }
+
+  .write-root .md-pop-search {
+    width: 100%;
+    font-size: 0.85rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .write-root .md-pop-list {
+    max-height: 240px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .write-root .md-pop-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    width: 100%;
+    text-align: left;
+    border: 0;
+    background: none;
+    border-radius: 8px;
+    padding: 0.45em 0.6em;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .write-root .md-pop-item:hover {
+    background-color: var(--accent-weak);
+    color: var(--accent);
+    border: 0;
+  }
+
+  .write-root .md-pop-hint {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    flex-shrink: 0;
+  }
+
+  .write-root .md-pop-item:hover .md-pop-hint {
+    color: var(--accent);
+  }
+
+  .write-root .md-pop-empty {
+    margin: 0;
+    padding: 0.5rem 0.6rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
   }
 
   .write-root .md-editor {
