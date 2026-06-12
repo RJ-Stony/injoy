@@ -173,6 +173,8 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
     background-color: color-mix(in srgb, var(--bg) 88%, transparent);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    /* 페이지 전환 시 헤더는 깜빡이지 않고 그대로 — 본문만 페이드 */
+    view-transition-name: site-header;
   }
 
   .site-header-inner {
@@ -226,9 +228,17 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
     text-decoration: none;
   }
 
+  /* 글쓰기 링크는 JS로 삽입되어 Astro 스코프 클래스가 없으므로
+     다른 내비 링크(그래프·About)와 같은 모양을 :global로 전부 지정한다 */
   .site-header nav :global(a.write-link) {
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
+
+  .site-header nav :global(a.write-link:hover) {
     color: var(--accent);
-    font-weight: 600;
+    text-decoration: none;
   }
 
   main {
