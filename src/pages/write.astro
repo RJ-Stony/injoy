@@ -2012,6 +2012,46 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     outline: 2px solid var(--accent);
   }
 
+  /* 콜아웃 박스 — 데코레이션이 블록인용에 class+라벨을 붙인다(문서는 그대로) */
+  .write-root .injoy-md .injoy-callout {
+    --callout: var(--accent);
+    position: relative;
+    border-inline-start: 3px solid var(--callout);
+    background-color: color-mix(in srgb, var(--callout) 7%, var(--bg));
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.6em 1.1em;
+    color: var(--text);
+  }
+
+  .write-root .injoy-md .injoy-callout::before {
+    content: attr(data-callout-label);
+    display: block;
+    font-weight: 700;
+    font-size: 0.85em;
+    color: var(--callout);
+    margin-bottom: 0.15em;
+  }
+
+  .write-root .injoy-md .injoy-callout-note { --callout: light-dark(#2f6fed, #5b8def); }
+  .write-root .injoy-md .injoy-callout-tip { --callout: light-dark(#1a7f4f, #4ecb96); }
+  .write-root .injoy-md .injoy-callout-important { --callout: light-dark(#8250df, #a98eea); }
+  .write-root .injoy-md .injoy-callout-warning { --callout: light-dark(#9a6700, #d9a83c); }
+  .write-root .injoy-md .injoy-callout-caution { --callout: light-dark(#cf222e, #e5695e); }
+
+  /* 콜아웃 마커([!NOTE])는 라벨로 대체하므로 숨긴다 */
+  .write-root .injoy-md .injoy-callout-hide {
+    display: none;
+  }
+
+  /* 위키링크 칩 — [[슬러그]]를 글 연결처럼 보이게(텍스트는 그대로 보존) */
+  .write-root .injoy-md .injoy-wikilink {
+    color: var(--accent);
+    background-color: var(--accent-weak);
+    border-radius: 5px;
+    padding: 0.05em 0.3em;
+    font-size: 0.95em;
+  }
+
   /* ---------- 정밀 미리보기(접이식) ---------- */
   .write-root .precise-preview {
     margin-top: 1rem;

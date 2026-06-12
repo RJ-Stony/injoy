@@ -22,8 +22,11 @@ import { gfm } from '@milkdown/kit/preset/gfm';
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { history } from '@milkdown/kit/plugin/history';
 import { math, katexOptionsCtx } from '@milkdown/plugin-math';
-import { replaceAll, insert, getMarkdown } from '@milkdown/kit/utils';
+import { replaceAll, insert, getMarkdown, $prose } from '@milkdown/kit/utils';
+import { Plugin } from '@milkdown/kit/prose/state';
+import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { alertOptions } from '../utils/callout-config.mjs';
+import { WIKI_LINK_RE } from '../plugins/wiki-link-pattern.mjs';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
 
@@ -43,6 +46,57 @@ export function normalizeMarkdown(md: string): string {
     .replace(/\\\]\\\]/g, ']]') // (혹시 닫는 괄호도 이스케이프된 경우)
     .replace(CALLOUT_ESCAPED, '$1[$2]'); // 콜아웃 마커 복원
 }
+
+/**
+ * 에디터 안에서 콜아웃을 박스로, 위키링크를 칩으로 "보이게" 하는 데코레이션.
+ * 문서 모델(블록인용·텍스트)은 그대로 두고 시각만 입히므로 round-trip에 영향이 없다.
+ * 위치 계산 오류가 에디터를 죽이지 않게 전체를 try/catch로 감싼다.
+ */
+const KIND_LABEL: Record<string, string> = Object.fromEntries(
+  alertOptions.alerts.map((a: { keyword: string; title: string }) => [a.keyword, a.title]),
+);
+const CALLOUT_MARKER_RE = new RegExp(`^\\[!(${Object.keys(KIND_LABEL).join('|')})\\]`);
+
+const injoyDecorations = $prose(
+  () =>
+    new Plugin({
+      props: {
+        decorations(state) {
+          const decos: any[] = [];
+          try {
+            state.doc.descendants((node: any, pos: number) => {
+              if (node.type.name === 'blockquote' && node.firstChild?.isTextblock) {
+                const m = node.firstChild.textContent.match(CALLOUT_MARKER_RE);
+                if (m) {
+                  const kind = m[1];
+                  decos.push(
+                    Decoration.node(pos, pos + node.nodeSize, {
+                      class: `injoy-callout injoy-callout-${kind.toLowerCase()}`,
+                      'data-callout-label': KIND_LABEL[kind] ?? kind,
+                    }),
+                  );
+                  const from = pos + 2; // blockquote(+1) → paragraph(+1) → 텍스트 시작
+                  decos.push(Decoration.inline(from, from + m[0].length, { class: 'injoy-callout-hide' }));
+                }
+              }
+              if (node.isText && node.text) {
+                const re = new RegExp(WIKI_LINK_RE.source, 'g');
+                let mm: RegExpExecArray | null;
+                while ((mm = re.exec(node.text))) {
+                  const from = pos + mm.index;
+                  decos.push(Decoration.inline(from, from + mm[0].length, { class: 'injoy-wikilink' }));
+                }
+              }
+              return undefined;
+            });
+          } catch {
+            return DecorationSet.empty;
+          }
+          return DecorationSet.create(state.doc, decos);
+        },
+      },
+    }),
+);
 
 export interface EditorHandle {
   /** 본문 전체를 마크다운으로 교체 (글 불러오기·초기화) */
@@ -148,6 +202,7 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
     .use(math)
     .use(history)
     .use(listener)
+    .use(injoyDecorations)
     .create();
 
   const view = () => editor.ctx.get(rootCtx) && editor;
