@@ -21,6 +21,7 @@ import { commonmark } from '@milkdown/kit/preset/commonmark';
 import { gfm } from '@milkdown/kit/preset/gfm';
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { history } from '@milkdown/kit/plugin/history';
+import { math, katexOptionsCtx } from '@milkdown/plugin-math';
 import { replaceAll, insert, getMarkdown } from '@milkdown/kit/utils';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
@@ -64,12 +65,15 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
         ...prev,
         attributes: { class: 'injoy-md ProseMirror', spellcheck: 'false' },
       }));
+      // 잘못된 LaTeX가 에디터를 죽이지 않게 (붉은 에러 표시로 대체)
+      ctx.set(katexOptionsCtx.key, { throwOnError: false });
       ctx.get(listenerCtx).markdownUpdated((_ctx, markdown, prevMarkdown) => {
         if (markdown !== prevMarkdown) opts.onChange(markdown);
       });
     })
     .use(commonmark)
     .use(gfm)
+    .use(math)
     .use(history)
     .use(listener)
     .create();
