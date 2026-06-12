@@ -1,6 +1,6 @@
 ---
 title: "이 블로그에 글 쓰는 법"
-description: "마크다운 파일 하나 추가가 곧 발행 — Injoy의 글쓰기 워크플로우 사용 설명서."
+description: "마크다운 파일 하나 추가가 곧 발행. Injoy의 글쓰기 워크플로우 사용 설명서."
 pubDate: 2026-06-09
 category: "개발"
 tags: ["astro", "markdown", "blog"]
@@ -59,7 +59,7 @@ draft: false
 | `draft` | — | `true`면 프로덕션 빌드에서 제외 (기본값 `false`) |
 | `cover` | — | 대표 이미지 경로 |
 
-스키마는 `src/content.config.ts`에 zod로 정의되어 있어서, 필수 필드가 빠지면
+스키마는 `src/content.config.ts`에 zod로 정의되어 있어서 필수 필드가 빠지면
 빌드가 친절한 에러와 함께 실패한다. 오타가 배포되는 일은 없다.
 
 ## 3. 본문 쓰기
