@@ -8,19 +8,22 @@
 
 주요 기능
 
-- **블로그 안에서 글쓰기·발행(CRUD)** — 내 브라우저에만 보이는 **글쓰기** 버튼 →
-  마크다운 에디터에서 쓰고 **발행** 버튼 한 번이면 lint 점검·연결 제안을 거쳐
-  GitHub에 커밋되고 자동 배포 (방문자에겐 버튼도 권한도 없음)
-- 마크다운 파일 추가 = 발행 (frontmatter는 zod로 검증)
-- 마크다운 풀세트: GFM(표·체크리스트), 콜아웃, 각주, **수식(KaTeX)**,
-  **다이어그램(Mermaid)**, 이모지 숏코드(Tossface), 이미지 캡션, 코드 줄 강조/diff
-- 라이트/다크 자동(시스템) + 헤더 토글로 수동 전환
-- 난이도 반영 읽기 시간(코드·수식·다이어그램 가중), 글별 조회수·전체 방문 수
-- 카드 썸네일(cover), 이전/다음 글 내비게이션, 태그 페이지
-- **지식 그래프** — `[[위키링크]]`와 타입 있는 연결(확장·뒷받침·반박 등)로 글을 잇고,
-  `/graph/`에서 연결 지도를 한눈에 (글 하단에 "연결된 글" 자동 표시)
-- 자동 목차 — 좁은 화면은 본문 상단 카드, 와이드 화면은 우측 sticky 사이드바
-- RSS·사이트맵·robots.txt 자동, 반응형(360px~)·접근성 기본기, 고정 헤더
+- **블로그 안에서 바로 쓰고 발행합니다.** 내 브라우저에만 보이는 **글쓰기** 버튼으로 에디터를
+  열어 글을 쓰고, **발행**을 누르면 점검과 연결 제안을 거쳐 GitHub에 커밋되고 자동 배포됩니다.
+  방문자에게는 버튼도 권한도 보이지 않습니다.
+- 마크다운 파일을 추가하면 그게 곧 발행입니다(frontmatter는 zod로 검증).
+- 쓰는 동안 오른쪽에 **발행 결과 그대로의 실시간 미리보기**가 뜹니다. 콜아웃·수식·다이어그램·
+  이미지까지 모두 보이고, 발행일은 토스 스타일 달력에서 고릅니다.
+- 마크다운 풀세트를 지원합니다. GFM(표·체크리스트), 콜아웃, 각주, **수식(KaTeX)**,
+  **다이어그램(Mermaid)**, 이모지 숏코드(Tossface), 이미지 캡션, 코드 줄 강조와 diff까지.
+- 라이트·다크는 시스템 설정을 따르고, 헤더 토글로 직접 바꿀 수도 있습니다.
+- 난이도를 반영한 읽기 시간(코드·수식·다이어그램에 가중), 글별 조회수와 전체 방문 수.
+- 카드 썸네일(cover), 이전·다음 글 내비게이션, 태그 페이지.
+- **지식 그래프.** `[[위키링크]]`와 타입 있는 연결(확장·뒷받침·사례 등 8종)로 글을 잇고,
+  `/graph/`에서 연결 지도를 한눈에 봅니다. 글 하단에는 "연결된 글"이 자동으로 붙습니다.
+- 자동 목차는 좁은 화면에선 본문 위 카드로, 넓은 화면에선 오른쪽 sticky 사이드바로 따라옵니다.
+- 글 사이를 옮길 때의 은은한 페이드, 헤더에 가리지 않는 각주 이동까지 읽는 흐름을 다듬었습니다.
+- RSS·사이트맵·robots.txt 자동 생성, 반응형(360px~)과 접근성 기본기, 고정 헤더.
 
 ## 빠른 시작
 
@@ -31,7 +34,7 @@ npm run write    # 블로그 + 글쓰기 에디터가 함께 열림
 
 | 명령 | 설명 |
 | --- | --- |
-| `npm run write` | **글쓰기 모드** — dev 서버 + 에디터(`/admin/`) 동시 실행 |
+| `npm run write` | **글쓰기 모드**. dev 서버와 에디터(`/admin/`)를 함께 실행 |
 | `npm run dev` | 로컬 개발 서버만 (draft 글도 보임) |
 | `npm run new -- <slug> "제목"` | 새 글 스캐폴드 (draft 상태로 생성) |
 | `npm run build` | 프로덕션 빌드 → `dist/` |
@@ -42,42 +45,44 @@ Node 18 이상이 필요합니다.
 
 ## 글 쓰는 법 ✍️
 
-### 방법 1 — 블로그에서 바로 쓰기 (권장)
+### 방법 1. 블로그에서 바로 쓰기 (권장)
 
 배포된 블로그의 **글쓰기** 버튼(또는 `/write/`)을 누르면 에디터가 열립니다.
 
-- **새 글 작성 · 기존 글 수정 · 삭제** 전부 브라우저에서 — 제목·요약·카테고리·태그·
-  대표 이미지(썸네일)·초안 여부를 폼으로, 본문은 마크다운으로(우측 간략 미리보기).
-- **발행 버튼 한 번이면 끝**: 점검(lint — 필수 필드·슬러그·위키링크 대상·이미지 alt 등)
-  → GitHub에 커밋(이미지·연결 포함 단일 커밋) → Actions가 자동 배포 → 완료되면
-  글 링크가 떠요. 1~2분이면 라이브에 반영됩니다.
-- **연결 제안**: 쓰고 있는 글과 비슷한 기존 글을 자동으로 찾아 제안하고, 수락하면
+- 새 글 작성과 기존 글 수정, 삭제를 모두 브라우저에서 합니다. 제목·요약·카테고리·태그·
+  대표 이미지(썸네일)·초안 여부는 폼으로 채우고, 발행일은 달력에서 고릅니다. 본문은
+  마크다운으로 쓰면 오른쪽에 발행했을 때 모습 그대로(콜아웃·수식·다이어그램·이미지까지)
+  실시간 미리보기가 뜹니다.
+- **발행 버튼 한 번이면 끝납니다.** 점검(필수 필드·슬러그·위키링크 대상·이미지 alt 등)을
+  통과하면 이미지와 연결까지 한 커밋으로 GitHub에 올라가고, Actions가 자동으로 배포합니다.
+  끝나면 글 링크가 떠요. 1~2분이면 라이브에 반영됩니다.
+- **연결 제안.** 쓰고 있는 글과 비슷한 기존 글을 자동으로 찾아 제안하고, 수락하면
   발행 커밋에 그래프 연결(edges.json)이 함께 기록됩니다. 글을 지우면 그 글을
   가리키던 연결도 자동으로 정리됩니다.
 
-**처음 한 번 — 발행 토큰 설정**
+**처음 한 번, 발행 토큰 설정**
 
-1. [GitHub fine-grained 토큰 만들기](https://github.com/settings/personal-access-tokens/new)
-   — Repository access를 `RJ-Stony/injoy`로 제한, Permissions는 `Contents: Read and write`만.
+1. [GitHub fine-grained 토큰 만들기](https://github.com/settings/personal-access-tokens/new)에서
+   Repository access를 `RJ-Stony/injoy`로 제한하고, Permissions는 `Contents: Read and write`만 켭니다.
 2. `/write/`에 붙여넣고 "이 기기에 저장".
 
 > [!IMPORTANT]
-> **나만 쓸 수 있는 이유**: `/write/` 페이지는 빈 정적 HTML일 뿐이고, 모든 권한은
+> **나만 쓸 수 있는 이유.** `/write/` 페이지는 빈 정적 HTML일 뿐이고, 모든 권한은
 > 내 브라우저 localStorage의 토큰에서 나옵니다. 토큰이 없는 방문자에겐 글쓰기 버튼
 > 자체가 보이지 않고, 페이지를 직접 열어도 아무것도 할 수 없습니다.
 > 토큰은 GitHub API 호출 외엔 어디로도 전송되지 않습니다. 공용 PC에서는 저장하지
 > 마시고, 필요하면 페이지 하단 "토큰 지우기"로 제거하세요.
 
-### 방법 2 — 로컬 CMS
+### 방법 2. 로컬 CMS
 
 ```bash
-npm run write   # dev 서버 + Decap 에디터(/admin/) — 인터넷 없이도 동작
+npm run write   # dev 서버 + Decap 에디터(/admin/). 인터넷 없이도 동작
 ```
 
 저장하면 로컬 파일로 기록되고, 커밋·푸시하면 발행됩니다.
 (`/admin/`은 프로덕션 빌드에서 제거되어 배포본에 존재하지 않습니다.)
 
-### 방법 3 — 파일로 직접 쓰기
+### 방법 3. 파일로 직접 쓰기
 
 ```bash
 npm run new -- my-first-post "첫 글입니다"   # 스캐폴드 한 줄로 시작
@@ -116,10 +121,10 @@ cover: "./cover.png"      # 선택, 대표 이미지
 | 필드 | 필수 | 설명 |
 | --- | --- | --- |
 | `title` | ✅ | 글 제목 |
-| `description` | ✅ | 한 줄 요약 — 홈 카드, meta description, OG 태그에 쓰임 |
+| `description` | ✅ | 한 줄 요약. 홈 카드·meta description·OG 태그에 쓰임 |
 | `pubDate` | ✅ | 발행일 `YYYY-MM-DD` |
 | `category` | ✅ | 카테고리 라벨 (메타 라인에 표시) |
-| `tags` | 선택 | 태그 배열 — `/tags/태그명/` 페이지 자동 생성 |
+| `tags` | 선택 | 태그 배열. `/tags/태그명/` 페이지 자동 생성 |
 | `draft` | 선택 | `true`면 프로덕션 빌드에서 제외 (기본 `false`) |
 | `cover` | 선택 | 대표 이미지 (글 파일 기준 상대 경로) |
 
@@ -146,8 +151,8 @@ draft: true
 - 코드블록: 언어를 지정하면 Shiki 하이라이트 + 복사 버튼 (라이트/다크 자동 전환)
   - 줄 끝에 `// [!code highlight]` `// [!code ++]` `// [!code --]`로 줄 강조·diff 표기
 - `##`/`###` 제목은 목차에 자동 수집 (와이드 화면에선 우측 sticky 사이드바)
-- 이미지: `![alt](../../assets/image.png)` — 글 기준 상대 경로면 자동 최적화 + lazy 로딩.
-  경로 뒤 `"따옴표"` 텍스트는 캡션이 됩니다. `alt`를 꼭 적어 주세요
+- 이미지: `![alt](../../assets/image.png)`처럼 글 기준 상대 경로로 넣으면 자동 최적화와
+  lazy 로딩이 붙습니다. 경로 뒤 `"따옴표"` 텍스트는 캡션이 됩니다. `alt`를 꼭 적어 주세요.
 
 샘플은 발행되어 있는 세 글
 ([welcome](src/content/posts/welcome.md),
@@ -165,7 +170,7 @@ RSS(`/rss.xml`)와 사이트맵(`/sitemap-index.xml`)은 빌드할 때마다 자
 
 ## 배포
 
-### 현재 상태 — GitHub Pages (운영 중)
+### 지금은 GitHub Pages로 운영 중
 
 이 레포는 이미 GitHub Pages로 배포되어 있습니다.
 
@@ -190,7 +195,7 @@ const BASE = '/injoy';                     // 하위 경로 (루트 배포면 '/
 - RSS·사이트맵·canonical·내부 링크가 전부 이 값을 따라가므로 다른 파일은 손댈 필요 없습니다.
   (컴포넌트는 `withBase()` 헬퍼, 마크다운 본문 링크는 `rehype-base-links` 플러그인이 처리)
 
-### 다른 곳에 배포하려면 — Vercel
+### Vercel로 배포하려면
 
 1. [vercel.com](https://vercel.com)에서 **Add New → Project**로 이 레포를 연결합니다.
 2. 프레임워크가 **Astro로 자동 인식**됩니다. 그대로 **Deploy**.
@@ -204,13 +209,15 @@ const BASE = '/injoy';                     // 하위 경로 (루트 배포면 '/
 src/
 ├── content/posts/      ← 글은 여기에 (.md 추가 = 발행, _images/는 업로드 이미지)
 ├── content.config.ts   ← frontmatter 스키마 (zod)
+├── data/edges.json     ← 글 사이 타입 있는 연결 (지식 그래프)
 ├── assets/             ← 글에서 쓰는 이미지 (자동 최적화)
 ├── layouts/            ← BaseLayout, MarkdownPage
 ├── components/         ← PostCard, PostMeta, TableOfContents, ThemeToggle, ViewCount
-├── pages/              ← 홈, 글 상세, about, 태그, rss.xml, 404
-├── plugins/            ← rehype 플러그인 (표 래퍼, base 링크, 캡션, Tossface)
+├── pages/              ← 홈, 글 상세, write(에디터), graph, about, 태그, rss.xml, 404
+├── plugins/            ← remark·rehype 플러그인 (위키링크, 표 래퍼, base 링크, 캡션, Tossface)
+├── scripts/            ← 에디터 미리보기·발행일 달력·Mermaid 렌더러
 ├── styles/global.css   ← 디자인 토큰·본문 스타일
-└── utils/              ← 글 목록·읽는 시간·날짜·withBase
+└── utils/              ← 글 목록·읽는 시간·그래프·날짜·withBase
 public/admin/           ← 글쓰기 에디터 (npm run write 전용, 배포 시 제거)
 scripts/new-post.mjs    ← 새 글 스캐폴드 (npm run new)
 scripts/verify.sh       ← 자체 점검 스크립트
@@ -221,7 +228,7 @@ scripts/verify.sh       ← 자체 점검 스크립트
 
 글은 쌓이기만 하지 않고 서로 연결됩니다. 연결하는 방법은 두 가지입니다.
 
-### 본문에서 — `[[위키링크]]`
+### 본문에서 `[[위키링크]]`로
 
 ```text
 구체적인 방법은 [[how-to-write]]에 정리해 두었다.
@@ -232,7 +239,7 @@ scripts/verify.sh       ← 자체 점검 스크립트
 - 그래프에 **"언급" 연결**로 자동 수집되고, 양쪽 글 하단 "연결된 글"에 나타납니다.
 - 존재하지 않는 슬러그면 빌드 로그에 경고가 남고 원문 그대로 표시됩니다.
 
-### 명시적으로 — 타입 있는 연결
+### 타입 있는 연결로 명시하기
 
 더 강한 관계는 [src/data/edges.json](src/data/edges.json)에 기록합니다.
 글쓰기 화면(`npm run write`)의 **연결(그래프)** 메뉴에서 글을 검색해 고르고
@@ -256,7 +263,7 @@ scripts/verify.sh       ← 자체 점검 스크립트
 존재하지 않는 글을 가리키는 연결은 **빌드가 실패**하므로(에러에 문제 슬러그 명시),
 끊어진 연결이 배포될 일이 없습니다.
 
-### 보기 — `/graph/`
+### `/graph/`에서 보기
 
 헤더의 **그래프** 메뉴에서 전체 연결 지도를 볼 수 있습니다. 노드를 끌어서 배치하고,
 누르면 그 글로 이동합니다. 글 하단 "그래프에서 보기 →"는 해당 글에 포커스된
@@ -275,11 +282,11 @@ GoatCounter·Cloudflare Analytics 같은 도구로 교체하는 것을 권합니
 이 블로그는 CDN으로 다음 폰트를 사용합니다. 모두 상업적 사용이 가능하지만,
 **운영(특히 상업적 운영) 전에 각 공식 라이선스 페이지를 한 번 더 확인하는 것을 권장**합니다.
 
-- **Wanted Sans** — [SIL OFL 1.1](https://github.com/wanteddev/wanted-sans?tab=OFL-1.1-1-ov-file).
+- **Wanted Sans**: [SIL OFL 1.1](https://github.com/wanteddev/wanted-sans?tab=OFL-1.1-1-ov-file).
   자유롭게 사용·수정·재배포할 수 있으나, **폰트 단독 판매와 라이선스 변경은 금지**됩니다.
-- **Tossface** — 토스 공식 안내([toss.im/tossface](https://toss.im/tossface)) 참고.
+- **Tossface**: 토스 공식 안내([toss.im/tossface](https://toss.im/tossface))를 참고하세요.
   본문 전체가 아닌 이모지 글리프에만 부분 적용하고 있습니다(`.tossface` 클래스).
-- **JetBrains Mono** — [SIL OFL 1.1](https://github.com/JetBrains/JetBrainsMono/blob/master/OFL.txt).
+- **JetBrains Mono**: [SIL OFL 1.1](https://github.com/JetBrains/JetBrainsMono/blob/master/OFL.txt).
 
 ## 의사결정 기록
 
