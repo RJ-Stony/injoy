@@ -61,9 +61,31 @@ export interface MountOptions {
   onChange: (markdown: string) => void;
   /** 초기 본문 */
   initialValue?: string;
+  /** 이미지 파일을 스테이징하고 본문에 넣을 경로(./_images/...)를 돌려준다. */
+  onImageFile?: (file: File) => Promise<string | null>;
+  /** 에디터에서 이미지를 보여 줄 때 src를 해석한다(./_images/ → dataURL/raw URL). 직렬화 src는 그대로. */
+  resolveImageSrc?: (src: string) => string | null;
 }
 
 export async function mountEditor(root: HTMLElement, opts: MountOptions): Promise<EditorHandle> {
+  // 붙여넣기·드롭한 이미지 파일을 스테이징한 뒤 커서 위치에 image 노드로 삽입한다.
+  const insertImageFiles = (view: any, files: FileList | File[]): boolean => {
+    const images = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (images.length === 0 || !opts.onImageFile) return false;
+    (async () => {
+      for (const file of images) {
+        const path = await opts.onImageFile!(file);
+        if (!path) continue;
+        const { state } = view;
+        const imageType = state.schema.nodes.image;
+        if (!imageType) continue;
+        const node = imageType.create({ src: path, alt: '설명을 적어 주세요' });
+        view.dispatch(view.state.tr.replaceSelectionWith(node).scrollIntoView());
+      }
+    })();
+    return true; // 기본 붙여넣기/드롭 동작은 막는다
+  };
+
   const editor = await Editor.make()
     .config((ctx) => {
       ctx.set(rootCtx, root);
@@ -82,6 +104,38 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
       ctx.update(editorViewOptionsCtx, (prev) => ({
         ...prev,
         attributes: { class: 'injoy-md ProseMirror', spellcheck: 'false' },
+        handlePaste: (view: any, event: ClipboardEvent) => {
+          const files = event.clipboardData?.files;
+          if (files && files.length > 0) return insertImageFiles(view, files);
+          return false;
+        },
+        handleDrop: (view: any, event: DragEvent) => {
+          const files = event.dataTransfer?.files;
+          if (files && files.length > 0) return insertImageFiles(view, files);
+          return false;
+        },
+        // 이미지 노드의 표시 src만 해석(./_images/ → dataURL/raw). 노드 attr(직렬화)는 불변.
+        nodeViews: {
+          ...((prev as any).nodeViews ?? {}),
+          image: (node: any) => {
+            const dom = document.createElement('img');
+            const apply = (n: any) => {
+              const src = n.attrs.src ?? '';
+              dom.src = (opts.resolveImageSrc?.(src) ?? null) || src;
+              dom.alt = n.attrs.alt ?? '';
+              if (n.attrs.title) dom.title = n.attrs.title;
+            };
+            apply(node);
+            return {
+              dom,
+              update: (updated: any) => {
+                if (updated.type.name !== 'image') return false;
+                apply(updated);
+                return true;
+              },
+            };
+          },
+        },
       }));
       // 잘못된 LaTeX가 에디터를 죽이지 않게 (붉은 에러 표시로 대체)
       ctx.set(katexOptionsCtx.key, { throwOnError: false });

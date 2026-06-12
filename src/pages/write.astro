@@ -292,7 +292,12 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     try {
       const { mountEditor } = await import('../scripts/milkdown-editor');
       host.innerHTML = '';
-      mdEditor = await mountEditor(host, { onChange: syncMirror, initialValue: '' });
+      mdEditor = await mountEditor(host, {
+        onChange: syncMirror,
+        initialValue: '',
+        onImageFile: (file) => stageImage(file), // 붙여넣기·드롭 이미지 스테이징
+        resolveImageSrc: resolveImage, // 에디터 안에서 이미지를 바로 보이게(dataURL/raw)
+      });
       // 개발·테스트용 핸들 (graph.astro의 __injoyGraph와 같은 선례). 운영자 전용 페이지.
       (window as any).__injoyEditor = mdEditor;
     } catch (e) {
@@ -558,12 +563,16 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     setCoverUI(null, '아직 선택한 이미지가 없어요', false);
   });
 
-  /** 첨부 이미지를 pendingFiles에 등록하고 본문에 넣을 마크다운을 돌려준다. */
+  /** 첨부 이미지를 pendingFiles에 등록하고 본문에 넣을 경로(./_images/...)를 돌려준다. */
   async function stageImage(file: File): Promise<string> {
     const slug = ($('fm-slug') as HTMLInputElement).value.trim() || 'post';
-    const name = `${slug}-${safeName(file.name)}`;
+    // 같은 파일명이 겹치면 덮어쓰지 않게 짧은 구분자를 붙인다(붙여넣기는 대개 'image.png').
+    const base = safeName(file.name) || 'image.png';
+    const name = state.pendingFiles.has(`${CFG.postsDir}/_images/${slug}-${base}`)
+      ? `${slug}-${state.pendingFiles.size}-${base}`
+      : `${slug}-${base}`;
     state.pendingFiles.set(`${CFG.postsDir}/_images/${name}`, await fileData(file));
-    return `![설명을 적어 주세요](./_images/${name})`;
+    return `./_images/${name}`;
   }
 
   $('insert-image').addEventListener('click', () => $('body-image').click());
@@ -571,7 +580,8 @@ const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
     const inputEl = ev.target as HTMLInputElement;
     const file = inputEl.files?.[0];
     if (!file) return;
-    const md = await stageImage(file);
+    const path = await stageImage(file);
+    const md = `![설명을 적어 주세요](${path})`;
     if (mdEditor) mdEditor.insertMarkdown(md);
     else {
       const ta = $('fm-body') as HTMLTextAreaElement;
