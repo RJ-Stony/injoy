@@ -739,6 +739,18 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   $('edge-add').addEventListener('click', () => {
     const to = ($('edge-target') as HTMLSelectElement).value;
     if (!to) return;
+    // 두 글 사이 연결은 하나면 충분 — 이미 연결됐거나 수락 목록에 있으면 막는다.
+    // 단, mention(위키링크 자동 연결)은 명시 연결로 '승격'할 수 있어야 하므로 제외한다.
+    const slug = ($('fm-slug') as HTMLInputElement).value.trim();
+    const connected = new Set(
+      state.index.edges
+        .filter((e: any) => e.type !== 'mentions')
+        .flatMap((e: any) => [`${e.from}→${e.to}`, `${e.to}→${e.from}`]),
+    );
+    if (connected.has(`${slug}→${to}`) || state.acceptedEdges.some((e) => e.to === to)) {
+      $('edge-hint').textContent = '이미 연결된 글이에요. 두 글 사이 연결은 하나면 충분해요.';
+      return;
+    }
     state.acceptedEdges.push({
       to,
       type: ($('edge-type') as HTMLSelectElement).value,
@@ -876,11 +888,18 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   async function mergedEdgesFile(slug: string): Promise<string | null> {
     if (state.acceptedEdges.length === 0) return null;
     const data = await fetchEdges();
-    const existing = new Set(data.edges.map((e: any) => `${e.from}→${e.to}:${e.type}`));
+    // 같은 두 글 사이에 이미 연결이 있으면(방향·타입 무관) 새로 만들지 않는다.
+    // 그래프 dedup·연결 제안과 같은 '두 글 사이 연결은 하나' 규칙 — 안 그러면
+    // 방향이나 설명만 다른 중복 엣지가 쌓여 연결 목록에 같은 글이 두 번 뜬다.
+    const connected = new Set<string>(
+      data.edges.flatMap((e: any) => [`${e.from}→${e.to}`, `${e.to}→${e.from}`]),
+    );
     for (const e of state.acceptedEdges) {
       if (e.to === slug) continue;
-      if (existing.has(`${slug}→${e.to}:${e.type}`)) continue;
+      if (connected.has(`${slug}→${e.to}`)) continue;
       data.edges.push({ from: slug, to: e.to, type: e.type, ...(e.note ? { note: e.note } : {}) });
+      connected.add(`${slug}→${e.to}`);
+      connected.add(`${e.to}→${slug}`);
     }
     return edgesToString(data);
   }
@@ -895,8 +914,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
 
   async function waitForDeploy(sha: string) {
     const status = $('publish-status');
-    for (let i = 0; i < 40; i++) {
-      await new Promise((r) => setTimeout(r, 6000));
+    for (let i = 0; i < 60; i++) {
+      await new Promise((r) => setTimeout(r, 4000));
       try {
         const runs = await gh(
           `/repos/${CFG.owner}/${CFG.repo}/actions/runs?head_sha=${sha}&per_page=1`,
@@ -907,6 +926,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
           status.textContent = `배포 중… (${run.status})`;
           continue;
         }
+        // 취소·건너뜀은 실패가 아니라 '더 최신 발행으로 대체됨' — 별도 신호로 구분한다.
+        if (run.conclusion === 'cancelled' || run.conclusion === 'skipped') return 'superseded';
         return run.conclusion === 'success';
       } catch {
         /* 일시 오류 무시 */
@@ -965,6 +986,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         ($('fm-slug') as HTMLInputElement).disabled = true;
         $('delete-post').hidden = false;
         await Promise.all([loadIndex(), loadPostList()]);
+      } else if (ok === 'superseded') {
+        status.textContent = '더 최신 발행으로 대체됐어요. 최신 내용이 곧 반영됩니다.';
       } else if (ok === false) {
         status.textContent = '✕ 배포에 실패했어요. GitHub Actions 로그를 확인해 주세요.';
       } else {
@@ -992,7 +1015,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     state.coverPath = parsed.cover;
     state.coverPendingPath = null;
 
-    $('editor-title').textContent = `수정: ${parsed.title}`;
+    $('editor-title').textContent = '글 수정';
     ($('fm-title') as HTMLInputElement).value = parsed.title;
     const slugEl = $('fm-slug') as HTMLInputElement;
     slugEl.value = state.editingSlug;

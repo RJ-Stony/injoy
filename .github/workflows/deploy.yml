@@ -10,19 +10,21 @@ permissions:
   pages: write
   id-token: write
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: withastro/action@v6
+# GitHub Pages 공식 권장 패턴: 진행 중인 배포는 끝까지 두고 새 푸시는 큐에 쌓는다.
+# (배포 도중 취소하면 단일 'github-pages' 환경이 꼬일 수 있다. 속도 이득은 아래 단일 잡 병합에서 온다.)
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
+jobs:
+  # 빌드와 배포를 한 잡에서 처리해 러너 스핀업을 한 번으로 줄인다.
   deploy:
-    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+      - uses: withastro/action@v6
       - id: deployment
         uses: actions/deploy-pages@v4

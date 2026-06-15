@@ -120,7 +120,7 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
 
     <footer class="site-footer">
       <div class:list={['site-footer-inner', { wide }]}>
-        <p>© {new Date().getFullYear()} Injoy. 마크다운으로 쓰고, 즐겁게 기록합니다.</p>
+        <p>© {new Date().getFullYear()} Injoy. 즐거움 안에서.</p>
         <p class="footer-links">
           <span id="site-visits" hidden></span>
           <a href={withBase('/rss.xml')}>RSS</a>
@@ -296,12 +296,15 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
   }
 
   .site-footer p {
-    margin: 0;
+    /* 세로 마진만 제거 — 가로는 .footer-links의 margin-left: auto가 쓸 수 있게 둔다 */
+    margin-block: 0;
   }
 
   .footer-links {
     display: flex;
     align-items: center;
     gap: 1rem;
+    /* 좁은 화면에서 줄바꿈돼도 푸터 오른쪽에 붙도록 — 없으면 왼쪽으로 몰린다 */
+    margin-left: auto;
   }
 </style>

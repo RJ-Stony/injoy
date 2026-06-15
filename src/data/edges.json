@@ -17,17 +17,6 @@
       "to": "welcome",
       "type": "instantiates",
       "note": "'정갈한 디자인' 다짐이 본문 요소 하나하나에 어떻게 구현됐는지 보여 주는 사례"
-    },
-    {
-      "from": "wysiwyg-editor",
-      "to": "markdown-styleguide",
-      "type": "extends"
-    },
-    {
-      "from": "how-to-write",
-      "to": "markdown-styleguide",
-      "type": "supports",
-      "note": "글쓰기 가이드가 약속한 문법들이 실제로 어떻게 보여주는지에 대한 근"
     }
   ]
 }
