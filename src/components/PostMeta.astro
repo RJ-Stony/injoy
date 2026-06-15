@@ -1,7 +1,8 @@
 ---
 /**
- * 시그니처 메타 라인 — 카테고리 라벨 + 발행일 + 읽는 시간을 한 줄로.
+ * 시그니처 메타 라인 — 카테고리 라벨 + 발행일 + (갱신일) + 읽는 시간 + (연결 수).
  * 글 카드와 글 상단에서 같은 모습으로 쓰인다.
+ * connections·updatedDate는 선택 — 글 상세에서만 넘긴다(카드는 그대로).
  */
 import { formatDate, isoDate } from '../utils/post';
 
@@ -9,9 +10,15 @@ interface Props {
   category: string;
   pubDate: Date;
   minutes: number;
+  /** 글 상세에서만 넘긴다. 0이면 표시하지 않음 */
+  connections?: number;
+  /** 발행일과 다를 때만 '갱신'으로 표시 */
+  updatedDate?: Date;
 }
 
-const { category, pubDate, minutes } = Astro.props;
+const { category, pubDate, minutes, connections, updatedDate } = Astro.props;
+const showUpdated = !!updatedDate && updatedDate.getTime() !== pubDate.getTime();
+const connCount = connections ?? 0;
 ---
 
 <div class="post-meta">
@@ -20,10 +27,28 @@ const { category, pubDate, minutes } = Astro.props;
     <span class="divider" aria-hidden="true">·</span>
     <time datetime={isoDate(pubDate)}>{formatDate(pubDate)}</time>
   </span>
+  {
+    showUpdated && (
+      <span class="item">
+        <span class="divider" aria-hidden="true">·</span>
+        <time datetime={isoDate(updatedDate!)}>갱신 {formatDate(updatedDate!)}</time>
+      </span>
+    )
+  }
   <span class="item">
     <span class="divider" aria-hidden="true">·</span>
     <span>{minutes}분 읽기</span>
   </span>
+  {
+    connCount > 0 && (
+      <span class="item">
+        <span class="divider" aria-hidden="true">·</span>
+        <a class="conn" href="#connections">
+          연결 {connCount}개
+        </a>
+      </span>
+    )
+  }
 </div>
 
 <style>
@@ -55,5 +80,16 @@ const { category, pubDate, minutes } = Astro.props;
 
   .divider {
     color: var(--border);
+  }
+
+  /* 연결 수 — 그래프임을 헤더에서 바로 드러내는 신호. 누르면 하단 '연결된 글'로 */
+  .conn {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .conn:hover {
+    color: var(--accent);
+    text-decoration: none;
   }
 </style>

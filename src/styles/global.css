@@ -21,6 +21,16 @@
   --accent-weak: #eaf1fe;
   --code-bg: #f4f5f7;
 
+  /* 엣지(연결) 타입별 색 — graph 캔버스·범례·연결 칩이 공유하는 단일 출처 */
+  --edge-extends: #2f6fed;
+  --edge-supports: #1f9d6b;
+  --edge-refines: #0e8ca8;
+  --edge-instantiates: #7c5cff;
+  --edge-requires: #c47d12;
+  --edge-triggered-by: #c2509a;
+  --edge-contradicts: #cf222e;
+  --edge-related: #6b7280;
+
   /* 폰트 */
   --font-sans: 'Wanted Sans Variable', 'Wanted Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'D2Coding', ui-monospace, monospace;
@@ -48,6 +58,14 @@
   --accent: #5b8def;
   --accent-weak: #1e2a44;
   --code-bg: #1b1e24;
+  --edge-extends: #5b8def;
+  --edge-supports: #3fc08a;
+  --edge-refines: #38c0d6;
+  --edge-instantiates: #9b85ff;
+  --edge-requires: #e0a948;
+  --edge-triggered-by: #e07ab8;
+  --edge-contradicts: #e5695e;
+  --edge-related: #9aa0a6;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -60,6 +78,14 @@
     --accent: #5b8def;
     --accent-weak: #1e2a44;
     --code-bg: #1b1e24;
+    --edge-extends: #5b8def;
+    --edge-supports: #3fc08a;
+    --edge-refines: #38c0d6;
+    --edge-instantiates: #9b85ff;
+    --edge-requires: #e0a948;
+    --edge-triggered-by: #e07ab8;
+    --edge-contradicts: #e5695e;
+    --edge-related: #9aa0a6;
   }
 }
 

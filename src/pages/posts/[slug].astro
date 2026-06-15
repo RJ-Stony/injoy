@@ -35,7 +35,13 @@ const connections = await getConnections(post.id);
   <article class="post">
     <header class="post-header">
       <div class="meta-row">
-        <PostMeta category={post.data.category} pubDate={post.data.pubDate} minutes={minutes} />
+        <PostMeta
+          category={post.data.category}
+          pubDate={post.data.pubDate}
+          minutes={minutes}
+          connections={connections.length}
+          updatedDate={post.data.updatedDate}
+        />
         <ViewCount slug={post.id} />
       </div>
       <h1>{post.data.title}</h1>
@@ -67,7 +73,7 @@ const connections = await getConnections(post.id);
 
     {
       connections.length > 0 && (
-        <section class="connections" aria-label="연결된 글">
+        <section id="connections" class="connections" aria-label="연결된 글">
           <div class="connections-head">
             <h2>연결된 글</h2>
             <a class="to-graph" href={withBase(`/graph/?focus=${post.id}`)}>그래프에서 보기 →</a>
@@ -284,6 +290,8 @@ const connections = await getConnections(post.id);
     border-radius: var(--radius);
     background-color: var(--surface);
     padding: 1.1rem 1.4rem;
+    /* 헤더 메타의 '연결 N개'에서 #connections로 점프할 때 고정 헤더에 안 가리게 */
+    scroll-margin-top: 5.5rem;
   }
 
   .connections-head {
@@ -326,21 +334,28 @@ const connections = await getConnections(post.id);
   }
 
   .edge-chip {
+    --chip: var(--accent);
     display: inline-block;
     margin-inline-end: 0.6em;
     padding: 0.08em 0.7em;
     border-radius: 999px;
-    background-color: var(--accent-weak);
-    color: var(--accent);
+    background-color: color-mix(in srgb, var(--chip) 12%, var(--bg));
+    color: var(--chip);
     font-size: 0.78rem;
     font-weight: 600;
     white-space: nowrap;
   }
 
-  .edge-chip.contradicts {
-    background-color: color-mix(in srgb, #cf222e 10%, var(--bg));
-    color: light-dark(#cf222e, #e5695e);
-  }
+  /* 타입별 색 — global.css의 --edge-* 단일 출처를 칩에 입힌다 */
+  .edge-chip.extends { --chip: var(--edge-extends); }
+  .edge-chip.supports { --chip: var(--edge-supports); }
+  .edge-chip.refines { --chip: var(--edge-refines); }
+  .edge-chip.instantiates { --chip: var(--edge-instantiates); }
+  .edge-chip.requires { --chip: var(--edge-requires); }
+  .edge-chip.triggered-by { --chip: var(--edge-triggered-by); }
+  .edge-chip.contradicts { --chip: var(--edge-contradicts); }
+  .edge-chip.related { --chip: var(--edge-related); }
+  .edge-chip.mentions { --chip: var(--text-muted); }
 
   .connections li a {
     font-weight: 600;

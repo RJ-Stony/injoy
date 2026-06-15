@@ -40,7 +40,7 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
   <ul class="legend" aria-label="범례">
     <li><span class="dot post" aria-hidden="true"></span>글</li>
     <li><span class="dot tag" aria-hidden="true"></span>태그</li>
-    <li><span class="line solid" aria-hidden="true"></span>명시적 연결</li>
+    <li><span class="line solid" aria-hidden="true"></span>연결(타입별 색)</li>
     <li><span class="line dashed" aria-hidden="true"></span>언급·태그</li>
   </ul>
 
@@ -51,7 +51,7 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
         explicitEdges.map((e) => (
           <li>
             <a href={withBase(`/posts/${e.from}/`)}>{titleOf.get(e.from)}</a>
-            <span class="edge-type">{edgeLabel(e.type)} →</span>
+            <span class:list={['edge-type', e.type]}>{edgeLabel(e.type)} →</span>
             <a href={withBase(`/posts/${e.to}/`)}>{titleOf.get(e.to)}</a>
             {e.note && <span class="note">· {e.note}</span>}
           </li>
@@ -64,15 +64,15 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
     <summary>연결 타입 안내</summary>
     <ul class="type-guide">
       {
-        Object.values(EDGE_TYPES).map((t) => (
+        Object.entries(EDGE_TYPES).map(([key, t]) => (
           <li>
-            <span class="edge-type">{t.label}</span>
+            <span class:list={['edge-type', key]}>{t.label}</span>
             <span class="note">{t.criteria}</span>
           </li>
         ))
       }
       <li>
-        <span class="edge-type">{AUTO_EDGE_TYPES.mentions.label}</span>
+        <span class="edge-type mentions">{AUTO_EDGE_TYPES.mentions.label}</span>
         <span class="note">{AUTO_EDGE_TYPES.mentions.criteria}</span>
       </li>
     </ul>
@@ -114,7 +114,11 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
       n.kind === 'post' ? Math.min(9 + n.degree * 1.5, 17) : 5 + Math.min(n.degree, 3);
 
     // CSS 토큰에서 색을 읽는다 — 테마가 바뀌면 다시 읽어 다시 그린다
-    const colors = {};
+    const EDGE_KINDS = [
+      'extends', 'supports', 'refines', 'instantiates',
+      'requires', 'triggered-by', 'contradicts', 'related',
+    ];
+    const colors = { edge: {} };
     const readColors = () => {
       const s = getComputedStyle(document.documentElement);
       colors.accent = s.getPropertyValue('--accent').trim();
@@ -123,6 +127,8 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
       colors.muted = s.getPropertyValue('--text-muted').trim();
       colors.border = s.getPropertyValue('--border').trim();
       colors.surface = s.getPropertyValue('--surface').trim();
+      // 엣지 타입별 색 — global.css의 --edge-* 단일 출처를 캔버스가 공유한다
+      for (const k of EDGE_KINDS) colors.edge[k] = s.getPropertyValue(`--edge-${k}`).trim();
     };
 
     const resize = () => {
@@ -215,14 +221,23 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
 
       for (const e of edges) {
         const isTag = e.to.startsWith('tag:');
-        const dashed = e.type === 'mentions' || isTag;
-        const alpha = Math.min(fade(e.a.id), fade(e.b.id)) * (isTag ? 0.55 : 0.95);
+        const isMention = e.type === 'mentions';
+        const faint = isTag || isMention;
+        // 색: 타입별 단일 토큰. 태그·언급은 약하게(회색), 명시 타입은 제 색.
+        const stroke = isTag
+          ? colors.border
+          : isMention
+            ? colors.muted
+            : colors.edge[e.type] || colors.accent;
+        // 형태: 언급·태그는 잔점선, 반박(contradicts)은 긴 점선(색 없이도 '긴장'을 구분), 그 외 실선.
+        const dash = faint ? [4, 4] : e.type === 'contradicts' ? [9, 5] : [];
+        const strong = hl && hl.set.has(e.a.id) && hl.set.has(e.b.id);
+        const alpha = Math.min(fade(e.a.id), fade(e.b.id)) * (faint ? 0.55 : 0.95);
         ctx.save();
         ctx.globalAlpha = alpha;
-        ctx.strokeStyle =
-          hl && hl.set.has(e.a.id) && hl.set.has(e.b.id) ? colors.accent : colors.border;
-        ctx.lineWidth = dashed ? 1 : 1.6;
-        ctx.setLineDash(dashed ? [4, 4] : []);
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = (dash.length ? 1 : 1.6) + (strong ? 0.8 : 0);
+        ctx.setLineDash(dash);
         ctx.beginPath();
         ctx.moveTo(e.a.x, e.a.y);
         ctx.lineTo(e.b.x, e.b.y);
@@ -569,15 +584,27 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
   }
 
   .edge-type {
+    --chip: var(--accent);
     display: inline-block;
     margin-inline: 0.4em;
     padding: 0.05em 0.6em;
     border-radius: 999px;
-    background-color: var(--accent-weak);
-    color: var(--accent);
+    background-color: color-mix(in srgb, var(--chip) 12%, var(--bg));
+    color: var(--chip);
     font-size: 0.8em;
     font-weight: 600;
   }
+
+  /* 타입별 색 — global.css의 --edge-* 단일 출처를 칩·범례에 입힌다 */
+  .edge-type.extends { --chip: var(--edge-extends); }
+  .edge-type.supports { --chip: var(--edge-supports); }
+  .edge-type.refines { --chip: var(--edge-refines); }
+  .edge-type.instantiates { --chip: var(--edge-instantiates); }
+  .edge-type.requires { --chip: var(--edge-requires); }
+  .edge-type.triggered-by { --chip: var(--edge-triggered-by); }
+  .edge-type.contradicts { --chip: var(--edge-contradicts); }
+  .edge-type.related { --chip: var(--edge-related); }
+  .edge-type.mentions { --chip: var(--text-muted); }
 
   .edge-list .note {
     color: var(--text-muted);
