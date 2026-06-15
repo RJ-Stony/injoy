@@ -22,6 +22,12 @@
       "from": "wysiwyg-editor",
       "to": "markdown-styleguide",
       "type": "extends"
+    },
+    {
+      "from": "how-to-write",
+      "to": "markdown-styleguide",
+      "type": "supports",
+      "note": "글쓰기 가이드가 약속한 문법들이 실제로 어떻게 보여주는지에 대한 근"
     }
   ]
 }
