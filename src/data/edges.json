@@ -17,6 +17,11 @@
       "to": "welcome",
       "type": "instantiates",
       "note": "'정갈한 디자인' 다짐이 본문 요소 하나하나에 어떻게 구현됐는지 보여 주는 사례"
+    },
+    {
+      "from": "wysiwyg-editor",
+      "to": "markdown-styleguide",
+      "type": "extends"
     }
   ]
 }
