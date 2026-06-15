@@ -154,6 +154,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         <!-- 삽입 툴바: 문법을 외우지 않아도 버튼으로 블록을 넣는다 (모바일에서도 동작) -->
         <!-- pending: 에디터 마운트 완료 전까지 비활성(그 사이 삽입분이 증발하지 않게) -->
         <div class="md-toolbar pending" role="toolbar" aria-label="삽입 도구" aria-disabled="true">
+          <div class="md-tools">
           <button type="button" data-md="heading" title="제목">제목</button>
           <button type="button" data-md="quote" title="인용">인용</button>
           <button type="button" data-pop="callout" title="콜아웃" aria-haspopup="true">콜아웃 ▾</button>
@@ -169,7 +170,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
           <button type="button" data-md="footnote" title="각주">각주</button>
           <button type="button" id="toolbar-image" title="이미지">이미지</button>
           <button type="button" data-pop="latex" title="수식 도움말" aria-haspopup="true">수식 도움 ▾</button>
-          <!-- 팝오버: 툴바 기준(position:relative) 절대배치 — JS가 위치·내용 채움 -->
+          </div>
+          <!-- 팝오버: 툴바 기준(position:relative) 절대배치 — 버튼 행(.md-tools) 밖에 둬야 가로 스크롤에 안 잘린다 -->
           <div id="md-popover" class="md-popover" role="menu" hidden></div>
         </div>
 
@@ -269,6 +271,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     coverPath: null as string | null,
     coverPendingPath: null as string | null,
     acceptedEdges: [] as { to: string; type: string; note?: string }[],
+    // acceptedEdges가 '이 글의 완전한 나가는 연결 집합'을 반영하는지. false면 reconcile가 삭제하지 않는다(데이터 보호).
+    edgesLoaded: true,
     index: { posts: [] as any[], edges: [] as any[] },
   };
 
@@ -671,9 +675,6 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     const picked = new Set(state.acceptedEdges.map((e) => e.to));
     const items = suggestEdges();
     ul.innerHTML = '';
-    if (items.length === 0 && state.acceptedEdges.length === 0) {
-      ul.innerHTML = '<li class="empty">아직 비슷한 글이 없어요. 본문을 쓰면 자동으로 제안돼요.</li>';
-    }
     for (const { post, score } of items) {
       if (picked.has(post.slug)) continue;
       const li = document.createElement('li');
@@ -732,6 +733,47 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       }
       li.append(rm);
       ul.appendChild(li);
+    }
+
+    // 읽기 전용: 이 글로 '들어오는' 명시 연결 + 위키링크 '언급'(양방향).
+    // 편집은 못 하지만 전체 연결 그림을 보여 줘 중복·승격 판단을 돕는다.
+    if (state.mode === 'edit' && state.editingSlug) {
+      const slug = state.editingSlug;
+      const ownedOut = new Set(state.acceptedEdges.map((e) => e.to));
+      const info = state.index.edges.filter((e: any) => {
+        if (e.from !== slug && e.to !== slug) return false;
+        // 편집 목록에 이미 있는 대상은 제외 — 위키링크를 명시 연결로 승격해도 중복 안 뜨게(mention 포함).
+        if (e.from === slug && ownedOut.has(e.to)) return false;
+        return true;
+      });
+      const shown = new Set<string>();
+      for (const e of info) {
+        const incoming = e.to === slug;
+        const other = incoming ? e.from : e.to;
+        if (shown.has(other)) continue; // 상호 언급 등 같은 글이 두 번 뜨지 않게
+        shown.add(other);
+        const p = state.index.posts.find((q: any) => q.slug === other);
+        const meta = EDGE_META.find((m: any) => m.value === e.type);
+        const li = document.createElement('li');
+        li.className = 'readonly-edge';
+        li.append(
+          Object.assign(document.createElement('span'), {
+            className: 'ro-chip',
+            textContent:
+              e.type === 'mentions' ? '언급' : `${meta?.label ?? e.type}${incoming ? ' 받음' : ''}`,
+          }),
+          Object.assign(document.createElement('span'), {
+            textContent: p?.title ?? other,
+            className: 'sug-title',
+          }),
+        );
+        ul.appendChild(li);
+      }
+    }
+
+    // 제안·수락·읽기 전용 어느 것도 없을 때만 빈 안내(읽기 전용 위에 모순되게 뜨지 않게).
+    if (ul.childElementCount === 0) {
+      ul.innerHTML = '<li class="empty">아직 비슷한 글이 없어요. 본문을 쓰면 자동으로 제안돼요.</li>';
     }
   }
 
@@ -892,22 +934,44 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   const edgesToString = (data: any) => JSON.stringify(data, null, 2) + '\n';
 
   async function mergedEdgesFile(slug: string): Promise<string | null> {
-    if (state.acceptedEdges.length === 0) return null;
+    // 연결을 못 불러온 상태(edit-load 실패)면 reconcile로 기존 연결을 지울 위험이 있으므로
+    // edges.json을 아예 건드리지 않는다(데이터 보호). 새 글·정상 로드는 edgesLoaded=true.
+    if (!state.edgesLoaded) return null;
     const data = await fetchEdges();
-    // 같은 두 글 사이에 이미 연결이 있으면(방향·타입 무관) 새로 만들지 않는다.
-    // 그래프 dedup·연결 제안과 같은 '두 글 사이 연결은 하나' 규칙 — 안 그러면
-    // 방향이나 설명만 다른 중복 엣지가 쌓여 연결 목록에 같은 글이 두 번 뜬다.
-    const connected = new Set<string>(
-      data.edges.flatMap((e: any) => [`${e.from}→${e.to}`, `${e.to}→${e.from}`]),
-    );
+    // 이 글이 '소유한' 나가는 엣지(from===slug)를 acceptedEdges로 통째로 교체(reconcile)한다.
+    // 다른 글의 엣지와 이 글로 '들어오는' 엣지(to===slug, from!==slug)는 건드리지 않는다 —
+    // 그건 상대 글의 소유라 여기서 지우거나 바꾸면 안 된다.
+    // 들어오는 역방향 엣지(bar→foo)와 이 글의 정방향 엣지(foo→bar)는 별개의 정당한 엣지다.
+    // 그래서 '같은 방향'만 중복으로 보고, 이 글이 소유한 나가는 엣지는 역방향 존재와 무관하게 보존한다.
+    const desired = new Map<string, { type: string; note?: string }>();
     for (const e of state.acceptedEdges) {
-      if (e.to === slug) continue;
-      if (connected.has(`${slug}→${e.to}`)) continue;
-      data.edges.push({ from: slug, to: e.to, type: e.type, ...(e.note ? { note: e.note } : {}) });
-      connected.add(`${slug}→${e.to}`);
-      connected.add(`${e.to}→${slug}`);
+      if (e.to === slug) continue; // 자기참조 방지
+      if (!desired.has(e.to)) desired.set(e.to, { type: e.type, note: e.note });
     }
-    return edgesToString(data);
+    // 기존 순서를 보존하며 제자리 reconcile — 남은 건 타입·노트만 갱신, 빠진 건 제거.
+    const seen = new Set<string>();
+    const next: any[] = [];
+    for (const e of data.edges) {
+      if (e.from === slug) {
+        const d = desired.get(e.to);
+        if (d && !seen.has(e.to)) {
+          next.push({ from: slug, to: e.to, type: d.type, ...(d.note ? { note: d.note } : {}) });
+          seen.add(e.to);
+        }
+        // desired에 없으면 제거(drop)
+      } else {
+        next.push(e); // 다른 글의 엣지·이 글로 들어오는 엣지는 그대로 보존
+      }
+    }
+    // 기존 edges.json에 없던 새 연결만 끝에 추가한다.
+    for (const [to, d] of desired) {
+      if (seen.has(to)) continue;
+      next.push({ from: slug, to, type: d.type, ...(d.note ? { note: d.note } : {}) });
+      seen.add(to);
+    }
+    // 제자리 reconcile라 순서까지 같으면 무변경 — 재발행 멱등(불필요한 커밋 방지).
+    if (JSON.stringify(next) === JSON.stringify(data.edges)) return null;
+    return edgesToString({ ...data, edges: next });
   }
 
   /** 삭제되는 글을 가리키는 연결을 함께 정리 — 남겨 두면 다음 빌드가 실패한다 */
@@ -984,7 +1048,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         status.innerHTML = `✓ 발행 완료 · <a href="${url}">글 보러 가기</a>`;
         state.pendingFiles.clear();
         state.coverPendingPath = null;
-        state.acceptedEdges = [];
+        // acceptedEdges는 비우지 않는다 — 방금 쓴 '이 글의 연결' 상태라, 유지해야
+        // 재발행 시 reconcile가 같은 집합으로 멱등 동작하고 실수로 지워지지 않는다.
         state.mode = 'edit';
         state.editingSlug = slug;
         // 발행되면 슬러그를 잠근다 — 잠그지 않으면 슬러그를 바꿔 재발행했을 때
@@ -1017,7 +1082,20 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     state.mode = 'edit';
     state.editingSlug = filename.replace(/\.mdx?$/, '');
     state.pendingFiles.clear();
-    state.acceptedEdges = [];
+    // 기존 연결을 GitHub의 현재 edges.json에서 직접 불러온다(빌드 인덱스보다 최신).
+    // 이 글이 소유한 '나가는' 명시 엣지만 편집 대상 — 들어오는 엣지·언급은 아래에서 읽기 전용으로 보여 준다.
+    try {
+      const existingEdges = await fetchEdges();
+      state.acceptedEdges = existingEdges.edges
+        .filter((e: any) => e.from === state.editingSlug)
+        .map((e: any) => ({ to: e.to, type: e.type, note: e.note }));
+      state.edgesLoaded = true;
+    } catch {
+      // 연결을 못 불러오면 reconcile가 기존 연결을 지우지 않도록 막는다(데이터 보호).
+      // 연결은 아래 읽기 전용 목록(state.index 기반)으로는 여전히 보인다.
+      state.acceptedEdges = [];
+      state.edgesLoaded = false;
+    }
     state.coverPath = parsed.cover;
     state.coverPendingPath = null;
 
@@ -1070,6 +1148,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     state.editingSlug = null;
     state.pendingFiles.clear();
     state.acceptedEdges = [];
+    state.edgesLoaded = true; // 새 글은 빈 집합이 곧 완전한 집합
     state.coverPath = null;
     state.coverPendingPath = null;
     $('editor-title').textContent = '새 글';
@@ -1831,14 +1910,18 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   /* 삽입 툴바 — 모바일에선 가로 스크롤, 넓은 화면에선 줄바꿈 */
   .write-root .md-toolbar {
     position: relative;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
     padding: 0.5rem;
     border: 1px solid var(--border);
     border-bottom: 0;
     border-radius: 12px 12px 0 0;
     background-color: var(--surface);
+  }
+
+  /* 버튼 행 — 모바일에선 이 안쪽만 가로 스크롤. 팝오버(.md-toolbar 직속)는 클리핑 밖에 둔다. */
+  .write-root .md-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
   }
 
   .write-root .md-toolbar button {
@@ -2173,6 +2256,22 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     padding: 0.3em 0.8em;
   }
 
+  /* 읽기 전용 연결(들어오는 엣지·언급) — 편집 컨트롤 없이 회색으로 구분 */
+  .write-root .suggestions li.readonly-edge .sug-title {
+    color: var(--text-muted);
+  }
+
+  .write-root .suggestions .ro-chip {
+    flex-shrink: 0;
+    padding: 0.1em 0.6em;
+    border-radius: 999px;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
   .write-root .manual-edge {
     display: flex;
     gap: 0.5rem;
@@ -2297,6 +2396,42 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
 
     .write-root .section {
       padding: 1.1rem 1.2rem;
+    }
+  }
+
+  /* 폰 — 에디터 컴포넌트를 손가락에 맞게 다듬는다 */
+  @media (max-width: 640px) {
+    /* 삽입 툴바: 버튼 행만 한 줄 가로 스크롤(5줄 쌓임 방지). 팝오버는 .md-toolbar 직속이라 안 잘린다. */
+    .write-root .md-tools {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .write-root .md-tools::-webkit-scrollbar {
+      display: none;
+    }
+    .write-root .md-toolbar button {
+      flex-shrink: 0;
+      /* 터치 타깃 확대(약 34 → 42px) */
+      padding: 0.55em 0.8em;
+    }
+
+    /* 연결 추가: 좁은 화면에선 세로로 쌓아 탭하기 쉽게 */
+    .write-root .manual-edge {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .write-root .manual-edge > *,
+    .write-root .manual-edge select {
+      width: 100%;
+    }
+    .write-root .manual-edge button {
+      padding: 0.6em 1em;
+    }
+
+    /* 상단 액션 버튼 터치 타깃 확대 (select은 커스텀 화살표 여백 유지를 위해 제외) */
+    .write-root .top-actions button {
+      padding: 0.5em 0.9em;
     }
   }
 </style>
