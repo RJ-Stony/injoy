@@ -23,7 +23,7 @@ import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { history } from '@milkdown/kit/plugin/history';
 import { math, katexOptionsCtx } from '@milkdown/plugin-math';
 import { replaceAll, insert, getMarkdown, $prose } from '@milkdown/kit/utils';
-import { Plugin } from '@milkdown/kit/prose/state';
+import { Plugin, TextSelection } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { alertOptions } from '../utils/callout-config.mjs';
 import { WIKI_LINK_RE } from '../plugins/wiki-link-pattern.mjs';
@@ -85,6 +85,48 @@ const KIND_LABEL: Record<string, string> = Object.fromEntries(
 );
 const CALLOUT_MARKER_RE = new RegExp(`^\\[!(${Object.keys(KIND_LABEL).join('|')})\\]`);
 
+interface MarkerLine {
+  /** NOTE·TIP 등 종류 */
+  kind: string;
+  /** 마커 텍스트('[!NOTE]') 길이 */
+  markerLen: number;
+  /** 마커 뒤에 줄바꿈(하드브레이크)이 붙어 있는가 */
+  hasBreak: boolean;
+}
+
+/**
+ * blockquote 첫 문단이 '온전한 콜아웃 마커 줄'이면 정보를, 아니면 null.
+ * 발행(rehype-github-alerts)은 마커가 첫 '문단' 첫 줄에 단독으로 와야 콜아웃으로 본다.
+ * 본문이 마커 줄에 붙으면(`[!NOTE]본문`) 강등되므로 그 경우는 마커 줄로 치지 않는다.
+ * 첫 자식이 제목 등 문단이 아닌 텍스트블록이면 발행 시 무시되므로 역시 제외한다.
+ * 이 함수는 '마커 줄이 깨졌는가'를 보는 가드의 기준이다(본문 유무는 보지 않는다).
+ */
+function markerLine(node: any): MarkerLine | null {
+  if (node?.type?.name !== 'blockquote' || node.firstChild?.type?.name !== 'paragraph') return null;
+  const txt: string = node.firstChild.textContent;
+  const m = txt.match(CALLOUT_MARKER_RE);
+  if (!m) return null;
+  const after = txt.charAt(m[0].length); // 마커 바로 뒤 글자
+  if (after !== '' && after !== '\n') return null; // 본문이 마커 줄에 붙음 → 강등
+  return { kind: m[1], markerLen: m[0].length, hasBreak: after === '\n' };
+}
+
+/**
+ * 이 blockquote가 '발행되면 실제로 콜아웃 박스가 되는가'. 마커 줄이 온전하고 본문이
+ * 있어야 한다 — 빈 콜아웃(`> [!NOTE]`)은 발행 시 일반 인용으로 강등되기 때문이다
+ * (rehype-github-alerts 규칙). 데코레이션(박스·마커 숨김)과 가드의 보호 대상은 이
+ * 기준을 따라 'WYSIWYG가 거짓말하지 않게' 한다(보이는 박스 = 발행될 박스).
+ */
+function calloutInfo(node: any): MarkerLine | null {
+  const info = markerLine(node);
+  if (!info) return null;
+  const txt: string = node.firstChild.textContent;
+  const hasInlineBody = txt.length > info.markerLen + (info.hasBreak ? 1 : 0);
+  const hasBlockBody = node.childCount > 1; // 마커 줄 다음에 또 다른 블록(본문 문단)
+  if (!hasInlineBody && !hasBlockBody) return null; // 본문 없음 → 발행 시 강등
+  return info;
+}
+
 const injoyDecorations = $prose(
   () =>
     new Plugin({
@@ -93,19 +135,16 @@ const injoyDecorations = $prose(
           const decos: any[] = [];
           try {
             state.doc.descendants((node: any, pos: number) => {
-              if (node.type.name === 'blockquote' && node.firstChild?.isTextblock) {
-                const m = node.firstChild.textContent.match(CALLOUT_MARKER_RE);
-                if (m) {
-                  const kind = m[1];
-                  decos.push(
-                    Decoration.node(pos, pos + node.nodeSize, {
-                      class: `injoy-callout injoy-callout-${kind.toLowerCase()}`,
-                      'data-callout-label': KIND_LABEL[kind] ?? kind,
-                    }),
-                  );
-                  const from = pos + 2; // blockquote(+1) → paragraph(+1) → 텍스트 시작
-                  decos.push(Decoration.inline(from, from + m[0].length, { class: 'injoy-callout-hide' }));
-                }
+              const callout = calloutInfo(node);
+              if (callout) {
+                decos.push(
+                  Decoration.node(pos, pos + node.nodeSize, {
+                    class: `injoy-callout injoy-callout-${callout.kind.toLowerCase()}`,
+                    'data-callout-label': KIND_LABEL[callout.kind] ?? callout.kind,
+                  }),
+                );
+                const from = pos + 2; // blockquote(+1) → paragraph(+1) → 텍스트 시작
+                decos.push(Decoration.inline(from, from + callout.markerLen, { class: 'injoy-callout-hide' }));
               }
               if (node.isText && node.text) {
                 const re = new RegExp(WIKI_LINK_RE.source, 'g');
@@ -121,6 +160,116 @@ const injoyDecorations = $prose(
             return DecorationSet.empty;
           }
           return DecorationSet.create(state.doc, decos);
+        },
+      },
+    }),
+);
+
+/**
+ * 콜아웃 마커 보호 가드.
+ *
+ * 콜아웃은 구조적 노드가 아니라 'blockquote + 데코레이션'이라, 마커 `[!NOTE]`가
+ * 화면엔 숨었지만 문서엔 진짜 텍스트로 남는다. 박스 머리에서 Backspace를 누르면
+ * 숨은 마커, 또는 마커와 본문을 가르는 줄바꿈/문단 경계가 깨져 콜아웃이 조용히
+ * 일반 인용으로 강등됐다(#6). '발행되는 콜아웃'의 기준은 calloutInfo가, '마커 줄이
+ * 온전한가'의 기준은 markerLine이 단일하게 가진다.
+ *
+ * 두 겹으로 막는다:
+ *  1) filterTransaction — 발행되던 콜아웃의 blockquote가 편집 뒤에도 '온전한 마커 줄'을
+ *     유지하는지만 본다(markerLine). 마커가 손상되거나 본문이 마커 줄에 붙으면(인라인
+ *     병합·문단 병합 모두) 마커 줄이 깨지므로 거부한다. 마커 줄을 안 건드리는 편집
+ *     (본문 입력·본문 맨 앞 입력·본문 비우기)은 그대로 허용된다. 위치가 아니라 구조로
+ *     재확인하므로 견고하고, 직렬화(round-trip)는 전혀 건드리지 않는다.
+ *  2) handleKeyDown — 박스 머리(마커+줄바꿈)에서 Backspace/Delete를 누르면 머리를 한
+ *     번에 깔끔히 지워 콜아웃을 의도적으로 해제한다(노션식 블록 서식 제거). 가드에
+ *     막혀 아무 일도 안 일어나는 막다른 길을 피하는 탈출구.
+ */
+interface CalloutMarker {
+  /** blockquote 노드 바로 앞 위치 — 편집 뒤 같은 블록을 다시 찾는 데 쓴다. */
+  blockquotePos: number;
+  /** 마커 텍스트 시작 — 데코레이션과 같은 계산(blockquote+1 → paragraph+1) */
+  markerFrom: number;
+  /** 마커 + 뒤따르는 줄바꿈(하드브레이크)까지 = 콜아웃 '머리'. 여기서의 삭제는 해제로 바꾼다. */
+  headEnd: number;
+}
+
+function collectCalloutMarkers(doc: any): CalloutMarker[] {
+  const out: CalloutMarker[] = [];
+  doc.descendants((node: any, pos: number) => {
+    const info = calloutInfo(node);
+    if (info) {
+      const markerFrom = pos + 2; // blockquote(+1) → paragraph(+1) → 마커 시작
+      const headEnd = markerFrom + info.markerLen + (info.hasBreak ? 1 : 0);
+      out.push({ blockquotePos: pos, markerFrom, headEnd });
+    }
+    return undefined;
+  });
+  return out;
+}
+
+/** 의도적 마커 제거(아래 keymap)는 가드를 통과시키는 표식. */
+const CALLOUT_BYPASS = 'injoyCalloutBypass';
+
+const calloutGuard = $prose(
+  () =>
+    new Plugin({
+      /**
+       * 진짜 방어선. 발행되던 콜아웃마다 편집 뒤 그 blockquote가 여전히 '온전한 마커
+       * 줄'을 갖는지(markerLine) 확인한다. 마커가 깨지거나 본문이 마커 줄에 붙으면
+       * (인라인 병합·문단 병합 모두) 거부, 블록이 통째로 사라지거나 더 이상 blockquote가
+       * 아니면 허용(깔끔한 해제). 본문 입력·본문 비우기는 마커 줄을 안 건드리므로 허용.
+       */
+      filterTransaction(tr, state) {
+        if (tr.getMeta(CALLOUT_BYPASS)) return true; // 의도적 해제는 통과
+        if (!tr.docChanged) return true;
+        // 글 전체 교체(replaceAll: 글 불러오기·초기화, 또는 전체 선택 삭제)는 대상이 아니다.
+        const s: any = tr.steps.length === 1 ? tr.steps[0] : null;
+        if (s && s.from === 0 && s.to === state.doc.content.size) return true;
+        let markers: CalloutMarker[];
+        try {
+          markers = collectCalloutMarkers(state.doc);
+        } catch {
+          return true; // 분석 실패 시 편집을 절대 잠그지 않는다
+        }
+        for (const mk of markers) {
+          const res = tr.mapping.mapResult(mk.blockquotePos, 1);
+          if (res.deleted) continue; // 블록이 통째로 지워짐 = 의도적 제거 → 허용
+          const node = tr.doc.nodeAt(res.pos);
+          if (!node || node.type.name !== 'blockquote') continue; // 더 이상 콜아웃 그릇 아님 → 허용
+          if (!markerLine(node)) return false; // 마커 줄이 깨짐(손상·본문 병합) → 거부
+        }
+        return true;
+      },
+      props: {
+        // 탈출구 — 박스 머리(마커+줄바꿈)에서의 Backspace/Delete는 콜아웃을 한 번에
+        // 깔끔히 해제한다(노션식 서식 제거). 머리에서의 기본 삭제는 마커를 손상시키거나
+        // (→가드가 막아 먹통) blockquote를 들어올려 마커를 노출시키므로, 수정자 키(단어·
+        // 줄 삭제)든 아니든 머리에서는 해제로 바꾸는 게 가장 안전하다(맨 앞 위치 포함).
+        // 머리 밖(본문)에서는 어떤 키도 가로채지 않아 단어·줄 삭제가 그대로 동작한다.
+        handleKeyDown(view, event) {
+          if (event.key !== 'Backspace' && event.key !== 'Delete') return false;
+          if (view.composing || (event as any).isComposing) return false; // IME 조합 중엔 손대지 않는다
+          const sel = view.state.selection;
+          if (!sel.empty) return false; // 범위 선택은 filterTransaction에 맡긴다
+          const pos = sel.from;
+          let markers: CalloutMarker[];
+          try {
+            markers = collectCalloutMarkers(view.state.doc);
+          } catch {
+            return false;
+          }
+          for (const mk of markers) {
+            const eatsBack = event.key === 'Backspace' && pos >= mk.markerFrom && pos <= mk.headEnd;
+            const eatsFwd = event.key === 'Delete' && pos >= mk.markerFrom && pos < mk.headEnd;
+            if (eatsBack || eatsFwd) {
+              // 콜아웃 머리(마커+줄바꿈)를 한 번에 지워 일반 인용으로 깔끔히 해제.
+              const tr = view.state.tr.delete(mk.markerFrom, mk.headEnd).setMeta(CALLOUT_BYPASS, true);
+              tr.setSelection(TextSelection.create(tr.doc, mk.markerFrom));
+              view.dispatch(tr.scrollIntoView());
+              return true; // 처리됨 — 기본 삭제 동작을 막는다
+            }
+          }
+          return false;
         },
       },
     }),
@@ -231,6 +380,7 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
     .use(history)
     .use(listener)
     .use(injoyDecorations)
+    .use(calloutGuard)
     .create();
 
   const view = () => editor.ctx.get(rootCtx) && editor;
