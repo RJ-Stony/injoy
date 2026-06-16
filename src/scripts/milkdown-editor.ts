@@ -187,10 +187,14 @@ const injoyDecorations = $prose(
 interface CalloutMarker {
   /** blockquote 노드 바로 앞 위치 — 편집 뒤 같은 블록을 다시 찾는 데 쓴다. */
   blockquotePos: number;
+  /** blockquote 노드 바로 뒤 위치(pos + nodeSize) — 선택이 이 콜아웃 안에 갇혔는지 판정. */
+  blockquoteEnd: number;
   /** 마커 텍스트 시작 — 데코레이션과 같은 계산(blockquote+1 → paragraph+1) */
   markerFrom: number;
-  /** 마커 + 뒤따르는 줄바꿈(하드브레이크)까지 = 콜아웃 '머리'. 여기서의 삭제는 해제로 바꾼다. */
-  headEnd: number;
+  /** 마커 텍스트 끝 */
+  markerTo: number;
+  /** 마커 뒤에 줄바꿈(하드브레이크)이 붙어 본문이 같은 문단인가. false면 본문이 다음 문단. */
+  hasBreak: boolean;
 }
 
 function collectCalloutMarkers(doc: any): CalloutMarker[] {
@@ -199,8 +203,13 @@ function collectCalloutMarkers(doc: any): CalloutMarker[] {
     const info = calloutInfo(node);
     if (info) {
       const markerFrom = pos + 2; // blockquote(+1) → paragraph(+1) → 마커 시작
-      const headEnd = markerFrom + info.markerLen + (info.hasBreak ? 1 : 0);
-      out.push({ blockquotePos: pos, markerFrom, headEnd });
+      out.push({
+        blockquotePos: pos,
+        blockquoteEnd: pos + node.nodeSize,
+        markerFrom,
+        markerTo: markerFrom + info.markerLen,
+        hasBreak: info.hasBreak,
+      });
     }
     return undefined;
   });
@@ -249,25 +258,57 @@ const calloutGuard = $prose(
         handleKeyDown(view, event) {
           if (event.key !== 'Backspace' && event.key !== 'Delete') return false;
           if (view.composing || (event as any).isComposing) return false; // IME 조합 중엔 손대지 않는다
-          const sel = view.state.selection;
-          if (!sel.empty) return false; // 범위 선택은 filterTransaction에 맡긴다
-          const pos = sel.from;
           let markers: CalloutMarker[];
           try {
             markers = collectCalloutMarkers(view.state.doc);
           } catch {
             return false;
           }
-          for (const mk of markers) {
-            const eatsBack = event.key === 'Backspace' && pos >= mk.markerFrom && pos <= mk.headEnd;
-            const eatsFwd = event.key === 'Delete' && pos >= mk.markerFrom && pos < mk.headEnd;
-            if (eatsBack || eatsFwd) {
-              // 콜아웃 머리(마커+줄바꿈)를 한 번에 지워 일반 인용으로 깔끔히 해제.
-              const tr = view.state.tr.delete(mk.markerFrom, mk.headEnd).setMeta(CALLOUT_BYPASS, true);
-              tr.setSelection(TextSelection.create(tr.doc, mk.markerFrom));
-              view.dispatch(tr.scrollIntoView());
-              return true; // 처리됨 — 기본 삭제 동작을 막는다
+          if (markers.length === 0) return false;
+          // 머리를 통째로 지워 일반 인용으로 깔끔히 해제. CALLOUT_BYPASS로 가드를 통과시키므로,
+          // 삭제 범위가 '한 콜아웃 안'을 벗어나지 않게 호출부에서 보장한다.
+          const drop = (from: number, to: number) => {
+            const tr = view.state.tr.delete(from, to).setMeta(CALLOUT_BYPASS, true);
+            tr.setSelection(TextSelection.create(tr.doc, from));
+            view.dispatch(tr.scrollIntoView());
+            return true; // 처리됨 — 기본 삭제 동작을 막는다
+          };
+          // 콜아웃의 '머리'(마커 줄). 본문이 같은 문단이면(hasBreak) 마커+하드브레이크를,
+          // 본문이 다음 문단이면 마커 문단 전체를 지워야 빈 인용 줄 없이 깔끔히 풀린다.
+          // bodyStart = 본문 진입 위치(여기서 Backspace는 마커 줄과 병합을 시도 → 해제로 전환).
+          const head = (mk: CalloutMarker) => ({
+            bodyStart: mk.markerTo + (mk.hasBreak ? 1 : 2),
+            removeFrom: mk.hasBreak ? mk.markerFrom : mk.blockquotePos + 1,
+            removeTo: mk.markerTo + 1,
+          });
+          const sel = view.state.selection;
+          if (sel.empty) {
+            const pos = sel.from;
+            for (const mk of markers) {
+              const { bodyStart, removeFrom, removeTo } = head(mk);
+              const eatsBack = event.key === 'Backspace' && pos >= mk.markerFrom && pos <= bodyStart;
+              const eatsFwd = event.key === 'Delete' && pos >= mk.markerFrom && pos < bodyStart;
+              if (eatsBack || eatsFwd) return drop(removeFrom, removeTo);
             }
+            return false;
+          }
+          // 범위 선택이 '한 콜아웃 안에 갇힌 채' 그 머리에 걸치면(예: 첫 줄 통째 선택 후
+          // 삭제), 기본 삭제는 마커를 깨 가드에 막혀 먹통이 된다. 선택 + 머리를 함께 지워
+          // 깔끔히 해제한다. 콜아웃 경계를 넘는 선택은 기본 동작(블록 통째 삭제)에 맡긴다.
+          const { from, to } = sel;
+          for (const mk of markers) {
+            const { bodyStart, removeFrom, removeTo } = head(mk);
+            const within = from > mk.blockquotePos && to < mk.blockquoteEnd; // 이 콜아웃 안에 갇힘
+            const hitsHead = from < bodyStart && to > mk.markerFrom; // 머리와 겹침
+            if (!within || !hitsHead) continue;
+            const delFrom = Math.min(from, removeFrom);
+            const delTo = Math.max(to, removeTo);
+            // 중첩 콜아웃 보호: bypass라 가드가 못 막으므로, 삭제 범위가 다른 콜아웃을
+            // 건드리면 직접 미개입(기본 동작에 위임)한다.
+            const crossesOther = markers.some(
+              (o) => o !== mk && delFrom < o.blockquoteEnd && delTo > o.blockquotePos,
+            );
+            if (!crossesOther) return drop(delFrom, delTo);
           }
           return false;
         },
