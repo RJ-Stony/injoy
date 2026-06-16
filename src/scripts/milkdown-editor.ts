@@ -316,6 +316,179 @@ const calloutGuard = $prose(
     }),
 );
 
+export interface SlashItem {
+  /** 메뉴에 표시할 이름 */
+  label: string;
+  /** 라벨 외 검색 키워드 */
+  keywords?: string;
+  /** 선택 시 삽입할 마크다운 */
+  md: string;
+}
+
+/**
+ * 데스크톱 슬래시 메뉴(노션식). 빈 문단이나 공백 뒤에서 '/'를 치면 캐럿 옆에 삽입
+ * 메뉴가 뜨고, 이어 타이핑하면 필터된다. ↑↓ 이동·Enter 선택·Esc 닫기. 선택하면
+ * '/질의' 텍스트를 지운 뒤 항목의 마크다운을 onInsert로 삽입한다(기존 툴바 삽입과
+ * 같은 경로 재사용). 모바일은 툴바를 쓰므로 이 메뉴는 데스크톱 보조 수단이다.
+ * URL의 '/'(앞이 공백·줄머리가 아님)는 트리거하지 않는다.
+ */
+function makeSlashPlugin(items: SlashItem[], onInsert: (md: string) => void) {
+  return $prose(() => {
+    const menu = document.createElement('div');
+    menu.className = 'injoy-slash';
+    menu.setAttribute('role', 'menu');
+    menu.hidden = true;
+    let open = false;
+    let active = 0;
+    let from = 0; // '/'의 절대 위치
+    let filtered: SlashItem[] = [];
+
+    const close = () => {
+      if (!open) return;
+      open = false;
+      menu.hidden = true;
+      menu.innerHTML = '';
+    };
+
+    // 현재 커서 앞에서 '/질의'(공백/슬래시 없는)를 줄머리나 공백 뒤에서만 잡는다.
+    const queryAt = (view: any): { q: string; from: number } | null => {
+      const sel = view.state.selection;
+      if (!sel.empty || !sel.$from.parent.isTextblock) return null;
+      const before = sel.$from.parent.textBetween(0, sel.$from.parentOffset, undefined, '￼');
+      const m = before.match(/(?:^|\s)\/([^\s/]*)$/);
+      if (!m) return null;
+      return { q: m[1], from: sel.from - 1 - m[1].length };
+    };
+
+    const paintActive = () => {
+      menu.querySelectorAll('.injoy-slash-item').forEach((el, i) => {
+        el.setAttribute('aria-selected', String(i === active));
+        if (i === active) (el as HTMLElement).scrollIntoView({ block: 'nearest' });
+      });
+    };
+
+    const choose = (view: any, item: SlashItem) => {
+      const to = view.state.selection.from;
+      // '/질의'를 선택 상태로 둬 insertMarkdown의 replaceSelection이 그 자리를 한 트랜잭션으로
+      // 치환하게 한다(삭제·삽입을 따로 dispatch하면 '삭제만 되고 삽입은 거부'되는 틈이 생긴다).
+      if (to > from) view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, from, to)));
+      close();
+      onInsert(item.md);
+      view.focus();
+    };
+
+    const render = (view: any, q: string) => {
+      const ql = q.trim().toLowerCase();
+      filtered = items.filter((it) => !ql || `${it.label} ${it.keywords ?? ''}`.toLowerCase().includes(ql));
+      menu.innerHTML = '';
+      if (filtered.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'injoy-slash-empty';
+        empty.textContent = '결과가 없어요';
+        menu.appendChild(empty);
+        return;
+      }
+      if (active >= filtered.length) active = 0;
+      filtered.forEach((it, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'injoy-slash-item';
+        b.setAttribute('role', 'menuitem');
+        b.textContent = it.label;
+        b.addEventListener('mousedown', (ev) => {
+          ev.preventDefault(); // 에디터 포커스 유지
+          choose(view, it);
+        });
+        b.addEventListener('mouseenter', () => {
+          active = i;
+          paintActive();
+        });
+        menu.appendChild(b);
+      });
+      paintActive();
+    };
+
+    const place = (view: any) => {
+      try {
+        const c = view.coordsAtPos(view.state.selection.from);
+        menu.style.position = 'fixed';
+        menu.style.left = `${Math.max(8, Math.min(c.left, window.innerWidth - 248))}px`;
+        menu.style.top = `${c.bottom + 4}px`;
+      } catch {
+        /* 위치 계산 실패는 무시(메뉴는 직전 위치 유지) */
+      }
+    };
+
+    return new Plugin({
+      view: (editorView: any) => {
+        document.body.appendChild(menu);
+        // 열린 동안 스크롤/리사이즈하면 캐럿에 다시 붙인다(fixed라 그냥 두면 어긋난다).
+        const reposition = () => {
+          if (open) place(editorView);
+        };
+        window.addEventListener('scroll', reposition, true);
+        window.addEventListener('resize', reposition);
+        return {
+          update: (view: any) => {
+            const hit = items.length ? queryAt(view) : null;
+            if (!hit) {
+              close();
+              return;
+            }
+            from = hit.from;
+            if (!open) {
+              open = true;
+              active = 0;
+              menu.hidden = false;
+            }
+            render(view, hit.q);
+            place(view);
+          },
+          destroy: () => {
+            window.removeEventListener('scroll', reposition, true);
+            window.removeEventListener('resize', reposition);
+            menu.remove();
+          },
+        };
+      },
+      props: {
+        // 메뉴가 열렸을 때만 방향키·Enter·Esc를 가로챈다.
+        handleKeyDown: (view: any, event: KeyboardEvent) => {
+          if (!open) return false;
+          if (view.composing || (event as any).isComposing) return false; // IME 조합 중엔 키를 가로채지 않는다
+          if (event.key === 'Escape') {
+            close();
+            return true;
+          }
+          if (filtered.length === 0) return false;
+          if (event.key === 'ArrowDown') {
+            active = (active + 1) % filtered.length;
+            paintActive();
+            return true;
+          }
+          if (event.key === 'ArrowUp') {
+            active = (active - 1 + filtered.length) % filtered.length;
+            paintActive();
+            return true;
+          }
+          if (event.key === 'Enter' && filtered[active]) {
+            choose(view, filtered[active]);
+            return true;
+          }
+          return false;
+        },
+        handleDOMEvents: {
+          // 에디터 밖을 클릭해 포커스를 잃으면 메뉴를 닫는다(항목 클릭은 preventDefault로 유지).
+          blur: () => {
+            close();
+            return false;
+          },
+        },
+      },
+    });
+  });
+}
+
 export interface EditorHandle {
   /** 본문 전체를 마크다운으로 교체 (글 불러오기·초기화) */
   setMarkdown(markdown: string): void;
@@ -337,6 +510,10 @@ export interface MountOptions {
   onImageFile?: (file: File) => Promise<string | null>;
   /** 에디터에서 이미지를 보여 줄 때 src를 해석한다(./_images/ → dataURL/raw URL). 직렬화 src는 그대로. */
   resolveImageSrc?: (src: string) => string | null;
+  /** 슬래시(/) 메뉴 항목. 비우면 메뉴가 뜨지 않는다(데스크톱 보조 삽입). */
+  slashItems?: SlashItem[];
+  /** 슬래시 메뉴에서 항목을 고르면 호출(마크다운 삽입). 보통 툴바와 같은 insertBlock. */
+  onSlashInsert?: (markdown: string) => void;
 }
 
 export async function mountEditor(root: HTMLElement, opts: MountOptions): Promise<EditorHandle> {
@@ -422,6 +599,7 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
     .use(listener)
     .use(injoyDecorations)
     .use(calloutGuard)
+    .use(makeSlashPlugin(opts.slashItems ?? [], (md) => opts.onSlashInsert?.(md)))
     .create();
 
   const view = () => editor.ctx.get(rootCtx) && editor;

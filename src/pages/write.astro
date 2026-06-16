@@ -327,6 +327,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         initialValue: '',
         onImageFile: (file) => stageImage(file), // 붙여넣기·드롭 이미지 스테이징
         resolveImageSrc: resolveImage, // 에디터 안에서 이미지를 바로 보이게(dataURL/raw)
+        slashItems: SLASH_ITEMS, // 데스크톱 '/' 메뉴 — 흔한 블록을 캐럿에서 바로 삽입
+        onSlashInsert: (md) => insertBlock(md), // 툴바와 같은 삽입 경로 재사용
       });
       // 개발·테스트용 핸들 (graph.astro의 __injoyGraph와 같은 선례). 운영자 전용 페이지.
       (window as any).__injoyEditor = mdEditor;
@@ -1251,6 +1253,30 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     { label: '화살표', code: '\\rightarrow' }, { label: '무한대', code: '\\infty' },
   ];
 
+  // 슬래시(/) 메뉴 항목 — 위 데이터 재사용. 코드 언어·이모지·머메이드 갤러리 같은 정교한
+  // 피커는 툴바에 남기고, 슬래시는 흔한 블록을 캐럿에서 바로 꽂는다(데스크톱 보조 삽입).
+  const SLASH_ITEMS = [
+    { label: '제목', keywords: 'heading h2 title 제목', md: SNIPPETS.heading },
+    { label: '인용', keywords: 'quote blockquote 인용', md: SNIPPETS.quote },
+    ...CALLOUT_META.map((c) => ({
+      label: `콜아웃 · ${c.title}`,
+      keywords: `callout 콜아웃 ${c.keyword} ${c.title}`,
+      md: `> [!${c.keyword}]\n> 내용을 적어요.`,
+    })),
+    { label: '표', keywords: 'table 표', md: SNIPPETS.table },
+    { label: '목록', keywords: 'list bullet 목록', md: SNIPPETS.list },
+    { label: '체크리스트', keywords: 'check todo task 체크 할일', md: SNIPPETS.check },
+    { label: '구분선', keywords: 'divider hr rule 구분선', md: SNIPPETS.divider },
+    { label: '코드블록', keywords: 'code 코드 fence', md: '```\n\n```' },
+    { label: '수식 블록', keywords: 'math latex 수식', md: SNIPPETS.math },
+    { label: '각주', keywords: 'footnote 각주', md: SNIPPETS.footnote },
+    {
+      label: '다이어그램',
+      keywords: 'mermaid diagram 다이어그램 순서도',
+      md: '```mermaid\n' + MERMAID_EXAMPLES[0].code + '\n```',
+    },
+  ];
+
   const popover = $('md-popover');
   let popoverAnchor: HTMLElement | null = null;
 
@@ -1955,6 +1981,47 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     border-radius: 12px;
     box-shadow: 0 12px 32px rgb(0 0 0 / 14%);
     padding: 0.5rem;
+  }
+
+  /* 슬래시(/) 메뉴 — JS가 document.body에 fixed로 붙이므로 .write-root 밖, 전역 선택자로 둔다.
+     테마 토큰(:root)은 body에 상속되어 라이트/다크 모두 따라온다. */
+  .injoy-slash {
+    position: fixed;
+    z-index: 1000;
+    min-width: 200px;
+    max-width: 240px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 4px;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgb(0 0 0 / 16%);
+    font-size: 0.92rem;
+  }
+  .injoy-slash[hidden] {
+    display: none;
+  }
+  .injoy-slash-item {
+    display: block;
+    width: 100%;
+    text-align: start;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    font: inherit;
+    white-space: nowrap;
+  }
+  .injoy-slash-item[aria-selected='true'] {
+    background-color: var(--accent-weak);
+  }
+  .injoy-slash-empty {
+    margin: 0;
+    padding: 8px 10px;
+    color: var(--text-muted);
   }
 
   @media (prefers-reduced-motion: no-preference) {
