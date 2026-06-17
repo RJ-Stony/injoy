@@ -1,0 +1,199 @@
+---
+/**
+ * 이 글의 만듦새 — 빌드 시점 사실만 모아 접이식으로 보여 주는 투명성 패널.
+ * 사이트 정체성("사람이 소싱, LLM이 집필·연결")을 한 줄로 드러내고,
+ * 본문 부피·읽는 시간 계산 근거·연결의 모양(수치·분포)을 푼다.
+ * '연결된 글' 목록과 겹치지 않게 개별 글은 절대 나열하지 않고 집계만 보여 준다.
+ */
+import { postStats, type Post } from '../utils/post';
+import { edgeLabel, type Connection } from '../utils/graph';
+import { withBase } from '../utils/url';
+
+interface Props {
+  post: Post;
+  connections: Connection[];
+}
+
+const { post, connections } = Astro.props;
+const s = postStats(post);
+
+const explicit = connections.filter((c) => c.type !== 'mentions');
+const mentions = connections.filter((c) => c.type === 'mentions');
+const outCount = explicit.filter((c) => c.direction === 'out').length;
+const inCount = explicit.filter((c) => c.direction === 'in').length;
+
+// 타입별 분포(언급 제외) — 들어오고 나간 같은 타입을 함께 센다
+const typeCounts = new Map<string, number>();
+for (const c of explicit) typeCounts.set(c.type, (typeCounts.get(c.type) ?? 0) + 1);
+const typeDist = [...typeCounts.entries()].map(([type, count]) => ({ type, count }));
+
+// 부피 표기 — 있는 항목만 점으로 잇는다
+const volume = [
+  `한글 ${s.cjkChars.toLocaleString('ko-KR')}자`,
+  s.latinWords > 0 && `영문 ${s.latinWords.toLocaleString('ko-KR')}단어`,
+  s.codeLines > 0 && `코드 ${s.codeLines}줄`,
+  s.diagrams > 0 && `다이어그램 ${s.diagrams}`,
+  s.mathBlocks + s.inlineMath > 0 && `수식 ${s.mathBlocks + s.inlineMath}`,
+  s.images > 0 && `이미지 ${s.images}`,
+].filter(Boolean);
+
+const edited =
+  !!post.data.updatedDate &&
+  post.data.updatedDate.getTime() !== post.data.pubDate.getTime();
+---
+
+<details class="makeup" data-pagefind-ignore>
+  <summary>이 글의 만듦새</summary>
+  <div class="mk-body">
+    <p class="mk-line">사람이 주제를 고르고, LLM이 쓰고 이었어요.</p>
+    <dl class="mk-facts">
+      <div class="mk-row">
+        <dt>부피</dt>
+        <dd>{volume.join(' · ')}</dd>
+      </div>
+      <div class="mk-row">
+        <dt>읽는 시간</dt>
+        <dd>약 {s.minutes}분 <span class="mk-dim">(한글 500자/분, 코드는 줄당 4초로 계산)</span></dd>
+      </div>
+      <div class="mk-row">
+        <dt>연결</dt>
+        <dd>
+          타입 있는 연결 {explicit.length}개 <span class="mk-dim">(나간 {outCount} · 들어온 {inCount})</span>
+          {mentions.length > 0 && <span class="mk-dim"> · 자동 언급 {mentions.length}개</span>}
+          {
+            typeDist.length > 0 && (
+              <span class="mk-types">
+                {typeDist.map((t) => (
+                  <span class:list={['mk-type', t.type]}>
+                    {edgeLabel(t.type as any)} {t.count}
+                  </span>
+                ))}
+              </span>
+            )
+          }
+        </dd>
+      </div>
+      {
+        edited && (
+          <div class="mk-row">
+            <dt>손질</dt>
+            <dd>처음 발행한 뒤 한 번 다듬었어요.</dd>
+          </div>
+        )
+      }
+    </dl>
+    <a class="mk-graph" href={withBase(`/graph/?focus=${post.id}`)}>이 글의 연결을 그래프에서 보기 →</a>
+  </div>
+</details>
+
+<style>
+  .makeup {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--surface);
+    padding: 0.4rem 1.4rem;
+  }
+
+  .makeup summary {
+    cursor: pointer;
+    padding: 0.7rem 0;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    list-style: none;
+  }
+
+  .makeup summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .makeup summary::before {
+    content: '▸';
+    margin-inline-end: 0.5em;
+    color: var(--text-muted);
+    font-size: 0.8em;
+  }
+
+  .makeup[open] summary::before {
+    content: '▾';
+  }
+
+  .makeup summary:hover {
+    color: var(--accent);
+  }
+
+  .mk-body {
+    padding: 0.3rem 0 0.9rem;
+  }
+
+  .mk-line {
+    margin: 0 0 0.9rem;
+    font-size: 0.92rem;
+    color: var(--text);
+  }
+
+  .mk-facts {
+    margin: 0;
+  }
+
+  .mk-row {
+    display: grid;
+    grid-template-columns: 4.5rem 1fr;
+    gap: 0.8rem;
+    padding: 0.4rem 0;
+    border-top: 1px solid var(--border);
+    font-size: 0.88rem;
+    line-height: 1.7;
+  }
+
+  .mk-row dt {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .mk-row dd {
+    margin: 0;
+    color: var(--text);
+  }
+
+  .mk-dim {
+    color: var(--text-muted);
+  }
+
+  .mk-types {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.6rem;
+    margin-inline-start: 0.1rem;
+  }
+
+  .mk-type {
+    --chip: var(--text-muted);
+    color: var(--chip);
+    font-weight: 600;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  /* 타입별 색 — global.css의 --edge-* 단일 출처 */
+  .mk-type.extends { --chip: var(--edge-extends); }
+  .mk-type.supports { --chip: var(--edge-supports); }
+  .mk-type.refines { --chip: var(--edge-refines); }
+  .mk-type.instantiates { --chip: var(--edge-instantiates); }
+  .mk-type.requires { --chip: var(--edge-requires); }
+  .mk-type.triggered-by { --chip: var(--edge-triggered-by); }
+  .mk-type.contradicts { --chip: var(--edge-contradicts); }
+  .mk-type.related { --chip: var(--edge-related); }
+
+  .mk-graph {
+    display: inline-block;
+    margin-top: 0.9rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .mk-graph:hover {
+    color: var(--accent);
+    text-decoration: none;
+  }
+</style>

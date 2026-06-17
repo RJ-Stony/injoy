@@ -14,14 +14,36 @@ export async function getPublishedPosts(): Promise<Post[]> {
   return posts.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 }
 
+/** 본문 통계 — 읽는 시간 계산과 '만듦새' 패널이 함께 쓰는 단일 출처 */
+export interface PostStats {
+  /** 읽는 시간(분) */
+  minutes: number;
+  /** 한글·CJK 글자 수 */
+  cjkChars: number;
+  /** 영문 단어 수 */
+  latinWords: number;
+  /** 코드(다이어그램 제외) 줄 수 */
+  codeLines: number;
+  /** 코드 블록 수(다이어그램 제외) */
+  codeBlocks: number;
+  /** mermaid 다이어그램 수 */
+  diagrams: number;
+  /** $$ 블록 수식 수 */
+  mathBlocks: number;
+  /** 인라인 수식 수 */
+  inlineMath: number;
+  /** 이미지 수 */
+  images: number;
+}
+
 /**
- * 읽는 시간(분) — 글자 수에 글의 난이도를 반영해 계산한다.
+ * 본문을 분해해 통계를 낸다. 읽는 시간 가중치:
  * - 한국어 산문: 분당 500자, 영문: 분당 200단어
  * - 코드: 줄당 4초 (산문보다 천천히 읽는다)
  * - 수식 블록·다이어그램: 개당 15초, 인라인 수식: 개당 3초
  * - 이미지: 개당 10초
  */
-export function readingMinutes(post: Post): number {
+export function postStats(post: Post): PostStats {
   const { prose: proseRaw, codeBlocks } = splitCode(post.body ?? '');
   let prose = proseRaw;
 
@@ -37,20 +59,34 @@ export function readingMinutes(post: Post): number {
     .length;
 
   const isMermaid = (b: string) => /^\s*`{3,}\s*mermaid/.test(b);
-  const mermaidCount = codeBlocks.filter(isMermaid).length;
-  const codeLines = codeBlocks
-    .filter((b) => !isMermaid(b))
-    .reduce((n, b) => n + Math.max(0, b.split('\n').length - 2), 0);
+  const diagrams = codeBlocks.filter(isMermaid).length;
+  const codeList = codeBlocks.filter((b) => !isMermaid(b));
+  const codeLines = codeList.reduce((n, b) => n + Math.max(0, b.split('\n').length - 2), 0);
 
   const seconds =
     (cjkChars / 500) * 60 +
     (latinWords / 200) * 60 +
     codeLines * 4 +
-    (mathBlocks + mermaidCount) * 15 +
+    (mathBlocks + diagrams) * 15 +
     inlineMath * 3 +
     images * 10;
 
-  return Math.max(1, Math.round(seconds / 60));
+  return {
+    minutes: Math.max(1, Math.round(seconds / 60)),
+    cjkChars,
+    latinWords,
+    codeLines,
+    codeBlocks: codeList.length,
+    diagrams,
+    mathBlocks,
+    inlineMath,
+    images,
+  };
+}
+
+/** 읽는 시간(분) — postStats의 minutes만 꺼낸 단축 함수 */
+export function readingMinutes(post: Post): number {
+  return postStats(post).minutes;
 }
 
 /** "2026. 6. 10." 형식의 발행일 표기 */
