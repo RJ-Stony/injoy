@@ -5,6 +5,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import PostMeta from '../../components/PostMeta.astro';
 import TableOfContents from '../../components/TableOfContents.astro';
 import ViewCount from '../../components/ViewCount.astro';
+import ReadingPath from '../../components/ReadingPath.astro';
+import TransparencyPanel from '../../components/TransparencyPanel.astro';
 import { getPublishedPosts, readingMinutes } from '../../utils/post';
 import { getConnections } from '../../utils/graph';
 import { withBase } from '../../utils/url';
@@ -32,9 +34,9 @@ const connections = await getConnections(post.id);
   wide
 >
   <div class="post-grid">
-  <article class="post">
+  <article class="post" data-pagefind-body>
     <header class="post-header">
-      <div class="meta-row">
+      <div class="meta-row" data-pagefind-ignore>
         <PostMeta
           category={post.data.category}
           pubDate={post.data.pubDate}
@@ -50,7 +52,7 @@ const connections = await getConnections(post.id);
       {cover && <Image class="cover" src={cover} alt="" loading="eager" />}
     </header>
 
-    <div class="toc-inline">
+    <div class="toc-inline" data-pagefind-ignore>
       <TableOfContents headings={headings} />
     </div>
 
@@ -72,9 +74,11 @@ const connections = await getConnections(post.id);
       )
     }
 
+    <ReadingPath slug={post.id} title={post.data.title} />
+
     {
       connections.length > 0 && (
-        <section id="connections" class="connections" aria-label="연결된 글">
+        <section id="connections" class="connections" aria-label="연결된 글" data-pagefind-ignore>
           <div class="connections-head">
             <h2>연결된 글</h2>
             <a class="to-graph" href={withBase(`/graph/?focus=${post.id}`)}>그래프에서 보기 →</a>
@@ -92,9 +96,11 @@ const connections = await getConnections(post.id);
       )
     }
 
+    <TransparencyPanel post={post} connections={connections} />
+
     {
       (older || newer) && (
-        <nav class="post-nav" aria-label="이전·다음 글">
+        <nav class="post-nav" aria-label="이전·다음 글" data-pagefind-ignore>
           {older ? (
             <a class="nav-card older" href={withBase(`/posts/${older.id}/`)}>
               <span class="label">← 이전 글</span>
