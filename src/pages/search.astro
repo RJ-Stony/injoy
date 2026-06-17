@@ -1,0 +1,115 @@
+---
+/**
+ * 검색 — Pagefind 정적 색인 위에 올린 검색 페이지.
+ * 색인은 빌드 후 dist/pagefind/에 생기므로(npm run build) 'astro dev'에는 없다.
+ * dev에서는 UI 스크립트 로드가 실패하므로 안내 문구로 우아하게 대체한다.
+ * 결과 URL은 dist 기준(/posts/..)이라 base('/injoy')를 앞에 붙여 바로잡는다.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { withBase } from '../utils/url';
+
+const cssHref = withBase('/pagefind/pagefind-ui.css');
+const jsSrc = withBase('/pagefind/pagefind-ui.js');
+const bundlePath = withBase('/pagefind/'); // '/injoy/pagefind/'
+---
+
+<BaseLayout title="검색" description="Injoy의 글을 제목과 본문에서 찾아보세요.">
+  <link href={cssHref} rel="stylesheet" />
+
+  <section class="search-page">
+    <h1>검색</h1>
+    <p class="search-sub">글 제목과 본문에서 찾아요.</p>
+    <div id="search"></div>
+    <p id="search-fallback" class="search-fallback" hidden>
+      검색 색인은 빌드된 사이트에서만 동작해요. 로컬에서는
+      <code>npm run build &amp;&amp; npm run preview</code>로 확인하세요.
+    </p>
+  </section>
+
+  <script is:inline src={jsSrc} type="text/javascript"></script>
+  <script is:inline define:vars={{ bundlePath }}>
+    window.addEventListener('DOMContentLoaded', () => {
+      if (typeof window.PagefindUI === 'undefined') {
+        const fb = document.getElementById('search-fallback');
+        if (fb) fb.hidden = false;
+        return;
+      }
+      const base = bundlePath.replace(/\/pagefind\/$/, ''); // '/injoy'
+      const fix = (u) => (u && u.startsWith('/') && !u.startsWith(base + '/') ? base + u : u);
+      new window.PagefindUI({
+        element: '#search',
+        bundlePath,
+        showSubResults: true,
+        showImages: false,
+        // 결과 URL을 base('/injoy') 기준으로 바로잡는다(색인은 dist 루트 기준이라 prefix가 없다).
+        processResult: (result) => {
+          result.url = fix(result.url);
+          if (Array.isArray(result.sub_results)) {
+            for (const sr of result.sub_results) sr.url = fix(sr.url);
+          }
+          return result;
+        },
+        translations: {
+          placeholder: '검색어를 입력하세요',
+          clear_search: '지우기',
+          load_more: '결과 더 보기',
+          search_label: 'Injoy 검색',
+          filters_label: '필터',
+          zero_results: '[SEARCH_TERM]에 대한 결과가 없어요',
+          many_results: '[SEARCH_TERM] 결과 [COUNT]개',
+          one_result: '[SEARCH_TERM] 결과 [COUNT]개',
+          alt_search: '[SEARCH_TERM] 대신 [DIFFERENT_TERM]의 결과예요',
+          search_suggestion: '[SEARCH_TERM]에 대한 결과가 없어요. 다른 말로 찾아보세요',
+          searching: '[SEARCH_TERM] 찾는 중...',
+        },
+      });
+    });
+  </script>
+</BaseLayout>
+
+<style>
+  .search-page {
+    max-width: var(--width-content);
+    margin: 0 auto;
+  }
+
+  .search-page h1 {
+    font-size: clamp(1.7rem, 5vw, 2.2rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.4rem;
+  }
+
+  .search-sub {
+    margin: 0 0 1.6rem;
+    color: var(--text-muted);
+  }
+
+  .search-fallback {
+    margin-top: 1rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.7;
+  }
+
+  .search-fallback code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background-color: var(--code-bg);
+    padding: 0.1em 0.4em;
+    border-radius: 6px;
+  }
+
+  /* Pagefind UI를 사이트 토큰에 맞춘다(라이트·다크 자동 전환). 자체 DOM이라 :global */
+  #search {
+    --pagefind-ui-scale: 0.9;
+    --pagefind-ui-primary: var(--accent);
+    --pagefind-ui-text: var(--text);
+    --pagefind-ui-background: var(--bg);
+    --pagefind-ui-border: var(--border);
+    --pagefind-ui-tag: var(--surface);
+    --pagefind-ui-border-width: 1px;
+    --pagefind-ui-border-radius: 10px;
+    --pagefind-ui-font: var(--font-sans);
+  }
+</style>

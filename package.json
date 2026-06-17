@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "astro build && pagefind --site dist",
     "preview": "astro preview",
     "new": "node scripts/new-post.mjs",
     "lint:wiki": "node scripts/lint-wiki.mjs",
@@ -37,6 +37,7 @@
   "devDependencies": {
     "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
-    "decap-server": "^3.9.0"
+    "decap-server": "^3.9.0",
+    "pagefind": "^1.5.2"
   }
 }
