@@ -1,8 +1,9 @@
 ---
 /**
- * 글 조회수 — Abacus(무가입 카운터 API)로 집계한다.
+ * 글 조회수 — Abacus(무가입 카운터 API)로 집계해 눈 아이콘 칩으로 보여 준다.
  * 배포된 사이트에서만 카운트를 올리고(hit), 로컬 미리보기는 조회만 한다(get).
  * API가 응답하지 않으면 조용히 숨겨져 본문 읽기에 영향을 주지 않는다.
+ * PostMeta의 통계 칩(.meta-stat)과 같은 모습으로 메타 줄에 자연스럽게 합류한다.
  */
 interface Props {
   slug: string;
@@ -12,8 +13,11 @@ const { slug } = Astro.props;
 const safeKey = `post-${slug.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 ---
 
-<span class="view-count" data-key={safeKey} hidden>
-  <span class="divider" aria-hidden="true">·</span>
+<span class="meta-stat view-count" data-key={safeKey} aria-label="조회수" hidden>
+  <svg class="ic" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"></path>
+    <circle cx="12" cy="12" r="3"></circle>
+  </svg>
   <span class="value"></span>
 </span>
 
@@ -27,7 +31,9 @@ const safeKey = `post-${slug.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
       .then((data: { value: number }) => {
         const value = el.querySelector('.value');
         if (value && typeof data.value === 'number') {
-          value.textContent = `조회 ${data.value.toLocaleString('ko-KR')}`;
+          const n = data.value.toLocaleString('ko-KR');
+          value.textContent = n;
+          el.setAttribute('aria-label', `조회수 ${n}`);
           el.hidden = false;
         }
       })
@@ -38,15 +44,29 @@ const safeKey = `post-${slug.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 </script>
 
 <style>
-  .view-count {
+  /* PostMeta의 통계 칩과 동일한 모습(아이콘 + 숫자) */
+  .meta-stat {
     display: inline-flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.32em;
+    margin-left: 0.85em;
+    white-space: nowrap;
     font-size: 0.875rem;
     color: var(--text-muted);
   }
 
-  .divider {
-    color: var(--border);
+  .meta-stat[hidden] {
+    display: none;
+  }
+
+  .meta-stat .ic {
+    width: 1.02em;
+    height: 1.02em;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.7;
+    flex-shrink: 0;
   }
 </style>

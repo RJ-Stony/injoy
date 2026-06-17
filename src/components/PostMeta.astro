@@ -1,8 +1,9 @@
 ---
 /**
  * 시그니처 메타 라인 — 카테고리 라벨 + 발행일 + (수정일) + 읽는 시간 + (연결 수).
- * 글 카드와 글 상단에서 같은 모습으로 쓰인다.
- * connections·updatedDate는 선택 — 글 상세에서만 넘긴다(카드는 그대로).
+ * 날짜는 잔잔한 본문 글씨로, 통계(읽기·연결·조회)는 아이콘 칩으로 위계를 준다.
+ * 글 카드와 글 상단에서 같은 모습으로 쓰인다(connections·updatedDate·stack은 상세에서만).
+ * stack=true면 좁은 화면에서 '날짜 줄'과 '통계 줄'을 또렷한 두 줄로 나눈다.
  */
 import { formatDate, isoDate } from '../utils/post';
 
@@ -14,39 +15,44 @@ interface Props {
   connections?: number;
   /** 발행일과 다를 때만 '수정'으로 표시 */
   updatedDate?: Date;
+  /** 글 상세에서 모바일 두 줄 그룹 배치를 켠다 */
+  stack?: boolean;
 }
 
-const { category, pubDate, minutes, connections, updatedDate } = Astro.props;
+const { category, pubDate, minutes, connections, updatedDate, stack } = Astro.props;
 const showUpdated = !!updatedDate && updatedDate.getTime() !== pubDate.getTime();
 const connCount = connections ?? 0;
 ---
 
 <div class="post-meta">
   <span class="category">{category}</span>
-  <span class="item">
-    <span class="divider" aria-hidden="true">·</span>
-    <time datetime={isoDate(pubDate)}>{formatDate(pubDate)}</time>
-  </span>
+  <time class="m-date" datetime={isoDate(pubDate)}>{formatDate(pubDate)}</time>
   {
     showUpdated && (
-      <span class="item">
-        <span class="divider" aria-hidden="true">·</span>
-        <time datetime={isoDate(updatedDate!)}>수정 {formatDate(updatedDate!)}</time>
-      </span>
+      <time class="m-date m-upd" datetime={isoDate(updatedDate!)}>
+        수정 {formatDate(updatedDate!)}
+      </time>
     )
   }
-  <span class="item">
-    <span class="divider" aria-hidden="true">·</span>
-    <span>{minutes}분 읽기</span>
+  {stack && <span class="m-break" aria-hidden="true"></span>}
+  <span class="meta-stat" aria-label={`${minutes}분 읽기`}>
+    <svg class="ic" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9"></circle>
+      <path d="M12 7.5V12l3 1.8"></path>
+    </svg>
+    {minutes}분
   </span>
   {
     connCount > 0 && (
-      <span class="item">
-        <span class="divider" aria-hidden="true">·</span>
-        <a class="conn" href="#connections">
-          연결 {connCount}개
-        </a>
-      </span>
+      <a class="meta-stat conn" href="#connections" aria-label={`연결된 글 ${connCount}개`}>
+        <svg class="ic" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="6" cy="12" r="2.6" />
+          <circle cx="18" cy="6" r="2.6" />
+          <circle cx="18" cy="18" r="2.6" />
+          <path d="m8.3 10.9 7.4-3.8M8.3 13.1l7.4 3.8" />
+        </svg>
+        {connCount}
+      </a>
     )
   }
 </div>
@@ -56,7 +62,8 @@ const connCount = connections ?? 0;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.5em;
+    column-gap: 0;
+    row-gap: 0.4em;
     font-size: 0.875rem;
     color: var(--text-muted);
     line-height: 1.5;
@@ -70,16 +77,35 @@ const connCount = connections ?? 0;
     border-radius: 999px;
   }
 
-  /* 줄바꿈 시 구분점이 항목과 함께 움직이도록 묶는다 */
-  .item {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5em;
+  /* 날짜 — 잔잔한 글씨. 항목 사이 가운뎃점은 ::before라 줄 맨 앞엔 오지 않는다 */
+  .m-date {
     white-space: nowrap;
   }
 
-  .divider {
+  .m-date::before {
+    content: '·';
+    margin: 0 0.45em;
     color: var(--border);
+  }
+
+  /* 통계 칩 — 아이콘 + 숫자. 가운뎃점 대신 아이콘과 간격으로 구분한다 */
+  .meta-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.32em;
+    margin-left: 0.85em;
+    white-space: nowrap;
+  }
+
+  .meta-stat .ic {
+    width: 1.02em;
+    height: 1.02em;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.7;
+    flex-shrink: 0;
   }
 
   /* 연결 수 — 그래프임을 헤더에서 바로 드러내는 신호. 누르면 하단 '연결된 글'로 */
@@ -91,5 +117,27 @@ const connCount = connections ?? 0;
   .conn:hover {
     color: var(--accent);
     text-decoration: none;
+  }
+
+  .conn:hover .ic {
+    opacity: 1;
+  }
+
+  /* 모바일 강제 줄바꿈자 — 기본은 숨김(데스크톱·카드는 한 줄로) */
+  .m-break {
+    display: none;
+  }
+
+  /* 좁은 화면: 날짜 줄(발행·수정)과 통계 줄(읽기·연결·조회)로 또렷이 나눈다 */
+  @media (max-width: 540px) {
+    .m-break {
+      display: block;
+      flex: 0 0 100%;
+      height: 0;
+    }
+    /* 통계 줄 첫 칩은 왼쪽 여백을 빼 줄을 깔끔하게 시작한다 */
+    .m-break + .meta-stat {
+      margin-left: 0;
+    }
   }
 </style>
