@@ -9,6 +9,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "new": "node scripts/new-post.mjs",
+    "lint:wiki": "node scripts/lint-wiki.mjs",
     "write": "concurrently -k -n blog,cms \"astro dev --open /injoy/admin/\" \"cross-env MODE=fs PORT=8081 decap-server\"",
     "astro": "astro"
   },
