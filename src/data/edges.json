@@ -23,6 +23,12 @@
       "to": "markdown-styleguide",
       "type": "requires",
       "note": "에디터로 다루는 마크다운 요소들을 먼저 훑어보면 '보이는 대로 편집'이 무엇을 다루는지 분명해진다"
+    },
+    {
+      "from": "slash-menu",
+      "to": "wysiwyg-editor",
+      "type": "extends",
+      "note": "wysiwyg-editor가 끝에 남긴 '슬래시 메뉴는 아직 없다'는 숙제를 이어받아 실제로 붙인 다음 이야기"
     }
   ]
 }
