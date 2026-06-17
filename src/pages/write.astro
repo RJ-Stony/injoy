@@ -215,12 +215,12 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
           <ul>
             {edgeTypeOptions.map((o) => (
               <li>
-                <strong>{o.label}</strong>
+                <strong class={o.value}>{o.label}</strong>
                 <span>{o.criteria}</span>
               </li>
             ))}
             <li>
-              <strong>{AUTO_EDGE_TYPES.mentions.label}</strong>
+              <strong class="mentions">{AUTO_EDGE_TYPES.mentions.label}</strong>
               <span>{AUTO_EDGE_TYPES.mentions.criteria}</span>
             </li>
           </ul>
@@ -2396,9 +2396,37 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     line-height: 1.65;
   }
 
+  /* 타입 라벨은 그래프·연결 칩과 같은 단일 출처(--edge-*)로 색을 맞춘다 */
   .write-root .edge-guide strong {
     color: var(--accent);
     font-weight: 700;
+  }
+  .write-root .edge-guide strong.extends {
+    color: var(--edge-extends);
+  }
+  .write-root .edge-guide strong.supports {
+    color: var(--edge-supports);
+  }
+  .write-root .edge-guide strong.refines {
+    color: var(--edge-refines);
+  }
+  .write-root .edge-guide strong.instantiates {
+    color: var(--edge-instantiates);
+  }
+  .write-root .edge-guide strong.requires {
+    color: var(--edge-requires);
+  }
+  .write-root .edge-guide strong.triggered-by {
+    color: var(--edge-triggered-by);
+  }
+  .write-root .edge-guide strong.contradicts {
+    color: var(--edge-contradicts);
+  }
+  .write-root .edge-guide strong.related {
+    color: var(--edge-related);
+  }
+  .write-root .edge-guide strong.mentions {
+    color: var(--text-muted);
   }
 
   .write-root .edge-guide span {
