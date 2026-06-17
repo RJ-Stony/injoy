@@ -1,6 +1,6 @@
 ---
 /**
- * 시그니처 메타 라인 — 카테고리 라벨 + 발행일 + (갱신일) + 읽는 시간 + (연결 수).
+ * 시그니처 메타 라인 — 카테고리 라벨 + 발행일 + (수정일) + 읽는 시간 + (연결 수).
  * 글 카드와 글 상단에서 같은 모습으로 쓰인다.
  * connections·updatedDate는 선택 — 글 상세에서만 넘긴다(카드는 그대로).
  */
@@ -12,7 +12,7 @@ interface Props {
   minutes: number;
   /** 글 상세에서만 넘긴다. 0이면 표시하지 않음 */
   connections?: number;
-  /** 발행일과 다를 때만 '갱신'으로 표시 */
+  /** 발행일과 다를 때만 '수정'으로 표시 */
   updatedDate?: Date;
 }
 
@@ -31,7 +31,7 @@ const connCount = connections ?? 0;
     showUpdated && (
       <span class="item">
         <span class="divider" aria-hidden="true">·</span>
-        <time datetime={isoDate(updatedDate!)}>갱신 {formatDate(updatedDate!)}</time>
+        <time datetime={isoDate(updatedDate!)}>수정 {formatDate(updatedDate!)}</time>
       </span>
     )
   }

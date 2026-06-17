@@ -231,7 +231,15 @@ const connections = await getConnections(post.id);
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.5em;
+    gap: 0.4em 0.5em;
+  }
+
+  /* PostMeta·ViewCount의 박스를 풀어 모든 항목을 한 흐름으로 합친다.
+     안 그러면 '조회'가 별도 컨테이너라 좁은 화면에서 혼자 줄을 차지한다.
+     ViewCount는 집계 성공 전까지 [hidden]이라 그때는 합치지 않는다. */
+  .meta-row :global(.post-meta),
+  .meta-row :global(.view-count:not([hidden])) {
+    display: contents;
   }
 
   .post-header h1 {

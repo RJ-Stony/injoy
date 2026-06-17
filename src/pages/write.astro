@@ -451,7 +451,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       `tags: [${tags.map((t) => `"${yamlEscape(t)}"`).join(', ')}]`,
       `draft: ${($('fm-draft') as HTMLInputElement).checked}`,
     ];
-    // 수정 발행이면 갱신일을 오늘로 기록(발행일과 다를 때만) — 헤더 '갱신' 메타로 노출
+    // 수정 발행이면 수정일을 오늘로 기록(발행일과 다를 때만) — 헤더 '수정' 메타로 노출
     if (state.mode === 'edit') {
       const d = new Date();
       const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
