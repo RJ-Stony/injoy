@@ -1,0 +1,140 @@
+---
+/**
+ * 읽기 경로 — requires·extends 엣지로 만든 선형 읽기 순서를 단계로 보여 준다.
+ * 현재 글을 강조하고, 앞·뒤 글은 링크로 건다. 경로가 없으면 아무것도 안 그린다.
+ */
+import { getReadingPath } from '../utils/graph';
+import { withBase } from '../utils/url';
+
+interface Props {
+  slug: string;
+  title: string;
+}
+
+const { slug, title } = Astro.props;
+const { before, after } = await getReadingPath(slug);
+const hasPath = before.length > 0 || after.length > 0;
+
+const steps = [
+  ...before.map((s) => ({ ...s, current: false })),
+  { slug, title, current: true },
+  ...after.map((s) => ({ ...s, current: false })),
+];
+---
+
+{
+  hasPath && (
+    <section class="reading-path" aria-label="읽기 경로" data-pagefind-ignore>
+      <div class="rp-head">
+        <h2>읽기 경로</h2>
+        <p class="rp-sub">이 순서로 읽으면 매끄러워요.</p>
+      </div>
+      <ol class="rp-steps">
+        {steps.map((s, i) => (
+          <li class:list={['rp-step', { current: s.current }]} aria-current={s.current ? 'step' : undefined}>
+            <span class="rp-num">{i + 1}</span>
+            {s.current ? (
+              <span class="rp-title">{s.title}</span>
+            ) : (
+              <a class="rp-title" href={withBase(`/posts/${s.slug}/`)}>
+                {s.title}
+              </a>
+            )}
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
+<style>
+  .reading-path {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--surface);
+    padding: 1.1rem 1.4rem;
+  }
+
+  .rp-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .reading-path h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .rp-sub {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .rp-steps {
+    position: relative;
+    margin: 0.9rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* 단계 배지를 잇는 세로선 — 배지(불투명 배경)가 그 위에 얹혀 점선처럼 보인다 */
+  .rp-steps::before {
+    content: '';
+    position: absolute;
+    left: 0.9rem;
+    top: 1.4rem;
+    bottom: 1.4rem;
+    width: 2px;
+    transform: translateX(-1px);
+    background-color: var(--border);
+  }
+
+  .rp-step {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.45rem 0;
+  }
+
+  .rp-num {
+    z-index: 1;
+    flex-shrink: 0;
+    width: 1.8rem;
+    height: 1.8rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .rp-title {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  a.rp-title:hover {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .rp-step.current .rp-num {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .rp-step.current .rp-title {
+    color: var(--accent);
+    font-weight: 700;
+  }
+</style>

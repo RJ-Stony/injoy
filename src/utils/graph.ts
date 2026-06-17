@@ -256,3 +256,61 @@ export function edgeLabel(type: EdgeType): string {
     AUTO_EDGE_TYPES.mentions.label
   );
 }
+
+/** 읽기 순서를 만드는 방향 엣지 — '선행(requires)'·'확장(extends)'만 순서를 가진다 */
+const READING_ORDER_TYPES = new Set<EdgeType>(['requires', 'extends']);
+
+export interface ReadingStep {
+  slug: string;
+  title: string;
+}
+
+export interface ReadingPathData {
+  /** 먼저 읽을 글 — 이른 순서대로 */
+  before: ReadingStep[];
+  /** 이어 읽을 글 — 가까운 순서대로 */
+  after: ReadingStep[];
+}
+
+/**
+ * requires·extends만으로 '읽기 경로'(선형)를 만든다.
+ * P -[requires|extends]-> Q 는 'Q를 먼저 읽어야/이어받아'의 관계라 Q가 P보다 앞선다.
+ * 따라서 나가는 엣지의 to는 before, 들어오는 엣지의 from은 after.
+ * 경로가 없으면 before·after 모두 빈 배열을 돌려준다(컴포넌트가 안 그림).
+ */
+export async function getReadingPath(slug: string): Promise<ReadingPathData> {
+  const graph = await getGraph();
+  const titles = new Map(
+    graph.nodes.filter((n) => n.kind === 'post').map((n) => [n.id, n.label]),
+  );
+  const order = graph.edges.filter(
+    (e) => !e.to.startsWith('tag:') && READING_ORDER_TYPES.has(e.type),
+  );
+
+  // 현재 데이터는 분기 없는 선형 사슬이라 글마다 앞/뒤 하나씩만 잇는다.
+  // 분기(한 글에 나가는 requires 2개 등)가 생기면 마지막 엣지만 남으므로,
+  // 그때 정렬로 결정하거나 트리로 확장하도록 바꾼다.
+  const prevOf = new Map<string, string>(); // 글 -> 바로 앞(선행) 글
+  const nextOf = new Map<string, string>(); // 글 -> 바로 뒤(후행) 글
+  for (const e of order) {
+    prevOf.set(e.from, e.to); // e.to가 e.from보다 앞
+    nextOf.set(e.to, e.from); // e.from이 e.to보다 뒤
+  }
+
+  const walk = (step: Map<string, string>): ReadingStep[] => {
+    const out: ReadingStep[] = [];
+    const seen = new Set<string>([slug]); // 순환 가드
+    let cur = step.get(slug);
+    while (cur && !seen.has(cur)) {
+      seen.add(cur);
+      out.push({ slug: cur, title: titles.get(cur) ?? cur });
+      cur = step.get(cur);
+    }
+    return out;
+  };
+
+  return {
+    before: walk(prevOf).reverse(), // 가까운→먼 순으로 모은 뒤 뒤집어 '이른 순서'로
+    after: walk(nextOf), // 가까운→먼 = 읽기 순서 그대로
+  };
+}
