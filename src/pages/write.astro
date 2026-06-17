@@ -687,14 +687,16 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         state.acceptedEdges.push({ to: post.slug, type: 'related', note: '자동 제안(유사도)' });
         renderSuggestions();
       });
-      li.append(
+      const main = document.createElement('div');
+      main.className = 'sug-main';
+      main.append(
         Object.assign(document.createElement('span'), { textContent: post.title, className: 'sug-title' }),
         Object.assign(document.createElement('span'), {
           textContent: `유사도 ${(score * 100).toFixed(0)}%`,
           className: 'muted',
         }),
-        btn,
       );
+      li.append(main, btn);
       ul.appendChild(li);
     }
     for (const [i, e] of state.acceptedEdges.entries()) {
@@ -723,17 +725,18 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         renderSuggestions();
       });
 
-      li.append(
-        wrap,
+      const main = document.createElement('div');
+      main.className = 'sug-main';
+      main.append(
         Object.assign(document.createElement('span'), {
           textContent: p?.title ?? e.to,
           className: 'sug-title',
         }),
       );
       if (e.note) {
-        li.append(Object.assign(document.createElement('span'), { textContent: e.note, className: 'muted' }));
+        main.append(Object.assign(document.createElement('span'), { textContent: e.note, className: 'muted' }));
       }
-      li.append(rm);
+      li.append(wrap, main, rm);
       ul.appendChild(li);
     }
 
@@ -2295,11 +2298,25 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
 
   .write-root .suggestions li {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.7rem;
     padding: 0.5rem 0.2rem;
     font-size: 0.9rem;
     border-top: 1px solid var(--border);
+  }
+
+  /* 제목과 메모(설명)는 가로로 찌부되지 않게 한 칸에 세로로 쌓는다 */
+  .write-root .suggestions .sug-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .write-root .suggestions .sug-main .muted {
+    font-size: 0.82rem;
+    line-height: 1.45;
   }
 
   .write-root .suggestions li:first-child {
