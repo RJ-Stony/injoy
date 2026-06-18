@@ -153,6 +153,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
 
         <!-- 삽입 툴바: 문법을 외우지 않아도 버튼으로 블록을 넣는다 (모바일에서도 동작) -->
         <!-- pending: 에디터 마운트 완료 전까지 비활성(그 사이 삽입분이 증발하지 않게) -->
+        <!-- 센티넬: 툴바가 sticky로 '고정됐는지' 감지해 .stuck 스타일을 켠다(IntersectionObserver) -->
+        <div class="md-toolbar-sentinel" aria-hidden="true"></div>
         <div class="md-toolbar pending" role="toolbar" aria-label="삽입 도구" aria-disabled="true">
           <div class="md-tools">
           <button type="button" data-md="heading" title="제목">제목</button>
@@ -1463,6 +1465,23 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     if (ev.key === 'Escape' && !popover.hidden) closePopover();
   });
 
+  // 삽입 툴바가 sticky로 '고정'되면 .stuck을 켜 떠 있는 막대 스타일로 바꾼다.
+  // 센티넬(툴바 바로 위)이 헤더 라인(top:66) 위로 사라지는 순간을 IntersectionObserver로 감지.
+  (() => {
+    const sentinel = document.querySelector('.md-toolbar-sentinel');
+    const toolbar = document.querySelector('.md-toolbar');
+    if (!sentinel || !toolbar || !('IntersectionObserver' in window)) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        // 센티넬이 헤더 라인 '위로' 올라가 사라졌을 때만 고정 상태(아래 폴드 밖은 제외).
+        const scrolledAbove = entry.boundingClientRect.top < 67;
+        toolbar.classList.toggle('stuck', !entry.isIntersecting && scrolledAbove);
+      },
+      { rootMargin: '-67px 0px 0px 0px', threshold: [0] },
+    );
+    io.observe(sentinel);
+  })();
+
   init();
 </script>
 
@@ -1956,6 +1975,15 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     gap: 0.8rem;
   }
 
+  /* 센티넬 — 툴바 바로 위 표식(1px, 음수 마진으로 레이아웃 영향 0).
+     이게 헤더 라인 위로 사라지면 툴바가 '고정'됐다고 본다(IntersectionObserver). */
+  .write-root .md-toolbar-sentinel {
+    height: 1px;
+    margin: 0 0 -1px;
+    padding: 0;
+    pointer-events: none;
+  }
+
   /* 삽입 툴바 — 모바일에선 가로 스크롤, 넓은 화면에선 줄바꿈.
      sticky로 본문을 길게 써도 화면 위에 붙어 따라온다. top은 sticky 사이트 헤더(66px) 바로 아래.
      z-index는 헤더(50)보다 낮아 헤더가 위를 덮고, 본문 에디터보다는 위에 온다.
@@ -1969,6 +1997,32 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     border-bottom: 0;
     border-radius: 12px 12px 0 0;
     background-color: var(--surface);
+    transition: box-shadow 0.2s ease, background-color 0.2s ease, border-radius 0.2s ease,
+      border-color 0.2s ease, margin 0.2s ease;
+  }
+
+  /* 고정됐을 때 — 떠 있는 막대처럼. 사방을 둥글게, 아래 테두리·은은한 그림자로 본문과 분리하고,
+     사이트 헤더와 같은 프로스트 배경으로 결을 맞춘다. 양옆을 살짝 좁혀 '떠오른' 느낌을 준다. */
+  .write-root .md-toolbar.stuck {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-inline: 0.35rem;
+    background-color: color-mix(in srgb, var(--surface) 90%, transparent);
+    backdrop-filter: saturate(140%) blur(8px);
+    -webkit-backdrop-filter: saturate(140%) blur(8px);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  }
+
+  /* 고정 중에는 툴바 아래 에디터 윗모서리도 직각이 되지 않게(틈이 자연스럽게 보이도록) */
+  .write-root .md-toolbar.stuck + .md-editor {
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .write-root .md-toolbar {
+      transition: none;
+    }
   }
 
   /* 버튼 행 — 모바일에선 이 안쪽만 가로 스크롤. 팝오버(.md-toolbar 직속)는 클리핑 밖에 둔다. */
