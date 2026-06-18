@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { getGraph, edgeLabel, EDGE_TYPES, AUTO_EDGE_TYPES } from '../utils/graph';
+import { getGraph, EDGE_TYPES, AUTO_EDGE_TYPES } from '../utils/graph';
 import { withBase } from '../utils/url';
 
 const graph = await getGraph();
@@ -10,10 +10,6 @@ const data = {
   nodes: graph.nodes.map((n) => ({ ...n, url: withBase(n.url) })),
   edges: graph.edges,
 };
-
-const postNodes = graph.nodes.filter((n) => n.kind === 'post');
-const titleOf = new Map(postNodes.map((n) => [n.id, n.label]));
-const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
 ---
 
 <BaseLayout
@@ -33,7 +29,7 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
   </section>
 
   <div class="graph-wrap">
-    <canvas id="graph-canvas" aria-label="글 연결 그래프. 아래 연결 목록에서 같은 내용을 읽을 수 있어요"></canvas>
+    <canvas id="graph-canvas" aria-label="글 연결 그래프. 노드를 끌거나 눌러 글로 이동할 수 있어요"></canvas>
     <div id="graph-tooltip" hidden></div>
   </div>
 
@@ -43,22 +39,6 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
     <li><span class="line solid" aria-hidden="true"></span>연결(타입별 색)</li>
     <li><span class="line dashed" aria-hidden="true"></span>언급·태그</li>
   </ul>
-
-  <details class="edge-list">
-    <summary>연결 목록으로 보기</summary>
-    <ul>
-      {
-        explicitEdges.map((e) => (
-          <li>
-            <a href={withBase(`/posts/${e.from}/`)}>{titleOf.get(e.from)}</a>
-            <span class:list={['edge-type', e.type]}>{edgeLabel(e.type)} →</span>
-            <a href={withBase(`/posts/${e.to}/`)}>{titleOf.get(e.to)}</a>
-            {e.note && <span class="note">· {e.note}</span>}
-          </li>
-        ))
-      }
-    </ul>
-  </details>
 
   <details class="edge-list">
     <summary>연결 타입 안내</summary>
@@ -80,7 +60,7 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
 
   <noscript>
     <p class="noscript-note">
-      자바스크립트가 꺼져 있으면 그래프 대신 위의 "연결 목록으로 보기"를 이용하세요.
+      자바스크립트가 꺼져 있으면 그래프가 보이지 않아요. 각 글 아래 '연결된 글'에서 같은 연결을 따라갈 수 있어요.
     </p>
   </noscript>
 </BaseLayout>
@@ -129,6 +109,8 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
       colors.surface = s.getPropertyValue('--surface').trim();
       // 엣지 타입별 색 — global.css의 --edge-* 단일 출처를 캔버스가 공유한다
       for (const k of EDGE_KINDS) colors.edge[k] = s.getPropertyValue(`--edge-${k}`).trim();
+      // 라벨 폰트도 여기서 한 번만 읽어 캐시한다 — draw()에서 매 프레임 읽지 않게
+      colors.fontFamily = getComputedStyle(document.body).fontFamily;
     };
 
     const resize = () => {
@@ -150,6 +132,8 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
       n.y = H / 2 + Math.sin(angle) * r * (n.kind === 'tag' ? 1.15 : 0.85);
     };
 
+    // 힘 시뮬레이션 한 스텝. 노드 간 척력은 O(n²)라 글이 수십 개로 늘면
+    // 공간 분할(Barnes-Hut류)로 근사해 줄일 수 있다. 지금 규모에선 단순 계산으로 충분.
     const tick = () => {
       const REPULSION = 2600;
       const SPRING = 0.012;
@@ -271,7 +255,7 @@ const explicitEdges = graph.edges.filter((e) => !e.to.startsWith('tag:'));
         }
         // 라벨
         ctx.fillStyle = n.kind === 'post' ? colors.text : colors.muted;
-        ctx.font = `${n.kind === 'post' ? 600 : 400} ${n.kind === 'post' ? 12.5 : 11.5}px ${getComputedStyle(document.body).fontFamily}`;
+        ctx.font = `${n.kind === 'post' ? 600 : 400} ${n.kind === 'post' ? 12.5 : 11.5}px ${colors.fontFamily}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         const label =
