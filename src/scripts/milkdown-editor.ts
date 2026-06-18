@@ -14,6 +14,7 @@ import {
   Editor,
   rootCtx,
   defaultValueCtx,
+  editorViewCtx,
   editorViewOptionsCtx,
   remarkStringifyOptionsCtx,
 } from '@milkdown/kit/core';
@@ -22,9 +23,10 @@ import { gfm } from '@milkdown/kit/preset/gfm';
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { history } from '@milkdown/kit/plugin/history';
 import { math, katexOptionsCtx } from '@milkdown/plugin-math';
-import { replaceAll, insert, getMarkdown, $prose } from '@milkdown/kit/utils';
+import { replaceAll, insert, getMarkdown, $prose, $markSchema } from '@milkdown/kit/utils';
 import { Plugin, TextSelection } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
+import { toggleMark } from '@milkdown/kit/prose/commands';
 import { alertOptions } from '../utils/callout-config.mjs';
 import { WIKI_LINK_RE } from '../plugins/wiki-link-pattern.mjs';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
@@ -489,11 +491,138 @@ function makeSlashPlugin(items: SlashItem[], onInsert: (md: string) => void) {
   });
 }
 
+/**
+ * 밑줄 마크 — 표준 마크다운엔 밑줄이 없어 `<u>...</u>` HTML로 직렬화한다.
+ * 발행 파이프라인이 rehype-raw로 인라인 HTML을 허용하므로 그대로 밑줄로 렌더된다.
+ * 에디터에선 <u> 태그로 보이고(toDOM), 붙여넣기한 <u>도 마크로 받는다(parseDOM).
+ * 직렬화는 remarkStringifyOptionsCtx.handlers.underline가 <u>로 감싼다(아래 config).
+ */
+const underline = $markSchema('underline', () => ({
+  parseDOM: [{ tag: 'u' }],
+  toDOM: () => ['u', 0],
+  parseMarkdown: {
+    match: (node: any) => node.type === 'underline',
+    runner: (state: any, node: any, markType: any) => {
+      state.openMark(markType).next(node.children).closeMark(markType);
+    },
+  },
+  toMarkdown: {
+    match: (mark: any) => mark.type.name === 'underline',
+    runner: (state: any, mark: any) => {
+      state.withMark(mark, 'underline');
+    },
+  },
+}));
+
+/**
+ * 인라인 서식 버블 — 노션식. 텍스트를 드래그해 선택하면 그 위에 떠서
+ * 굵게(B)·기울임(I)·밑줄(U)·취소선(S)을 토글한다. 스크롤 위치와 무관하게
+ * 캐럿/선택 좌표에 fixed로 붙으므로(슬래시 메뉴와 같은 패턴) 멀리 있는 툴바로
+ * 올라갈 필요가 없다. 선택이 비거나 포커스를 잃으면 숨는다.
+ */
+const FORMAT_BUTTONS: { mark: string; label: string; cls: string; title: string }[] = [
+  { mark: 'strong', label: 'B', cls: 'b', title: '굵게' },
+  { mark: 'emphasis', label: 'I', cls: 'i', title: '기울임' },
+  { mark: 'underline', label: 'U', cls: 'u', title: '밑줄' },
+  { mark: 'strike_through', label: 'S', cls: 's', title: '취소선' },
+];
+
+function makeFormatBubble() {
+  return $prose(() => {
+    let view: any = null;
+    const bar = document.createElement('div');
+    bar.className = 'injoy-bubble';
+    bar.setAttribute('role', 'toolbar');
+    bar.hidden = true;
+
+    // 마크가 현재 선택에 걸려 있는가(버튼 활성 표시용).
+    const markActive = (markType: any): boolean => {
+      const { from, $from, to, empty } = view.state.selection;
+      if (empty) return !!markType.isInSet(view.state.storedMarks || $from.marks());
+      return view.state.doc.rangeHasMark(from, to, markType);
+    };
+
+    const buttons = FORMAT_BUTTONS.map((b) => {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = `injoy-bubble-btn bb-${b.cls}`;
+      el.textContent = b.label;
+      el.title = b.title;
+      el.setAttribute('aria-label', b.title);
+      el.addEventListener('mousedown', (ev) => {
+        ev.preventDefault(); // 선택·포커스 유지
+        const markType = view.state.schema.marks[b.mark];
+        if (markType) toggleMark(markType)(view.state, view.dispatch);
+        view.focus();
+      });
+      bar.appendChild(el);
+      return { ...b, el };
+    });
+
+    // 선택 위에 버블을 띄운다. 비선택·포커스 없음·코드블록 안에서는 숨긴다.
+    const place = () => {
+      if (!view || !view.hasFocus()) {
+        bar.hidden = true;
+        return;
+      }
+      const sel = view.state.selection;
+      const { from, to, empty } = sel;
+      // 텍스트 선택만 대상(노드 선택·빈 선택 제외). 코드(인라인/블록) 안에서는 서식이 무의미.
+      const sameTextblock = sel.$from.sameParent(sel.$to) && sel.$from.parent.isTextblock;
+      const inCode = !!sel.$from.parent.type.spec.code;
+      if (empty || !(sel instanceof TextSelection) || !sameTextblock || inCode) {
+        bar.hidden = true;
+        return;
+      }
+      try {
+        const start = view.coordsAtPos(from);
+        const end = view.coordsAtPos(to);
+        const mid = (Math.min(start.left, end.left) + Math.max(start.right ?? start.left, end.right ?? end.left)) / 2;
+        bar.hidden = false;
+        // 활성 상태 갱신
+        buttons.forEach((b) => {
+          const markType = view.state.schema.marks[b.mark];
+          b.el.setAttribute('aria-pressed', String(markType ? markActive(markType) : false));
+        });
+        const rect = bar.getBoundingClientRect();
+        const top = Math.min(start.top, end.top) - rect.height - 8;
+        const left = Math.max(8, Math.min(mid - rect.width / 2, window.innerWidth - rect.width - 8));
+        bar.style.left = `${left}px`;
+        bar.style.top = `${Math.max(8, top)}px`;
+      } catch {
+        bar.hidden = true;
+      }
+    };
+
+    return new Plugin({
+      view: (editorView: any) => {
+        view = editorView;
+        document.body.appendChild(bar);
+        const reposition = () => {
+          if (!bar.hidden) place();
+        };
+        window.addEventListener('scroll', reposition, true);
+        window.addEventListener('resize', reposition);
+        return {
+          update: () => place(),
+          destroy: () => {
+            window.removeEventListener('scroll', reposition, true);
+            window.removeEventListener('resize', reposition);
+            bar.remove();
+          },
+        };
+      },
+    });
+  });
+}
+
 export interface EditorHandle {
   /** 본문 전체를 마크다운으로 교체 (글 불러오기·초기화) */
   setMarkdown(markdown: string): void;
   /** 커서 위치에 마크다운 조각 삽입 (이미지·블록 삽입) */
   insertMarkdown(markdown: string): void;
+  /** 커서에 각주 참조를, 글 끝에 각주 정의를 자동 번호로 넣는다 */
+  insertFootnote(): void;
   /** 현재 본문 마크다운 */
   getMarkdown(): string;
   /** 편집 포커스 */
@@ -549,6 +678,16 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
         fences: true,
         emphasis: '*',
         strong: '*',
+        handlers: {
+          ...((prev as any).handlers ?? {}),
+          // 밑줄 마크('underline' mdast 노드)를 <u>...</u> HTML로 내보낸다(표준 마크다운엔 밑줄이 없음).
+          underline(node: any, _parent: any, state: any, info: any) {
+            const exit = state.enter('underline');
+            const value = state.containerPhrasing(node, info);
+            exit();
+            return `<u>${value}</u>`;
+          },
+        },
       }));
       ctx.update(editorViewOptionsCtx, (prev) => ({
         ...prev,
@@ -566,22 +705,74 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
         // 이미지 노드의 표시 src만 해석(./_images/ → dataURL/raw). 노드 attr(직렬화)는 불변.
         nodeViews: {
           ...((prev as any).nodeViews ?? {}),
-          image: (node: any) => {
-            const dom = document.createElement('img');
+          image: (node: any, editorView: any, getPos: any) => {
+            // 이미지 + alt 입력칸을 함께 감싼다. 이미지를 누르면 바로 아래 입력칸이 펼쳐져
+            // alt(대체 텍스트)를 고친다 — 노션식 인라인 편집. 입력값은 image 노드 attr에 반영돼
+            // 마크다운에 그대로 직렬화된다. resolveImageSrc로 표시 src만 해석하고 attr은 불변.
+            const wrap = document.createElement('span');
+            wrap.className = 'injoy-img';
+            wrap.contentEditable = 'false';
+            const img = document.createElement('img');
+            const altRow = document.createElement('span');
+            altRow.className = 'injoy-img-alt';
+            altRow.hidden = true;
+            const hint = document.createElement('span');
+            hint.className = 'injoy-img-hint';
+            hint.textContent = 'alt';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.placeholder = '이미지 설명을 적어 주세요';
+            altRow.append(hint, input);
+            wrap.append(img, altRow);
+
             const apply = (n: any) => {
               const src = n.attrs.src ?? '';
-              dom.src = (opts.resolveImageSrc?.(src) ?? null) || src;
-              dom.alt = n.attrs.alt ?? '';
-              if (n.attrs.title) dom.title = n.attrs.title;
+              img.src = (opts.resolveImageSrc?.(src) ?? null) || src;
+              img.alt = n.attrs.alt ?? '';
+              img.title = n.attrs.title || '';
+              if (document.activeElement !== input) input.value = n.attrs.alt ?? '';
             };
             apply(node);
+
+            // 이미지 클릭 → alt 입력칸 펼침/접힘.
+            img.addEventListener('mousedown', (ev) => {
+              ev.preventDefault();
+              altRow.hidden = !altRow.hidden;
+              if (!altRow.hidden) {
+                input.focus();
+                input.select();
+              }
+            });
+            // 입력 → 같은 위치의 image 노드 alt attr 갱신.
+            const commit = () => {
+              const pos = typeof getPos === 'function' ? getPos() : null;
+              if (pos == null) return;
+              const n = editorView.state.doc.nodeAt(pos);
+              if (!n || n.type.name !== 'image' || n.attrs.alt === input.value) return;
+              editorView.dispatch(
+                editorView.state.tr.setNodeMarkup(pos, undefined, { ...n.attrs, alt: input.value }),
+              );
+            };
+            input.addEventListener('input', commit);
+            input.addEventListener('keydown', (ev: KeyboardEvent) => {
+              ev.stopPropagation(); // ProseMirror 단축키가 입력을 가로채지 않게
+              if (ev.key === 'Enter' || ev.key === 'Escape') {
+                ev.preventDefault();
+                altRow.hidden = true;
+                editorView.focus();
+              }
+            });
+
             return {
-              dom,
+              dom: wrap,
               update: (updated: any) => {
                 if (updated.type.name !== 'image') return false;
                 apply(updated);
                 return true;
               },
+              // 입력칸에서 일어나는 이벤트·DOM 변화는 ProseMirror가 다루지 않게 한다.
+              stopEvent: (e: any) => e.target === input || altRow.contains(e.target),
+              ignoreMutation: () => true,
             };
           },
         },
@@ -594,12 +785,14 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
     })
     .use(commonmark)
     .use(gfm)
+    .use(underline)
     .use(math)
     .use(history)
     .use(listener)
     .use(injoyDecorations)
     .use(calloutGuard)
     .use(makeSlashPlugin(opts.slashItems ?? [], (md) => opts.onSlashInsert?.(md)))
+    .use(makeFormatBubble())
     .create();
 
   const view = () => editor.ctx.get(rootCtx) && editor;
@@ -614,6 +807,43 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
       editor.action(insert(markdown));
       // insert는 동기로 dispatch되지만 listener는 200ms 디바운스라, 삽입 직후
       // 발행하면 mirror에 누락된다. setMarkdown처럼 즉시 한 번 동기화한다.
+      opts.onChange(normalizeMarkdown(editor.action(getMarkdown())));
+    },
+    insertFootnote() {
+      // gfm의 footnote_reference(인라인)·footnote_definition(블록) 노드를 직접 만든다.
+      // 마크다운 조각 삽입과 달리, 참조는 커서에 인라인으로·정의는 글 맨 끝에 top-level로
+      // 들어가 절대 다른 각주 정의 안에 중첩되지 않고(번호도 노드 라벨에서 안전히 계산), 직렬화는
+      // gfm이 [^N] / [^N]: 로 정확히 왕복한다. 새 정의의 안내 문구를 선택해 둬 바로 덮어쓰게 한다.
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state } = view;
+        const refType = state.schema.nodes.footnote_reference;
+        const defType = state.schema.nodes.footnote_definition;
+        const paraType = state.schema.nodes.paragraph;
+        if (!refType || !defType || !paraType) return;
+        let max = 0;
+        state.doc.descendants((node: any) => {
+          if ((node.type === refType || node.type === defType) && node.attrs.label) {
+            const num = parseInt(node.attrs.label, 10);
+            if (!Number.isNaN(num)) max = Math.max(max, num);
+          }
+        });
+        const label = String(max + 1);
+        const placeholder = '각주 내용을 적어요.';
+        const refNode = refType.create({ label });
+        const defNode = defType.create({ label }, paraType.create(null, state.schema.text(placeholder)));
+        let tr = state.tr.insert(state.selection.to, refNode); // 참조: 커서(선택 끝) 인라인
+        const defStart = tr.doc.content.size; // 정의: 글 맨 끝 top-level
+        tr = tr.insert(defStart, defNode);
+        const textStart = defStart + 2; // def(+1) → paragraph(+1) → 텍스트 시작
+        try {
+          tr = tr.setSelection(TextSelection.create(tr.doc, textStart, textStart + placeholder.length));
+        } catch {
+          /* 위치 계산이 어긋나면 선택만 생략(삽입은 이미 끝남) */
+        }
+        view.dispatch(tr.scrollIntoView());
+        view.focus();
+      });
       opts.onChange(normalizeMarkdown(editor.action(getMarkdown())));
     },
     getMarkdown() {

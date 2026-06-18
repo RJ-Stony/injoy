@@ -328,7 +328,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         onImageFile: (file) => stageImage(file), // 붙여넣기·드롭 이미지 스테이징
         resolveImageSrc: resolveImage, // 에디터 안에서 이미지를 바로 보이게(dataURL/raw)
         slashItems: SLASH_ITEMS, // 데스크톱 '/' 메뉴 — 흔한 블록을 캐럿에서 바로 삽입
-        onSlashInsert: (md) => insertBlock(md), // 툴바와 같은 삽입 경로 재사용
+        onSlashInsert: (md) => (md === FOOTNOTE ? insertFootnote() : insertBlock(md)), // 툴바와 같은 삽입 경로(각주는 자동 번호)
       });
       // 개발·테스트용 핸들 (graph.astro의 __injoyGraph와 같은 선례). 운영자 전용 페이지.
       (window as any).__injoyEditor = mdEditor;
@@ -1203,6 +1203,25 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     }
   };
 
+  // 각주 버튼: 본문에서 가장 큰 [^N] 번호를 찾아 다음 번호로 자동 증가시킨다.
+  // 참조 [^N]과 하단 정의 [^N]: 를 함께 넣어, 발행하면 글 맨 아래 각주로 모인다.
+  const FOOTNOTE = ' footnote'; // 슬래시 메뉴에서 각주를 자동 번호 경로로 보내는 표식
+  const nextFootnoteNumber = () => {
+    const md = mdEditor ? mdEditor.getMarkdown() : ($('fm-body') as HTMLTextAreaElement).value;
+    let max = 0;
+    for (const m of md.matchAll(/\[\^(\d+)\]/g)) max = Math.max(max, parseInt(m[1], 10));
+    return max + 1;
+  };
+  const insertFootnote = () => {
+    if (mdEditor) {
+      mdEditor.insertFootnote(); // 참조는 커서에, 정의는 글 끝에 자동 번호로
+      mdEditor.focus();
+    } else {
+      const n = nextFootnoteNumber();
+      insertBlock(`[^${n}]\n\n[^${n}]: 각주 내용을 적어요.`);
+    }
+  };
+
   // data-md 버튼: 정해진 마크다운 조각을 삽입
   const SNIPPETS: Record<string, string> = {
     heading: '## 제목',
@@ -1212,7 +1231,6 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     list: '- 항목 1\n- 항목 2',
     check: '- [ ] 할 일',
     divider: '---',
-    footnote: '각주를 답니다[^1]\n\n[^1]: 각주 내용을 적어요.',
   };
 
   // mermaid 예시 갤러리
@@ -1273,7 +1291,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     { label: '구분선', keywords: 'divider hr rule 구분선', md: SNIPPETS.divider },
     { label: '코드블록', keywords: 'code 코드 fence', md: '```\n\n```' },
     { label: '수식 블록', keywords: 'math latex 수식', md: SNIPPETS.math },
-    { label: '각주', keywords: 'footnote 각주', md: SNIPPETS.footnote },
+    { label: '각주', keywords: 'footnote 각주', md: FOOTNOTE },
     {
       label: '다이어그램',
       keywords: 'mermaid diagram 다이어그램 순서도',
@@ -1427,7 +1445,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     if (btn.id === 'toolbar-image') return $('body-image').click();
     const md = btn.dataset.md;
     if (md) {
-      insertBlock(SNIPPETS[md] ?? '');
+      if (md === 'footnote') insertFootnote();
+      else insertBlock(SNIPPETS[md] ?? '');
       return;
     }
     const pop = btn.dataset.pop;
@@ -1937,9 +1956,14 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     gap: 0.8rem;
   }
 
-  /* 삽입 툴바 — 모바일에선 가로 스크롤, 넓은 화면에선 줄바꿈 */
+  /* 삽입 툴바 — 모바일에선 가로 스크롤, 넓은 화면에선 줄바꿈.
+     sticky로 본문을 길게 써도 화면 위에 붙어 따라온다. top은 sticky 사이트 헤더(66px) 바로 아래.
+     z-index는 헤더(50)보다 낮아 헤더가 위를 덮고, 본문 에디터보다는 위에 온다.
+     position:sticky도 절대배치 자식의 기준이므로 .md-popover 위치 계산은 그대로 유효하다. */
   .write-root .md-toolbar {
-    position: relative;
+    position: sticky;
+    top: 66px;
+    z-index: 40;
     padding: 0.5rem;
     border: 1px solid var(--border);
     border-bottom: 0;
@@ -2026,6 +2050,86 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     margin: 0;
     padding: 8px 10px;
     color: var(--text-muted);
+  }
+
+  /* 인라인 서식 버블(B/I/U/S) — 슬래시 메뉴처럼 document.body에 fixed로 붙으므로 전역 선택자. */
+  .injoy-bubble {
+    position: fixed;
+    z-index: 1000;
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  }
+  .injoy-bubble[hidden] {
+    display: none;
+  }
+  .injoy-bubble-btn {
+    min-width: 30px;
+    height: 28px;
+    padding: 0 7px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+  .injoy-bubble-btn:hover {
+    background-color: var(--surface);
+  }
+  .injoy-bubble-btn[aria-pressed='true'] {
+    background-color: var(--accent-weak);
+    color: var(--accent);
+  }
+  .injoy-bubble-btn.bb-b { font-weight: 800; }
+  .injoy-bubble-btn.bb-i { font-style: italic; font-family: Georgia, 'Times New Roman', serif; }
+  .injoy-bubble-btn.bb-u { text-decoration: underline; }
+  .injoy-bubble-btn.bb-s { text-decoration: line-through; }
+
+  /* 이미지 + alt 입력칸 (에디터 안 nodeView). 이미지를 누르면 아래 입력칸이 펼쳐진다. */
+  .write-root .injoy-img {
+    display: inline-block;
+    max-width: 100%;
+  }
+  .write-root .injoy-img > img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .write-root .injoy-img-alt {
+    display: flex;
+    align-items: center;
+    gap: 0.45em;
+    margin-top: 0.35rem;
+    padding: 0.3rem 0.55rem;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .write-root .injoy-img-alt[hidden] {
+    display: none;
+  }
+  .write-root .injoy-img-hint {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+  }
+  .write-root .injoy-img-alt input[type='text'] {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.85rem;
+    border: 0;
+    background: transparent;
+    padding: 0.1rem 0;
   }
 
   @media (prefers-reduced-motion: no-preference) {
