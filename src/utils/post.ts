@@ -89,6 +89,11 @@ export function readingMinutes(post: Post): number {
   return postStats(post).minutes;
 }
 
+/** 본문에 mermaid 다이어그램이 있는가 — 커버 없는 글의 대체 썸네일 판정에 쓴다 */
+export function hasDiagram(post: Post): boolean {
+  return postStats(post).diagrams > 0;
+}
+
 /** "2026. 6. 10." 형식의 발행일 표기 */
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long' }).format(date);
