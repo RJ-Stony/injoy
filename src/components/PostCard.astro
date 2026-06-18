@@ -156,9 +156,11 @@ const diagram = cover ? null : firstDiagram(post);
   );
   if (thumbs.length > 0) {
     const rendered: HTMLElement[] = [];
+    // 렌더를 직렬화한다 — mermaid는 단일 인스턴스라 동시 호출이 겹치면 일부가 실패한다.
+    let chain: Promise<void> = Promise.resolve();
     const drawOne = (el: HTMLElement) => {
-      renderMermaidDiagrams([el]);
       rendered.push(el);
+      chain = chain.then(() => renderMermaidDiagrams([el]));
     };
 
     if ('IntersectionObserver' in window) {
@@ -179,7 +181,7 @@ const diagram = cover ? null : firstDiagram(post);
 
     // 라이트/다크 토글 시 이미 그린 썸네일은 색을 따라오도록 다시 그린다(글 상세와 같은 패턴).
     const rerender = () => {
-      if (rendered.length > 0) renderMermaidDiagrams(rendered);
+      if (rendered.length > 0) chain = chain.then(() => renderMermaidDiagrams(rendered));
     };
     window.addEventListener('injoy:theme-change', rerender);
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rerender);
