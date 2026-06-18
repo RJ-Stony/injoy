@@ -572,7 +572,9 @@ a:hover {
   margin-inline-end: 0.4em;
 }
 
-.prose li:has(> input[type='checkbox']) {
+/* 체크박스 항목의 불릿 제거 — 발행 HTML이 loose 리스트(li > p > input)라
+   직속 자식 셀렉터로는 못 잡으므로 remark-gfm이 붙이는 클래스를 직접 겨냥한다. */
+.prose li.task-list-item {
   list-style: none;
   margin-inline-start: -1.4em;
 }
