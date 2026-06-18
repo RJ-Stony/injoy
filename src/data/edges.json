@@ -29,6 +29,18 @@
       "to": "wysiwyg-editor",
       "type": "extends",
       "note": "wysiwyg-editor가 끝에 남긴 '슬래시 메뉴는 아직 없다'는 숙제를 이어받아 실제로 붙인 다음 이야기"
+    },
+    {
+      "from": "slash-menu",
+      "to": "markdown-styleguide",
+      "type": "related",
+      "note": "슬래시 메뉴로 넣는 블록들이 발행되면 실제로 어떻게 보이는지를 이 가이드에 모아 두었다"
+    },
+    {
+      "from": "wysiwyg-editor",
+      "to": "how-to-write",
+      "type": "related",
+      "note": "보이는 대로 편집으로 바꾼 뒤에도 글을 올리는 전체 절차는 이 글에 그대로 정리해 두었다"
     }
   ]
 }
