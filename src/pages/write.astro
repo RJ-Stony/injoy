@@ -360,7 +360,9 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     $('auth-card').hidden = true;
     $('editor').hidden = false;
     await mountBodyEditor();
-    await Promise.all([loadIndex(), loadPostList()]);
+    // 순차로: loadPostList가 최신순·제목 정렬에 state.index(loadIndex 결과)를 쓰므로 먼저 채운다.
+    await loadIndex();
+    await loadPostList();
     resetForm();
   };
 
@@ -427,9 +429,20 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     picker.length = 1;
     try {
       const list = await gh(`/repos/${CFG.owner}/${CFG.repo}/contents/${CFG.postsDir}?ref=${CFG.branch}`);
-      for (const f of list.filter((f: any) => f.type === 'file' && /\.mdx?$/.test(f.name))) {
-        picker.add(new Option(f.name.replace(/\.mdx?$/, ''), f.name));
-      }
+      const files = list
+        .filter((f: any) => f.type === 'file' && /\.mdx?$/.test(f.name))
+        .map((f: any) => ({ name: f.name, slug: f.name.replace(/\.mdx?$/, '') }));
+      // 표시는 슬러그 대신 제목, 순서는 site-index(발행 최신순)를 따른다.
+      // 색인에 없는 글(초안 등)은 제목을 모르니 슬러그로, 목록 맨 뒤에 둔다(수정은 그대로 가능).
+      const order = new Map<string, number>(state.index.posts.map((p: any, i: number) => [p.slug, i]));
+      const titleOf = new Map<string, string>(state.index.posts.map((p: any) => [p.slug, p.title]));
+      files.sort((a: any, b: any) => {
+        const ia = order.has(a.slug) ? (order.get(a.slug) as number) : Infinity;
+        const ib = order.has(b.slug) ? (order.get(b.slug) as number) : Infinity;
+        return ia !== ib ? ia - ib : a.name.localeCompare(b.name);
+      });
+      // value는 파일명 그대로 유지한다(수정 로드가 파일명에 의존).
+      for (const f of files) picker.add(new Option(titleOf.get(f.slug) ?? f.slug, f.name));
     } catch {
       /* 목록 실패 시 새 글만 가능 */
     }
@@ -1064,7 +1077,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         // 옛 .md가 고아로 남고 중복 점검도 edit 모드라 건너뛴다(이름 변경은 새 글로).
         ($('fm-slug') as HTMLInputElement).disabled = true;
         $('delete-post').hidden = false;
-        await Promise.all([loadIndex(), loadPostList()]);
+        await loadIndex();
+        await loadPostList();
       } else if (ok === 'superseded') {
         status.textContent = '더 최신 발행으로 대체됐어요. 최신 내용이 곧 반영됩니다.';
       } else if (ok === false) {
@@ -1145,7 +1159,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       );
       resetForm(); // resetForm이 상태 문구를 비우므로 성공 메시지는 그 뒤에
       status.textContent = '✓ 삭제 커밋 완료. 곧 사이트에서 사라져요(관련 연결도 함께 정리했어요).';
-      await Promise.all([loadIndex(), loadPostList()]);
+      await loadIndex();
+      await loadPostList();
     } catch (e) {
       status.textContent = `✕ 삭제 실패: ${e}`;
     }
@@ -1530,6 +1545,12 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     appearance: none;
     padding-right: 2.1em;
     cursor: pointer;
+  }
+
+  /* 기존 글 수정 드롭다운은 제목을 보여 주므로 넉넉한 폭(좁은 화면에선 칸 폭에 맞춤) */
+  .write-root #post-picker {
+    min-width: 18rem;
+    max-width: min(28rem, 100%);
   }
 
   .write-root .select-wrap::after {
