@@ -41,6 +41,12 @@
       "to": "how-to-write",
       "type": "related",
       "note": "보이는 대로 편집으로 바꾼 뒤에도 글을 올리는 전체 절차는 이 글에 그대로 정리해 두었다"
+    },
+    {
+      "from": "polish-round",
+      "to": "slash-menu",
+      "type": "extends",
+      "note": "슬래시 메뉴를 붙인 뒤 남은 잔손질을 이어, 쓰는 화면과 읽는 화면을 두루 다듬은 다음 회차"
     }
   ]
 }
