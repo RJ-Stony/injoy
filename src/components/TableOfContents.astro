@@ -75,4 +75,43 @@ const items = headings.filter(
   .toc a:hover {
     color: var(--accent);
   }
+
+  /* 스크롤 스파이 — 지금 보고 있는 섹션의 목차 항목을 포인트 색으로 강조 */
+  .toc a.active {
+    color: var(--accent);
+    font-weight: 600;
+  }
 </style>
+
+<script>
+  // 목차 스크롤 스파이 — 본문을 스크롤할 때 '지금 보고 있는' 섹션의 목차 항목을 강조한다.
+  // box·rail 두 목차가 한 페이지에 있을 수 있어 각 nav.toc를 독립으로 초기화한다.
+  function initToc(nav: HTMLElement) {
+    const links = Array.from(nav.querySelectorAll<HTMLAnchorElement>('a[href^="#"]'));
+    const entries = links
+      .map((a) => ({ a, el: document.getElementById(decodeURIComponent(a.hash.slice(1))) }))
+      .filter((e): e is { a: HTMLAnchorElement; el: HTMLElement } => !!e.el);
+    if (entries.length === 0) return;
+
+    // 활성 기준선: 고정 헤더(66px) 약간 아래. 이 선을 지난 마지막 heading이 '현재'.
+    const LINE = 88;
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      let active = entries[0];
+      for (const e of entries) {
+        if (e.el.getBoundingClientRect().top <= LINE) active = e;
+        else break;
+      }
+      for (const { a } of entries) a.classList.toggle('active', a === active.a);
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    update();
+  }
+
+  document.querySelectorAll<HTMLElement>('nav.toc').forEach(initToc);
+</script>
