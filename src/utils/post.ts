@@ -89,9 +89,25 @@ export function readingMinutes(post: Post): number {
   return postStats(post).minutes;
 }
 
+/**
+ * 본문 첫 mermaid 다이어그램의 소스(펜스 제외)를 돌려준다. 없으면 null.
+ * 커버 없는 글의 카드 썸네일을 이 다이어그램으로 그릴 때 쓴다(postStats와 같은 판정).
+ */
+export function firstDiagram(post: Post): string | null {
+  const { codeBlocks } = splitCode(post.body ?? '');
+  const block = codeBlocks.find((b) => /^\s*`{3,}\s*mermaid/.test(b));
+  if (!block) return null;
+  const lines = block.split('\n');
+  const inner = lines.slice(1); // ```mermaid 헤더 제거
+  // 닫는 펜스(```/~~~)가 있으면 함께 제거 — 안쪽 소스만 남긴다
+  if (inner.length > 0 && /^\s*(`{3,}|~{3,})\s*$/.test(inner[inner.length - 1])) inner.pop();
+  const src = inner.join('\n').trim();
+  return src || null;
+}
+
 /** 본문에 mermaid 다이어그램이 있는가 — 커버 없는 글의 대체 썸네일 판정에 쓴다 */
 export function hasDiagram(post: Post): boolean {
-  return postStats(post).diagrams > 0;
+  return firstDiagram(post) !== null;
 }
 
 /** "2026. 6. 10." 형식의 발행일 표기 */

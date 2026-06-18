@@ -1,7 +1,7 @@
 ---
 import { Image } from 'astro:assets';
 import PostMeta from './PostMeta.astro';
-import { readingMinutes, hasDiagram, type Post } from '../utils/post';
+import { readingMinutes, firstDiagram, type Post } from '../utils/post';
 import { withBase } from '../utils/url';
 
 interface Props {
@@ -11,8 +11,8 @@ interface Props {
 const { post } = Astro.props;
 const href = withBase(`/posts/${post.id}/`);
 const cover = post.data.cover;
-// 커버가 없고 본문에 다이어그램이 있으면, 우리 톤의 도식 썸네일을 대신 보여 준다.
-const showDiagramThumb = !cover && hasDiagram(post);
+// 커버가 없으면 본문 첫 다이어그램(mermaid)을 카드 썸네일로 그린다(둘 다 없으면 썸네일 없음).
+const diagram = cover ? null : firstDiagram(post);
 ---
 
 <article class="post-card">
@@ -28,27 +28,9 @@ const showDiagramThumb = !cover && hasDiagram(post);
       <a class="thumb" href={href} tabindex="-1" aria-hidden="true">
         <Image src={cover} alt="" width={360} height={203} />
       </a>
-    ) : showDiagramThumb ? (
-      <a class="thumb thumb-diagram" href={href} tabindex="-1" aria-hidden="true">
-        <svg viewBox="0 0 360 203" role="img" aria-hidden="true">
-          <g class="edges">
-            <line x1="78" y1="132" x2="150" y2="70" />
-            <line x1="150" y1="70" x2="225" y2="114" />
-            <line x1="78" y1="132" x2="172" y2="160" />
-            <line x1="225" y1="114" x2="172" y2="160" />
-            <line x1="225" y1="114" x2="292" y2="150" />
-            <line x1="225" y1="114" x2="300" y2="74" />
-            <line x1="172" y1="160" x2="292" y2="150" />
-          </g>
-          <g class="nodes">
-            <circle cx="78" cy="132" r="7" />
-            <circle cx="150" cy="70" r="7" />
-            <circle cx="172" cy="160" r="6.5" />
-            <circle cx="292" cy="150" r="6.5" />
-            <circle cx="300" cy="74" r="5.5" />
-          </g>
-          <circle class="accent" cx="225" cy="114" r="11" />
-        </svg>
+    ) : diagram ? (
+      <a class="thumb thumb-mermaid" href={href} tabindex="-1" aria-hidden="true">
+        <div class="mermaid-diagram" data-source={diagram}></div>
       </a>
     ) : null
   }
@@ -92,31 +74,32 @@ const showDiagramThumb = !cover && hasDiagram(post);
     transform: scale(1.03);
   }
 
-  /* 커버 없는 다이어그램 글의 대체 썸네일 — 우리 톤의 점·선 도식(실제 mermaid 아님) */
-  .thumb-diagram {
-    background-color: var(--surface);
-  }
-
-  .thumb-diagram svg {
-    display: block;
+  /* 커버 없는 글의 썸네일 — 본문 첫 mermaid 다이어그램을 박스에 맞춰 그린다(클라이언트 렌더).
+     박스는 커버와 같은 160px·16:9로 고정해 레이아웃이 튀지 않게 하고, SVG는 안에 가둔다. */
+  .thumb-mermaid {
     width: 160px;
     aspect-ratio: 16 / 9;
+    background-color: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.4rem;
+  }
+
+  .thumb-mermaid .mermaid-diagram {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: normal;
+  }
+
+  .thumb-mermaid .mermaid-diagram svg {
+    max-width: 100%;
+    max-height: 100%;
     height: auto;
-  }
-
-  .thumb-diagram .edges line {
-    stroke: var(--border);
-    stroke-width: 1.6;
-  }
-
-  .thumb-diagram .nodes circle {
-    fill: var(--bg);
-    stroke: var(--border);
-    stroke-width: 1.6;
-  }
-
-  .thumb-diagram .accent {
-    fill: var(--accent);
+    display: block;
   }
 
   /* 좁은 화면: 세로로 쌓되 본문(메타·제목·요약)을 먼저, 커버는 그 아래 전체 폭으로 둔다.
@@ -128,8 +111,11 @@ const showDiagramThumb = !cover && hasDiagram(post);
       gap: 0.9rem;
     }
 
-    .thumb img,
-    .thumb-diagram svg {
+    .thumb img {
+      width: 100%;
+    }
+
+    .thumb-mermaid {
       width: 100%;
     }
   }
@@ -159,3 +145,43 @@ const showDiagramThumb = !cover && hasDiagram(post);
     line-height: 1.7;
   }
 </style>
+
+<script>
+  // 커버 없는 글의 카드 썸네일 = 본문 첫 mermaid 다이어그램. 글 상세와 같은 렌더러를 재사용한다.
+  // 목록에 도식 글이 여럿이어도 부담 없게, 카드가 화면에 들어올 때만 그린다(지연 렌더).
+  import { renderMermaidDiagrams } from '../scripts/mermaid-render';
+
+  const thumbs = Array.from(
+    document.querySelectorAll<HTMLElement>('.thumb-mermaid .mermaid-diagram'),
+  );
+  if (thumbs.length > 0) {
+    const rendered: HTMLElement[] = [];
+    const drawOne = (el: HTMLElement) => {
+      renderMermaidDiagrams([el]);
+      rendered.push(el);
+    };
+
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver(
+        (entries, obs) => {
+          for (const e of entries) {
+            if (!e.isIntersecting) continue;
+            drawOne(e.target as HTMLElement);
+            obs.unobserve(e.target);
+          }
+        },
+        { rootMargin: '200px' },
+      );
+      thumbs.forEach((t) => io.observe(t));
+    } else {
+      thumbs.forEach(drawOne);
+    }
+
+    // 라이트/다크 토글 시 이미 그린 썸네일은 색을 따라오도록 다시 그린다(글 상세와 같은 패턴).
+    const rerender = () => {
+      if (rendered.length > 0) renderMermaidDiagrams(rendered);
+    };
+    window.addEventListener('injoy:theme-change', rerender);
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rerender);
+  }
+</script>
