@@ -22,7 +22,9 @@ Astro 5 정적 블로그이자, **사람이 소싱하고 LLM이 집필·연결·
 ## 글쓰기 관습 (엄수)
 
 - **목소리** — 절제된 1인칭 평서문("~다/~한다"). 기존 글(`welcome`·`how-to-write`·
-  `markdown-styleguide`·`wysiwyg-editor`)의 톤을 따른다.
+  `markdown-styleguide`·`slash-menu`·`wysiwyg-editor`)의 톤을 따른다. 말투의 단일 기록처는
+  숨은 `/voice` 노트(`src/pages/voice.astro` — 미게시·noindex, about 맨 아래 🌱로만 닿는다).
+  글이 늘거나 고쳐지면 이 노트를 함께 손봐 말투를 한 결로 유지한다.
 - **카피 규칙** — 엠 대시(—)를 쓰지 않는다(쉼표·괄호·마침표로 푼다). 영문 용어는 한국어로
   풀어 쓴다. 토스급 간결·정확이 기준이다.
 - **윤문** — 새 글이나 다듬을 글은 `/humanize-korean` 스킬로 AI 티를 제거한 뒤 발행한다.

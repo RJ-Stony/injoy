@@ -56,7 +56,12 @@ export default defineConfig({
   site: SITE,
   base: BASE,
   output: 'static',
-  integrations: [mdx(), sitemap(), stripAdmin],
+  integrations: [
+    mdx(),
+    // /voice(말투 노트)는 미게시 페이지 — 사이트맵에서 제외(noindex와 함께 검색 노출 차단)
+    sitemap({ filter: (page) => !page.includes('/voice') }),
+    stripAdmin,
+  ],
   markdown: {
     remarkPlugins: [
       remarkMath, // $인라인$ / $$블록$$ 수식
