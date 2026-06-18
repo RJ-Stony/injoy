@@ -113,11 +113,15 @@ const data = {
       colors.fontFamily = getComputedStyle(document.body).fontFamily;
     };
 
+    // 모바일 등 작은 화면 판정 — 시뮬레이션 부하·정착을 가볍게 조정하는 데 쓴다.
+    const isSmall = () => Math.min(window.innerWidth, window.innerHeight) < 700;
+
     const resize = () => {
       const rect = canvas.parentElement.getBoundingClientRect();
       W = rect.width;
       H = Math.max(360, Math.min(560, Math.round(rect.width * 0.62)));
-      const dpr = window.devicePixelRatio || 1;
+      // 고DPR(모바일 2~3배) 백킹스토어가 매 프레임 칠하는 픽셀을 폭주시키지 않게 2배로 캡
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = W * dpr;
       canvas.height = H * dpr;
       canvas.style.height = `${H}px`;
@@ -168,6 +172,7 @@ const data = {
         e.b.vx -= (dx / d) * f;
         e.b.vy -= (dy / d) * f;
       }
+      const damp = isSmall() ? 0.78 : 0.82; // 작은 화면은 감쇠를 키워 더 빨리 정착(데스크톱 0.82 유지)
       for (const n of nodes) {
         n.vx += (W / 2 - n.x) * GRAVITY;
         n.vy += (H / 2 - n.y) * GRAVITY;
@@ -176,8 +181,8 @@ const data = {
           n.vy = 0;
           continue;
         }
-        n.vx *= 0.82;
-        n.vy *= 0.82;
+        n.vx *= damp;
+        n.vy *= damp;
         n.x += n.vx;
         n.y += n.vy;
         const m = 24;
@@ -267,12 +272,18 @@ const data = {
 
     let running = false;
     let calmFrames = 0;
+    let frames = 0;
     const loop = () => {
+      frames++;
       tick();
       draw();
       const energy = nodes.reduce((s, n) => s + Math.abs(n.vx) + Math.abs(n.vy), 0);
       calmFrames = energy < 0.5 ? calmFrames + 1 : 0;
-      if (calmFrames > 30 && !dragging) {
+      const calmLimit = isSmall() ? 18 : 30; // 작은 화면은 더 일찍 멈춰 rAF 루프를 끝낸다
+      // 중력·척력 균형 탓에 에너지가 0까지 안 떨어질 수 있다 → 프레임 상한을 backstop으로 둬
+      // 배치가 자리 잡으면 루프를 끝낸다(무한 rAF·모바일 발열/미세 떨림 방지). 드래그 중엔 유지.
+      const maxFrames = isSmall() ? 180 : 300;
+      if ((calmFrames > calmLimit || frames > maxFrames) && !dragging) {
         running = false;
         return;
       }
@@ -285,6 +296,7 @@ const data = {
         return;
       }
       calmFrames = 0;
+      frames = 0;
       if (!running) {
         running = true;
         requestAnimationFrame(loop);
