@@ -1,11 +1,12 @@
 ---
 /**
- * 시그니처 메타 라인 — 카테고리 라벨 + 발행일 + (수정일) + 읽는 시간 + (연결 수).
- * 날짜는 잔잔한 본문 글씨로, 통계(읽기·연결·조회)는 아이콘 칩으로 위계를 준다.
- * 글 카드와 글 상단에서 같은 모습으로 쓰인다(connections·updatedDate·stack은 상세에서만).
- * stack=true면 좁은 화면에서 '날짜 줄'과 '통계 줄'을 또렷한 두 줄로 나눈다.
+ * 시그니처 메타 라인 — 카테고리 라벨 + 발행일 + (수정일) + (통계 칩).
+ * 날짜는 잔잔한 본문 글씨로, 통계(읽기·연결)는 아이콘 칩으로 위계를 준다.
+ * 글 카드에선 통계를 함께 보여 주고(showStats=true), 글 상단에선 통계를 따로
+ * 배치하므로 showStats=false로 카테고리·날짜만 그린다.
  */
 import { formatDate, isoDate } from '../utils/post';
+import PostStats from './PostStats.astro';
 
 interface Props {
   category: string;
@@ -15,13 +16,12 @@ interface Props {
   connections?: number;
   /** 발행일과 다를 때만 '수정'으로 표시 */
   updatedDate?: Date;
-  /** 글 상세에서 모바일 두 줄 그룹 배치를 켠다 */
-  stack?: boolean;
+  /** false면 통계 칩을 빼고 카테고리·날짜만 — 글 상단처럼 통계를 따로 배치할 때 */
+  showStats?: boolean;
 }
 
-const { category, pubDate, minutes, connections, updatedDate, stack } = Astro.props;
+const { category, pubDate, minutes, connections, updatedDate, showStats = true } = Astro.props;
 const showUpdated = !!updatedDate && updatedDate.getTime() !== pubDate.getTime();
-const connCount = connections ?? 0;
 ---
 
 <div class="post-meta">
@@ -34,27 +34,7 @@ const connCount = connections ?? 0;
       </time>
     )
   }
-  {stack && <span class="m-break" aria-hidden="true"></span>}
-  <span class="meta-stat" aria-label={`${minutes}분 읽기`}>
-    <svg class="ic" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="9"></circle>
-      <path d="M12 7.5V12l3 1.8"></path>
-    </svg>
-    {minutes}분
-  </span>
-  {
-    connCount > 0 && (
-      <a class="meta-stat conn" href="#connections" aria-label={`연결된 글 ${connCount}개`}>
-        <svg class="ic" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="6" cy="12" r="2.6" />
-          <circle cx="18" cy="6" r="2.6" />
-          <circle cx="18" cy="18" r="2.6" />
-          <path d="m8.3 10.9 7.4-3.8M8.3 13.1l7.4 3.8" />
-        </svg>
-        {connCount}
-      </a>
-    )
-  }
+  {showStats && <PostStats minutes={minutes} connections={connections} />}
 </div>
 
 <style>
@@ -86,61 +66,5 @@ const connCount = connections ?? 0;
     content: '·';
     margin: 0 0.45em;
     color: var(--border);
-  }
-
-  /* 통계 칩 — 아이콘 + 숫자. 가운뎃점 대신 아이콘과 간격으로 구분한다 */
-  .meta-stat {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.32em;
-    margin-left: 0.85em;
-    white-space: nowrap;
-  }
-
-  .meta-stat .ic {
-    width: 1.02em;
-    height: 1.02em;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    opacity: 0.7;
-    flex-shrink: 0;
-  }
-
-  /* 연결 수 — 그래프임을 헤더에서 바로 드러내는 신호. 누르면 하단 '연결된 글'로 */
-  .conn {
-    color: var(--text-muted);
-    font-weight: 600;
-  }
-
-  .conn:hover {
-    color: var(--accent);
-    text-decoration: none;
-  }
-
-  .conn:hover .ic {
-    opacity: 1;
-  }
-
-  /* 모바일 강제 줄바꿈자 — 기본은 숨김(데스크톱·카드는 한 줄로) */
-  .m-break {
-    display: none;
-  }
-
-  /* 통계 칩은 오른쪽으로 붙인다 — 날짜는 왼쪽, 통계는 오른쪽.
-     첫 통계 칩의 auto 여백이 데스크톱 한 줄에선 양끝 정렬을,
-     모바일 둘째 줄에선 통계 묶음의 우측 정렬을 만든다. */
-  .m-break + .meta-stat {
-    margin-left: auto;
-  }
-
-  /* 좁은 화면: 날짜 줄(발행·수정)과 통계 줄(읽기·연결·조회)로 또렷이 나눈다 */
-  @media (max-width: 540px) {
-    .m-break {
-      display: block;
-      flex: 0 0 100%;
-      height: 0;
-    }
   }
 </style>

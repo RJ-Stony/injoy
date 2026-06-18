@@ -3,6 +3,7 @@ import { render } from 'astro:content';
 import { Image } from 'astro:assets';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PostMeta from '../../components/PostMeta.astro';
+import PostStats from '../../components/PostStats.astro';
 import TableOfContents from '../../components/TableOfContents.astro';
 import ViewCount from '../../components/ViewCount.astro';
 import ReadingPath from '../../components/ReadingPath.astro';
@@ -36,15 +37,17 @@ const connections = await getConnections(post.id);
   <div class="post-grid">
   <article class="post" data-pagefind-body>
     <header class="post-header">
-      <div class="meta-row" data-pagefind-ignore>
+      <div class="meta-line" data-pagefind-ignore>
         <PostMeta
           category={post.data.category}
           pubDate={post.data.pubDate}
           minutes={minutes}
-          connections={connections.length}
           updatedDate={post.data.updatedDate}
-          stack
+          showStats={false}
         />
+      </div>
+      <div class="meta-stats" data-pagefind-ignore>
+        <PostStats minutes={minutes} connections={connections.length} />
         <ViewCount slug={post.id} />
       </div>
       <h1>{post.data.title}</h1>
@@ -234,22 +237,39 @@ const connections = await getConnections(post.id);
     }
   }
 
-  .meta-row {
-    display: flex;
+  /* 글 머리: 데스크톱은 한 줄에 [날짜 | 통계], 그 아래 제목·설명·커버.
+     모바일은 통계를 제목 아래로 내려 위 날짜·카테고리와 위계를 분리한다. */
+  .post-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    flex-wrap: wrap;
-    column-gap: 0;
-    row-gap: 0.4em;
+    column-gap: 0.75rem;
   }
 
-  /* PostMeta의 박스를 풀어 그 안의 날짜·통계 칩과 줄바꿈자가 메타 줄의 직접 항목이 되게 한다.
-     ViewCount는 그 자체가 칩(.meta-stat)이라 일반 항목으로 두면 통계 줄에 자연히 합류한다.
-     항목 간격은 가운뎃점(::before)과 칩의 margin-left가 책임진다. */
-  .meta-row :global(.post-meta) {
-    display: contents;
+  .meta-line {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .meta-stats {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4em 0.85em;
+  }
+
+  /* 통계 그룹 안에서는 간격을 gap이 책임지므로 칩의 기본 좌여백을 없앤다 */
+  .meta-stats :global(.meta-stat) {
+    margin-left: 0;
   }
 
   .post-header h1 {
+    grid-column: 1 / -1;
+    grid-row: 2;
     margin: 0.8rem 0 0.5rem;
     font-size: clamp(1.7rem, 5vw, 2.2rem);
     font-weight: 800;
@@ -258,16 +278,53 @@ const connections = await getConnections(post.id);
   }
 
   .post-header .description {
+    grid-column: 1 / -1;
+    grid-row: 3;
     margin: 0;
     color: var(--text-muted);
     line-height: 1.7;
   }
 
   .post-header .cover {
+    grid-column: 1 / -1;
+    grid-row: 4;
     margin-top: 1.5rem;
     border-radius: var(--radius);
     width: 100%;
     height: auto;
+  }
+
+  /* 좁은 화면: 통계를 제목 아래 줄로 내린다(날짜·카테고리는 위에 그대로). */
+  @media (max-width: 540px) {
+    .post-header {
+      grid-template-columns: 1fr;
+    }
+
+    .meta-line {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .post-header h1 {
+      grid-column: 1;
+      grid-row: 2;
+    }
+
+    .post-header .description {
+      grid-column: 1;
+      grid-row: 3;
+    }
+
+    .meta-stats {
+      grid-column: 1;
+      grid-row: 4;
+      justify-self: start;
+    }
+
+    .post-header .cover {
+      grid-column: 1;
+      grid-row: 5;
+    }
   }
 
   .post-footer {

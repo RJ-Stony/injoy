@@ -1,0 +1,76 @@
+---
+/**
+ * 통계 칩 — 읽는 시간 + (연결 수). 아이콘 + 숫자 형태.
+ * 글 카드(PostMeta 안)와 글 상단(통계 그룹)에서 같은 모습으로 재사용한다.
+ * ViewCount(조회수 칩)와 한 줄에 자연스럽게 어울리도록 같은 .meta-stat 모양을 쓴다.
+ */
+interface Props {
+  minutes: number;
+  /** 글 상세에서만 넘긴다. 0이면 표시하지 않음 */
+  connections?: number;
+}
+
+const { minutes, connections } = Astro.props;
+const connCount = connections ?? 0;
+---
+
+<span class="meta-stat" aria-label={`${minutes}분 읽기`}>
+  <svg class="ic" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <circle cx="12" cy="12" r="9"></circle>
+    <path d="M12 7.5V12l3 1.8"></path>
+  </svg>
+  {minutes}분
+</span>
+{
+  connCount > 0 && (
+    <a class="meta-stat conn" href="#connections" aria-label={`연결된 글 ${connCount}개`}>
+      <svg class="ic" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="6" cy="12" r="2.6" />
+        <circle cx="18" cy="6" r="2.6" />
+        <circle cx="18" cy="18" r="2.6" />
+        <path d="m8.3 10.9 7.4-3.8M8.3 13.1l7.4 3.8" />
+      </svg>
+      {connCount}
+    </a>
+  )
+}
+
+<style>
+  /* 통계 칩 — 아이콘 + 숫자. 항목 사이는 margin-left로 띄운다(카드에서 날짜 뒤에 붙을 때 필요).
+     통계 그룹(.meta-stats) 안에 모일 때는 부모가 margin-left를 0으로 덮고 gap으로 간격을 준다. */
+  .meta-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.32em;
+    margin-left: 0.85em;
+    white-space: nowrap;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+
+  .meta-stat .ic {
+    width: 1.02em;
+    height: 1.02em;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.7;
+    flex-shrink: 0;
+  }
+
+  /* 연결 수 — 그래프임을 헤더에서 바로 드러내는 신호. 누르면 하단 '연결된 글'로 */
+  .conn {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .conn:hover {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .conn:hover .ic {
+    opacity: 1;
+  }
+</style>
