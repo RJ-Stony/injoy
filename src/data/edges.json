@@ -47,6 +47,12 @@
       "to": "slash-menu",
       "type": "extends",
       "note": "슬래시 메뉴를 붙인 뒤 남은 잔손질을 이어, 쓰는 화면과 읽는 화면을 두루 다듬은 다음 회차"
+    },
+    {
+      "from": "polish-round-2",
+      "to": "polish-round",
+      "type": "extends",
+      "note": "지난 다듬기 회차를 이어받아 쓰고 읽는 화면을 또 깎고, 카테고리로 모아 보는 길까지 낸 다음 회차"
     }
   ]
 }
