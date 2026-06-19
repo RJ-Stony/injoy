@@ -14,6 +14,19 @@ export async function getPublishedPosts(): Promise<Post[]> {
   return posts.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 }
 
+/**
+ * 발행된 글의 카테고리 목록 — 고유 카테고리와 글 수. 글 많은 순, 같으면 가나다순.
+ * 헤더 카테고리 메뉴와 /categories/[category] 라우트가 함께 쓴다.
+ */
+export async function getCategories(): Promise<{ name: string; count: number }[]> {
+  const posts = await getPublishedPosts();
+  const counts = new Map<string, number>();
+  for (const p of posts) counts.set(p.data.category, (counts.get(p.data.category) ?? 0) + 1);
+  return [...counts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'ko'));
+}
+
 /** 본문 통계 — 읽는 시간 계산과 '만듦새' 패널이 함께 쓰는 단일 출처 */
 export interface PostStats {
   /** 읽는 시간(분) */

@@ -3,6 +3,7 @@ import 'katex/dist/katex.min.css';
 import { Image } from 'astro:assets';
 import ThemeToggle from '../components/ThemeToggle.astro';
 import { withBase } from '../utils/url';
+import { getCategories } from '../utils/post';
 import profile from '../assets/profile.jpg';
 
 interface Props {
@@ -21,6 +22,8 @@ const ogImageURL = ogImage ? new URL(ogImage, Astro.site) : undefined;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const siteName = 'Injoy';
 const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
+// 헤더 카테고리 메뉴 — 데스크톱 드롭다운과 모바일 햄버거가 함께 쓴다(빌드 시 1회).
+const categories = await getCategories();
 ---
 
 <!doctype html>
@@ -92,28 +95,116 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
           <span>Injoy</span>
         </a>
         <div class="header-actions">
-          <nav aria-label="주 메뉴">
+          <nav class="nav-desktop" aria-label="주 메뉴">
+            <a class="write-link" href={withBase('/write/')} hidden>글쓰기</a>
             <a href={withBase('/search/')}>검색</a>
             <a href={withBase('/graph/')}>그래프</a>
+            <div class="cat-dd">
+              <button type="button" class="cat-dd-btn" aria-haspopup="true" aria-expanded="false">
+                카테고리<span class="caret" aria-hidden="true"></span>
+              </button>
+              <div class="cat-dd-menu" role="menu" hidden>
+                {
+                  categories.map((c) => (
+                    <a role="menuitem" href={withBase(`/categories/${c.name}/`)}>
+                      <span>{c.name}</span>
+                      <span class="cat-count">{c.count}</span>
+                    </a>
+                  ))
+                }
+              </div>
+            </div>
             <a href={withBase('/about/')}>About</a>
           </nav>
-          <!-- 글쓰기 버튼: 이 기기에 발행 토큰이 있을 때만 보인다 (운영자 전용) -->
-          <script is:inline define:vars={{ writeUrl: withBase('/write/') }}>
-            try {
-              if (localStorage.getItem('injoy-gh-token')) {
-                const nav = document.currentScript.previousElementSibling;
-                const link = document.createElement('a');
-                link.href = writeUrl;
-                link.textContent = '글쓰기';
-                link.className = 'write-link';
-                nav.prepend(link);
-              }
-            } catch {}
-          </script>
+
+          <button
+            type="button"
+            class="nav-toggle"
+            aria-label="메뉴 열기"
+            aria-expanded="false"
+            aria-controls="mobile-menu"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            >
+              <path d="M4 7h16M4 12h16M4 17h16"></path>
+            </svg>
+          </button>
+
           <ThemeToggle />
         </div>
       </div>
+
+      <!-- 모바일: 메뉴 + 카테고리를 한 패널에 모은다(헤더 밖 absolute라 폭을 늘리지 않는다) -->
+      <div id="mobile-menu" class="mobile-menu" role="navigation" aria-label="모바일 메뉴" hidden>
+        <a class="write-link" href={withBase('/write/')} hidden>글쓰기</a>
+        <a href={withBase('/search/')}>검색</a>
+        <a href={withBase('/graph/')}>그래프</a>
+        <a href={withBase('/about/')}>About</a>
+        <div class="mm-sep"></div>
+        <p class="mm-label">카테고리</p>
+        {
+          categories.map((c) => (
+            <a href={withBase(`/categories/${c.name}/`)}>
+              <span>{c.name}</span>
+              <span class="cat-count">{c.count}</span>
+            </a>
+          ))
+        }
+      </div>
     </header>
+
+    <!-- 글쓰기 링크: 이 기기에 발행 토큰이 있을 때만 보인다(운영자 전용). 두 메뉴 모두 적용. -->
+    <script is:inline>
+      try {
+        if (localStorage.getItem('injoy-gh-token')) {
+          document.querySelectorAll('a.write-link').forEach((a) => {
+            a.hidden = false;
+          });
+        }
+      } catch {}
+    </script>
+
+    <script>
+      // 헤더 메뉴 토글: 카테고리 드롭다운(데스크톱) + 햄버거(모바일).
+      // 바깥 클릭·Esc·패널 내부 링크 클릭 시 닫는다.
+      function wire(btn: HTMLElement | null, panel: HTMLElement | null) {
+        if (!btn || !panel) return;
+        const close = () => {
+          panel.hidden = true;
+          btn.setAttribute('aria-expanded', 'false');
+        };
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const willOpen = panel.hidden;
+          panel.hidden = !willOpen;
+          btn.setAttribute('aria-expanded', String(willOpen));
+        });
+        panel.addEventListener('click', (e) => {
+          if ((e.target as HTMLElement).closest('a')) close();
+        });
+        document.addEventListener('click', (e) => {
+          const t = e.target as Node;
+          if (!panel.hidden && !panel.contains(t) && !btn.contains(t)) close();
+        });
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') close();
+        });
+      }
+      wire(
+        document.querySelector<HTMLElement>('.cat-dd-btn'),
+        document.querySelector<HTMLElement>('.cat-dd-menu'),
+      );
+      wire(
+        document.querySelector<HTMLElement>('.nav-toggle'),
+        document.querySelector<HTMLElement>('#mobile-menu'),
+      );
+    </script>
 
     <main id="main" class:list={[{ wide }]}>
       <slot />
@@ -264,6 +355,159 @@ const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
   .site-header nav :global(a.write-link:hover) {
     color: var(--accent);
     text-decoration: none;
+  }
+
+  /* ---------- 카테고리 드롭다운(데스크톱) ---------- */
+  .site-header .cat-dd {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .site-header .cat-dd-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 500;
+    font-size: 0.95rem;
+    color: var(--text-muted);
+  }
+
+  .site-header .cat-dd-btn:hover {
+    color: var(--accent);
+  }
+
+  .site-header .cat-dd-btn .caret {
+    width: 0.42em;
+    height: 0.42em;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: translateY(-2px) rotate(45deg);
+    transition: transform 0.15s ease;
+  }
+
+  .site-header .cat-dd-btn[aria-expanded='true'] .caret {
+    transform: translateY(1px) rotate(-135deg);
+  }
+
+  .site-header .cat-dd-menu {
+    position: absolute;
+    top: calc(100% + 0.7rem);
+    right: 0;
+    min-width: 11rem;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 0.4rem;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    z-index: 60;
+  }
+
+  .site-header .cat-dd-menu a,
+  .site-header .mobile-menu a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: 7px;
+    color: var(--text);
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+
+  .site-header .cat-dd-menu a:hover,
+  .site-header .mobile-menu a:hover {
+    background-color: var(--accent-weak);
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  /* display:flex가 hidden 속성을 덮지 않도록 — 글쓰기 링크는 토큰 있을 때만 보인다 */
+  .site-header .cat-dd-menu a[hidden],
+  .site-header .mobile-menu a[hidden] {
+    display: none;
+  }
+
+  .site-header .cat-dd-menu .cat-count,
+  .site-header .mobile-menu .cat-count {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+
+  /* ---------- 햄버거(모바일) ---------- */
+  .site-header .nav-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    color: var(--text);
+  }
+
+  .site-header .nav-toggle svg {
+    width: 1.45rem;
+    height: 1.45rem;
+  }
+
+  .site-header .mobile-menu {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    right: 0.8rem;
+    min-width: 12rem;
+    max-width: calc(100vw - 1.6rem);
+    max-height: calc(100vh - 5rem);
+    overflow-y: auto;
+    padding: 0.5rem;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+    z-index: 60;
+  }
+
+  .site-header .mobile-menu a {
+    font-size: 0.95rem;
+    padding: 0.55rem 0.7rem;
+  }
+
+  .site-header .mobile-menu .mm-sep {
+    height: 1px;
+    margin: 0.4rem 0.3rem;
+    background-color: var(--border);
+  }
+
+  .site-header .mobile-menu .mm-label {
+    margin: 0.3rem 0.7rem 0.15rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  /* 좁은 화면: 인라인 메뉴를 햄버거로 접는다(카테고리가 늘어도 헤더가 안 깨진다) */
+  @media (max-width: 640px) {
+    .site-header .nav-desktop {
+      display: none;
+    }
+
+    .site-header .nav-toggle {
+      display: inline-flex;
+    }
+  }
+
+  /* 넓은 화면에선 모바일 패널이 떠 있지 않게 확실히 숨긴다 */
+  @media (min-width: 641px) {
+    .site-header .mobile-menu {
+      display: none !important;
+    }
   }
 
   main {
