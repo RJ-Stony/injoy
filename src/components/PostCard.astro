@@ -17,7 +17,12 @@ const diagram = cover ? null : firstDiagram(post);
 
 <article class="post-card">
   <div class="text">
-    <PostMeta category={post.data.category} pubDate={post.data.pubDate} minutes={readingMinutes(post)} />
+    <PostMeta
+      category={post.data.category}
+      pubDate={post.data.pubDate}
+      minutes={readingMinutes(post)}
+      viewSlug={post.id}
+    />
     <h2 class="title">
       <a href={href}>{post.data.title}</a>
     </h2>

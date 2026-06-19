@@ -6,7 +6,9 @@
  * 배치하므로 showStats=false로 카테고리·날짜만 그린다.
  */
 import { formatDate, isoDate } from '../utils/post';
+import { withBase } from '../utils/url';
 import PostStats from './PostStats.astro';
+import ViewCount from './ViewCount.astro';
 
 interface Props {
   category: string;
@@ -18,14 +20,24 @@ interface Props {
   updatedDate?: Date;
   /** false면 통계 칩을 빼고 카테고리·날짜만 — 글 상단처럼 통계를 따로 배치할 때 */
   showStats?: boolean;
+  /** 넘기면 읽기 시간 옆에 조회수 칩을 함께 — 홈 목록용(카운트는 올리지 않고 조회만) */
+  viewSlug?: string;
 }
 
-const { category, pubDate, minutes, connections, updatedDate, showStats = true } = Astro.props;
+const {
+  category,
+  pubDate,
+  minutes,
+  connections,
+  updatedDate,
+  showStats = true,
+  viewSlug,
+} = Astro.props;
 const showUpdated = !!updatedDate && updatedDate.getTime() !== pubDate.getTime();
 ---
 
 <div class="post-meta">
-  <span class="category">{category}</span>
+  <a class="category" href={withBase(`/categories/${category}/`)}>{category}</a>
   <time class="m-date" datetime={isoDate(pubDate)}>{formatDate(pubDate)}</time>
   {
     showUpdated && (
@@ -35,6 +47,7 @@ const showUpdated = !!updatedDate && updatedDate.getTime() !== pubDate.getTime()
     )
   }
   {showStats && <PostStats minutes={minutes} connections={connections} />}
+  {showStats && viewSlug && <ViewCount slug={viewSlug} increment={false} />}
 </div>
 
 <style>
@@ -55,6 +68,11 @@ const showUpdated = !!updatedDate && updatedDate.getTime() !== pubDate.getTime()
     font-weight: 600;
     padding: 0.1em 0.6em;
     border-radius: 999px;
+  }
+
+  a.category:hover {
+    background-color: color-mix(in srgb, var(--accent) 16%, var(--accent-weak));
+    text-decoration: none;
   }
 
   /* 날짜 — 잔잔한 글씨. 항목 사이 가운뎃점은 ::before라 줄 맨 앞엔 오지 않는다 */
