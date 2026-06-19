@@ -3,8 +3,8 @@ import type { MarkdownHeading } from 'astro';
 
 interface Props {
   headings: MarkdownHeading[];
-  /** box: 본문 상단 카드형(기본) / rail: 데스크톱 사이드바용 미니멀 레일 */
-  variant?: 'box' | 'rail';
+  /** box: 본문 상단 카드형(기본) / rail: 데스크톱 사이드바 / dots: 모바일 우측 점 인디케이터 */
+  variant?: 'box' | 'rail' | 'dots';
 }
 
 const { headings, variant = 'box' } = Astro.props;
@@ -16,12 +16,15 @@ const items = headings.filter(
 
 {
   items.length > 0 && (
-    <nav class:list={['toc', variant]} aria-label="목차">
-      <p class="toc-title">목차</p>
+    <nav class:list={['toc', variant]} aria-label={variant === 'dots' ? '섹션 바로가기' : '목차'}>
+      {variant !== 'dots' && <p class="toc-title">목차</p>}
       <ul>
         {items.map((h) => (
           <li class={`depth-${h.depth}`}>
-            <a href={`#${h.slug}`}>{h.text}</a>
+            <a href={`#${h.slug}`}>
+              <span class="toc-dot" aria-hidden="true" />
+              <span class="toc-label">{h.text}</span>
+            </a>
           </li>
         ))}
       </ul>
@@ -80,6 +83,114 @@ const items = headings.filter(
   .toc a.active {
     color: var(--accent);
     font-weight: 600;
+  }
+
+  /* 점은 dots 변형에서만 — box·rail에선 제목 텍스트만 보인다 */
+  .toc-dot {
+    display: none;
+  }
+
+  /* ---------- dots: 우측 가장자리 고정 점 인디케이터(모바일·태블릿) ---------- */
+  .toc.dots {
+    position: fixed;
+    top: 50%;
+    right: 0.5rem;
+    transform: translateY(-50%);
+    z-index: 40;
+    /* 점 사이 빈 공간은 클릭이 본문으로 통과하게 — 점만 잡는다 */
+    pointer-events: none;
+  }
+
+  .toc.dots ul {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-end;
+  }
+
+  .toc.dots li {
+    margin: 0;
+  }
+
+  /* dots에선 하위 섹션 들여쓰기를 무시한다(점만 작게 구분) */
+  .toc.dots li.depth-3 {
+    padding-inline-start: 0;
+  }
+
+  .toc.dots a {
+    pointer-events: auto;
+    position: relative;
+    display: block;
+    padding: 0.22rem 0.15rem;
+  }
+
+  .toc.dots .toc-dot {
+    display: block;
+    width: 0.46rem;
+    height: 0.46rem;
+    border-radius: 50%;
+    background-color: var(--border);
+    transition:
+      background-color 0.15s ease,
+      transform 0.15s ease;
+  }
+
+  .toc.dots li.depth-3 .toc-dot {
+    width: 0.34rem;
+    height: 0.34rem;
+  }
+
+  .toc.dots a:hover .toc-dot,
+  .toc.dots a.active .toc-dot {
+    background-color: var(--accent);
+  }
+
+  .toc.dots a.active .toc-dot {
+    transform: scale(1.35);
+    box-shadow: 0 0 0 3px var(--accent-weak);
+  }
+
+  /* 제목은 평소 숨고, 점에 호버·포커스하면 점 왼쪽에 칩으로 뜬다(레이아웃엔 영향 없음) */
+  .toc.dots .toc-label {
+    position: absolute;
+    right: calc(100% + 0.4rem);
+    top: 50%;
+    max-width: 46vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    background-color: var(--text);
+    color: var(--bg);
+    font-size: 0.76rem;
+    line-height: 1.3;
+    opacity: 0;
+    transform: translateY(-50%) translateX(0.3rem);
+    transition:
+      opacity 0.12s ease,
+      transform 0.12s ease;
+    pointer-events: none;
+  }
+
+  .toc.dots a:hover .toc-label,
+  .toc.dots a:focus-visible .toc-label {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+
+  /* 와이드 화면에선 우측 sticky 레일(.toc-aside)이 있으므로 점 인디케이터는 숨긴다 */
+  @media (min-width: 1100px) {
+    .toc.dots {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toc.dots .toc-dot,
+    .toc.dots .toc-label {
+      transition: none;
+    }
   }
 </style>
 
