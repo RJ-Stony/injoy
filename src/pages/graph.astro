@@ -212,16 +212,12 @@ const data = {
         const isTag = e.to.startsWith('tag:');
         const isMention = e.type === 'mentions';
         const faint = isTag || isMention;
-        // 색: 타입별 단일 토큰. 태그·언급은 약하게(회색), 명시 타입은 제 색.
-        const stroke = isTag
-          ? colors.border
-          : isMention
-            ? colors.muted
-            : colors.edge[e.type] || colors.accent;
+        // 색: 타입별 단일 토큰. 태그·언급은 약한 회색(흰 배경에서도 보이게 muted), 명시 타입은 제 색.
+        const stroke = faint ? colors.muted : colors.edge[e.type] || colors.accent;
         // 형태: 언급·태그는 잔점선, 반박(contradicts)은 긴 점선(색 없이도 '긴장'을 구분), 그 외 실선.
         const dash = faint ? [4, 4] : e.type === 'contradicts' ? [9, 5] : [];
         const strong = hl && hl.set.has(e.a.id) && hl.set.has(e.b.id);
-        const alpha = Math.min(fade(e.a.id), fade(e.b.id)) * (faint ? 0.55 : 0.95);
+        const alpha = Math.min(fade(e.a.id), fade(e.b.id)) * (faint ? 0.7 : 0.95);
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.strokeStyle = stroke;
