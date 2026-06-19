@@ -740,19 +740,36 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         renderSuggestions();
       });
 
-      const main = document.createElement('div');
-      main.className = 'sug-main';
-      main.append(
+      // 한 줄(타입·제목·빼기) + 그 아래 편집 가능한 메모칸. 기존 메모도 여기서 바로 고친다.
+      const row = document.createElement('div');
+      row.className = 'sug-row';
+      row.append(
+        wrap,
         Object.assign(document.createElement('span'), {
           textContent: p?.title ?? e.to,
           className: 'sug-title',
         }),
+        rm,
       );
-      if (e.note) {
-        main.append(Object.assign(document.createElement('span'), { textContent: e.note, className: 'muted' }));
-      }
-      li.append(wrap, main, rm);
+
+      const note = document.createElement('textarea');
+      note.className = 'sug-note';
+      note.rows = 1;
+      note.placeholder = '메모(선택)';
+      note.setAttribute('aria-label', '연결 메모');
+      note.value = e.note ?? '';
+      const grow = () => {
+        note.style.height = 'auto';
+        if (note.scrollHeight) note.style.height = `${note.scrollHeight}px`;
+      };
+      note.addEventListener('input', () => {
+        e.note = note.value.trim() || undefined;
+        grow();
+      });
+
+      li.append(row, note);
       ul.appendChild(li);
+      grow();
     }
 
     // 읽기 전용: 이 글로 '들어오는' 명시 연결 + 위키링크 '언급'(양방향).
@@ -1547,10 +1564,20 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     cursor: pointer;
   }
 
-  /* 기존 글 수정 드롭다운은 제목을 보여 주므로 넉넉한 폭(좁은 화면에선 칸 폭에 맞춤) */
+  /* 기존 글 수정 드롭다운은 제목을 보여 주므로 넉넉한 폭. 단 좁은 화면에선 칸을
+     뚫지 않도록 줄어들고(min-width:0), 넘치는 제목은 …로 자른다(펼치면 전체가 보인다). */
+  .write-root .top-actions .select-wrap {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 28rem;
+  }
+
   .write-root #post-picker {
-    min-width: 18rem;
-    max-width: min(28rem, 100%);
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .write-root .select-wrap::after {
@@ -2518,6 +2545,35 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   .write-root .suggestions button {
     font-size: 0.8rem;
     padding: 0.3em 0.8em;
+  }
+
+  /* 수락한 연결: 한 줄(타입·제목·빼기) + 아래 한 줄 메모칸(길면 줄바꿈). */
+  .write-root .suggestions li.accepted {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .write-root .suggestions .sug-row {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+  }
+
+  .write-root .suggestions .sug-row .sug-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .write-root .suggestions .sug-note {
+    width: 100%;
+    resize: none;
+    overflow: hidden;
+    font-size: 0.82rem;
+    line-height: 1.5;
   }
 
   /* 읽기 전용 연결(들어오는 엣지·언급) — 편집 컨트롤 없이 회색으로 구분 */
