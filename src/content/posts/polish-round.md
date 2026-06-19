@@ -1,8 +1,8 @@
 ---
-title: "여러 기능을 다듬는 과정 속에서의 즐거움"
-description: "새 기능을 추가하기보단, 읽고 쓰는 화면의 모서리를 깎아낸 과정들"
+title: "아직 완벽해지기엔 멀었다 !! 그래프 뷰를 다듬는 과정 속에서의 즐거움"
+description: "새 기능을 추가하기보단, 읽고 쓰는 화면의 문제들을 깎아낸 과정들"
 pubDate: 2026-06-18
-updatedDate: 2026-06-19
+updatedDate: 2026-06-20
 category: "개발"
 tags: ["에디터", "ui", "그래프"]
 draft: false
