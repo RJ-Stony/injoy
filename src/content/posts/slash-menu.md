@@ -1,5 +1,5 @@
 ---
-title: "'/' 한 번이면 메뉴가 뜬다: Notion식 슬래시 붙이기"
+title: "'/' 한 번으로 블록을 넣는 Notion식 슬래시 메뉴"
 description: "슬래시와 툴바가 같은 길로 흐르게, 한글 조합은 안 깨지게"
 pubDate: 2026-06-17
 updatedDate: 2026-06-20

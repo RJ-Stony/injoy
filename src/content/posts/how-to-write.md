@@ -1,5 +1,5 @@
 ---
-title: "글 올리기가 귀찮아서 - 파일 하나로 끝내버리는 발행 구조"
+title: "글 올리기가 귀찮아서 만든 발행 구조"
 description: "관리자 페이지도 데이터베이스도 없이, 마크다운 파일 하나 추가하면 발행되는 흐름"
 pubDate: 2026-06-09
 updatedDate: 2026-06-20
@@ -44,7 +44,7 @@ frontmatter가 채워진 파일이 `draft: true` 상태로 생성된다. 초안�
 title: "글 제목"
 description: "목록·검색·공유 미리보기에 쓰이는 한 줄 요약"
 pubDate: 2026-06-10
-category: "개발"
+category: "블로그"
 tags: ["astro", "blog"]
 draft: false
 ---
@@ -55,7 +55,7 @@ draft: false
 | `title`       | ✅  | 글 제목                               |
 | `description` | ✅  | 한 줄 요약. 홈 카드와 OG 태그에 쓰인다           |
 | `pubDate`     | ✅  | 발행일 (`YYYY-MM-DD`)                 |
-| `category`    | ✅  | 카테고리 라벨 (예: 개발, 회고, 데이터)           |
+| `category`    | ✅  | 카테고리 라벨 (예: 블로그, 글쓰기, 회고)           |
 | `tags`        | —  | 태그 배열. `/tags/태그명/` 페이지가 자동 생성된다   |
 | `draft`       | —  | `true`면 프로덕션 빌드에서 제외 (기본값 `false`) |
 | `cover`       | —  | 대표 이미지 경로                          |
