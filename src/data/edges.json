@@ -4,7 +4,7 @@
       "from": "how-to-write",
       "to": "welcome",
       "type": "extends",
-      "note": "welcome이 선언한 '발행 마찰 최소화' 원칙을 구체적인 절차로 풀어낸 글"
+      "note": "첫 글에서 얘기한 발행에 드는 공수를 최소화하는 원칙을 구체적인 절차로 풀어낸 글"
     },
     {
       "from": "markdown-styleguide",
