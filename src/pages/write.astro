@@ -273,6 +273,9 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     coverPath: null as string | null,
     coverPendingPath: null as string | null,
     acceptedEdges: [] as { to: string; type: string; note?: string }[],
+    // 이 글로 '들어오는' 수동 연결의 메모만 고친 것(키 `from→to`, 값은 새 메모 또는 비우면 undefined).
+    // 들어오는 엣지는 상대 글 소유라 타입·존재는 안 건드리고, reconcile에서 note만 갈아끼운다.
+    incomingNoteEdits: new Map<string, string | undefined>(),
     // acceptedEdges가 '이 글의 완전한 나가는 연결 집합'을 반영하는지. false면 reconcile가 삭제하지 않는다(데이터 보호).
     edgesLoaded: true,
     index: { posts: [] as any[], edges: [] as any[] },
@@ -791,6 +794,45 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         shown.add(other);
         const p = state.index.posts.find((q: any) => q.slug === other);
         const meta = EDGE_META.find((m: any) => m.value === e.type);
+        const title = p?.title ?? other;
+
+        // 들어온 수동 연결: 메모만 그 자리에서 고친다(타입·삭제는 상대 글 소유라 없음).
+        if (incoming && e.type !== 'mentions') {
+          const key = `${e.from}→${e.to}`;
+          const li = document.createElement('li');
+          li.className = 'incoming-edge';
+          const row = document.createElement('div');
+          row.className = 'sug-row';
+          row.append(
+            Object.assign(document.createElement('span'), {
+              className: 'ro-chip',
+              textContent: `${meta?.label ?? e.type} 받음`,
+            }),
+            Object.assign(document.createElement('span'), { textContent: title, className: 'sug-title' }),
+          );
+          const note = document.createElement('textarea');
+          note.className = 'sug-note';
+          note.rows = 1;
+          note.placeholder = '메모(선택)';
+          note.setAttribute('aria-label', '연결 메모');
+          note.value = state.incomingNoteEdits.has(key)
+            ? state.incomingNoteEdits.get(key) ?? ''
+            : e.note ?? '';
+          const grow = () => {
+            note.style.height = 'auto';
+            if (note.scrollHeight) note.style.height = `${note.scrollHeight}px`;
+          };
+          note.addEventListener('input', () => {
+            state.incomingNoteEdits.set(key, note.value.trim() || undefined);
+            grow();
+          });
+          li.append(row, note);
+          ul.appendChild(li);
+          grow();
+          continue;
+        }
+
+        // 그 밖(언급, 또는 연결을 못 불러온 경우의 나가는 연결)은 읽기 전용.
         const li = document.createElement('li');
         li.className = 'readonly-edge';
         li.append(
@@ -800,7 +842,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
               e.type === 'mentions' ? '언급' : `${meta?.label ?? e.type}${incoming ? ' 받음' : ''}`,
           }),
           Object.assign(document.createElement('span'), {
-            textContent: p?.title ?? other,
+            textContent: title,
             className: 'sug-title',
           }),
         );
@@ -998,7 +1040,15 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         }
         // desired에 없으면 제거(drop)
       } else {
-        next.push(e); // 다른 글의 엣지·이 글로 들어오는 엣지는 그대로 보존
+        // 다른 글의 엣지·이 글로 들어오는 엣지는 그대로 보존하되,
+        // 들어온 연결의 메모만 고쳤으면 그 note만 갈아끼운다(타입·존재·방향은 불변).
+        const key = `${e.from}→${e.to}`;
+        if (e.to === slug && state.incomingNoteEdits.has(key)) {
+          const note = state.incomingNoteEdits.get(key);
+          next.push({ from: e.from, to: e.to, type: e.type, ...(note ? { note } : {}) });
+        } else {
+          next.push(e);
+        }
       }
     }
     // 기존 edges.json에 없던 새 연결만 끝에 추가한다.
@@ -1121,6 +1171,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     state.mode = 'edit';
     state.editingSlug = filename.replace(/\.mdx?$/, '');
     state.pendingFiles.clear();
+    state.incomingNoteEdits.clear();
     // 기존 연결을 GitHub의 현재 edges.json에서 직접 불러온다(빌드 인덱스보다 최신).
     // 이 글이 소유한 '나가는' 명시 엣지만 편집 대상 — 들어오는 엣지·언급은 아래에서 읽기 전용으로 보여 준다.
     try {
@@ -1188,6 +1239,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     state.editingSlug = null;
     state.pendingFiles.clear();
     state.acceptedEdges = [];
+    state.incomingNoteEdits.clear();
     state.edgesLoaded = true; // 새 글은 빈 집합이 곧 완전한 집합
     state.coverPath = null;
     state.coverPendingPath = null;
@@ -1567,9 +1619,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   /* 기존 글 수정 드롭다운은 제목을 보여 주므로 넉넉한 폭. 단 좁은 화면에선 칸을
      뚫지 않도록 줄어들고(min-width:0), 넘치는 제목은 …로 자른다(펼치면 전체가 보인다). */
   .write-root .top-actions .select-wrap {
-    flex: 1 1 auto;
+    flex: 0 1 20rem;
     min-width: 0;
-    max-width: 28rem;
   }
 
   .write-root #post-picker {
@@ -1737,7 +1788,13 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     display: flex;
     gap: 0.5rem;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  /* 새 글·삭제는 줄어들지도 다음 줄로 떨어지지도 않는다 */
+  .write-root .top-actions button {
+    flex-shrink: 0;
   }
 
   /* ---------- 섹션 카드 ---------- */
@@ -2545,6 +2602,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   .write-root .suggestions button {
     font-size: 0.8rem;
     padding: 0.3em 0.8em;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   /* 수락한 연결: 한 줄(타입·제목·빼기) + 아래 한 줄 메모칸(길면 줄바꿈). */
@@ -2576,8 +2635,20 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     line-height: 1.5;
   }
 
-  /* 읽기 전용 연결(들어오는 엣지·언급) — 편집 컨트롤 없이 회색으로 구분 */
+  /* 읽기 전용 연결(언급) — 편집 컨트롤 없이 회색으로 구분 */
   .write-root .suggestions li.readonly-edge .sug-title {
+    color: var(--text-muted);
+  }
+
+  /* 들어온(받은) 수동 연결 — 메모는 그 자리에서 고칠 수 있다. 타입·삭제는 상대 글 소유라
+     없고, 회색 제목으로 '내가 소유한 연결이 아님'을 구분한다. */
+  .write-root .suggestions li.incoming-edge {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .write-root .suggestions li.incoming-edge .sug-title {
     color: var(--text-muted);
   }
 
@@ -2775,6 +2846,14 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     }
     .write-root .manual-edge button {
       padding: 0.6em 1em;
+    }
+
+    /* 상단 액션: 좁은 화면에선 제목 아래 전체폭 한 줄, 드롭다운이 남는 폭을 채운다 */
+    .write-root .top-actions {
+      flex: 1 1 100%;
+    }
+    .write-root .top-actions .select-wrap {
+      flex: 1 1 0;
     }
 
     /* 상단 액션 버튼 터치 타깃 확대 (select은 커스텀 화살표 여백 유지를 위해 제외) */
