@@ -28,7 +28,7 @@
       "from": "slash-menu",
       "to": "wysiwyg-editor",
       "type": "extends",
-      "note": "wysiwyg-editor가 끝에 남긴 '슬래시 메뉴는 아직 없다'는 숙제를 이어받아 실제로 붙인 다음 이야기"
+      "note": "에디터 관련 글에서 끝에 남긴 '슬래시 메뉴는 아직 없다'는 숙제를 이어받아 실제로 붙인 다음 이야기"
     },
     {
       "from": "slash-menu",

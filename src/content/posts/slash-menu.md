@@ -1,6 +1,6 @@
 ---
-title: "'/' 한 번이면 끝: 노션식 슬래시 메뉴 붙이기"
-description: "툴바와 길을 똑같이, 주소 속 슬래시는 건너뛰게, 한글 조합은 안 깨지게"
+title: "'/' 한 번이면 끝 - Notion식 슬래시 메뉴 붙이기"
+description: "툴바와 슬래시 기능을 똑같이, 한글은 안 깨지도록"
 pubDate: 2026-06-17
 updatedDate: 2026-06-20
 category: "블로그"
