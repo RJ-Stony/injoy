@@ -1,8 +1,8 @@
 ---
 title: "Injoy를 시작하며"
-description: "블로그 이름에 담긴 뜻, 그리고 앞으로 이곳에 쌓일 기록들을 기대하며"
+description: "enjoy의 오타가 아니다. '즐거움 안에서' 기록하자는 다짐과 운영 원칙"
 pubDate: 2026-06-08
-updatedDate: 2026-06-17
+updatedDate: 2026-06-20
 category: "회고"
 tags: ["블로그", "시작"]
 draft: false

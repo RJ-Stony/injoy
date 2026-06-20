@@ -1,8 +1,8 @@
 ---
-title: "블로그에 글 쓰는 법"
-description: "Notion처럼 마크다운 파일 하나만 추가해도 글이 써지는 Injoy"
+title: "글 올리기가 귀찮아서: 파일 하나로 끝내는 발행 구조"
+description: "관리자 페이지도 데이터베이스도 없이, 마크다운 파일 하나 추가하면 발행되는 흐름"
 pubDate: 2026-06-09
-updatedDate: 2026-06-17
+updatedDate: 2026-06-20
 category: "글쓰기"
 tags: ["astro", "markdown", "blog"]
 draft: false

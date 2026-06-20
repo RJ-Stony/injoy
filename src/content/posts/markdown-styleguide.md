@@ -1,9 +1,9 @@
 ---
-title: "마크다운 스타일 가이드"
-description: "제목, 코드, 표, 인용, 이미지가 Injoy의 디자인에서 어떻게 보이는지 한눈에 점검하는 글"
+title: "마크다운으로 이게 다 된다: Injoy 렌더링 총정리"
+description: "제목·코드·표·수식·다이어그램·콜아웃까지, Injoy에서 쓰는 모든 마크다운을 한 화면에서 점검"
 pubDate: 2026-06-10
-updatedDate: 2026-06-18
-category: "개발"
+updatedDate: 2026-06-20
+category: "글쓰기"
 tags: ["markdown", "design"]
 draft: false
 cover: "../../assets/markdown-demo.svg"
