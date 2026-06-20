@@ -1,9 +1,9 @@
 ---
-title: "마크다운을 보이는 대로 쓰기까지"
-description: "Injoy 글쓰기 페이지를 Notion식 에디터로 바꾸게 된 스토리"
+title: "마크다운을 직접 안 치고 싶어서: 보이는 대로 쓰는 에디터 도입기"
+description: "보이는 대로 쓰되, 발행 코드는 한 줄도 안 건드린 방법"
 pubDate: 2026-06-13
-updatedDate: 2026-06-18
-category: "개발"
+updatedDate: 2026-06-20
+category: "블로그"
 tags: ["에디터", "milkdown", "markdown", "notion"]
 draft: false
 ---
@@ -35,6 +35,15 @@ bootEditor(document.querySelector('#editor'));
 
 답은 숨은 textarea였다. 에디터에서 무엇을 하든 그 결과를 마크다운으로 바꿔 화면 뒤편의 `#fm-body` textarea로 흘려보낸다. 발행도 점검도 연결 제안도 예전처럼 이 textarea 값만 읽는다. 편집기는 갈아 끼웠지만 발행이 바라보는 진실은 그대로 둔 셈이다.
 
+코드로는 한 줄이다. 에디터 내용이 바뀔 때마다 마크다운으로 직렬화해서 흘려보내는 콜백, 그게 전부다.
+
+```ts
+// 에디터가 바뀔 때마다 마크다운으로 직렬화해 숨은 textarea로 보낸다
+opts.onChange(normalizeMarkdown(editor.action(getMarkdown())));
+```
+
+`getMarkdown()`이 화면을 마크다운 문자열로 되돌리고, `normalizeMarkdown()`이 그 결과를 다듬고, `onChange`가 textarea에 써 넣는다. 발행 쪽 코드는 이 줄의 존재조차 모른다.
+
 ```mermaid
 flowchart LR
     A[위지윅 편집] --> B[마크다운으로 변환]
@@ -57,6 +66,43 @@ flowchart LR
 | 위키링크 `[[슬러그]]`  | 위와 같은 방식으로 복원            |
 
 콜아웃과 위키링크는 마크다운으로 풀 때 대괄호 앞에 백슬래시가 끼어드는 문제가 있었다. 이걸 되돌리는 보정을 넣되 코드블록과 인라인 코드 안에서는 절대 손대지 않도록 막았다.
+
+그 보정은 줄 단위로 돈다. 코드펜스를 만나면 닫는 펜스까지 한 줄도 손대지 않고 그대로 흘려보내고, 코드 밖 줄에서만 위키링크와 콜아웃 마커를 되살린다.
+
+```ts
+export function normalizeMarkdown(md: string): string {
+  const lines = md.split('\n');
+  let fence: string | null = null;
+  return lines
+    .map((line) => {
+      const fenceTok = line.match(/^\s*(`{3,}|~{3,})/)?.[1];
+      if (fence) {
+        // 코드펜스 안, 닫는 펜스를 만나기 전까지 전부 그대로
+        if (fenceTok && fenceTok[0] === fence[0] && fenceTok.length >= fence.length) fence = null;
+        return line; // [!code highlight]
+      }
+      if (fenceTok) { fence = fenceTok; return line; } // [!code highlight]
+      // 코드 밖 줄에서만 보정한다
+      return restoreWikiOutsideInlineCode(line).replace(CALLOUT_LINE, '$1[$2]');
+    })
+    .join('\n');
+}
+```
+
+`fence` 변수가 핵심이다. 여는 펜스를 만나면 그 토큰을 기억해 두었다가, 같은 토큰의 닫는 펜스가 나올 때까지 모든 줄을 그대로 내보낸다. 강조한 두 줄이 바로 그 '건드리지 않는 길'이라, 코드 안에 적어 둔 `[[대괄호]]`나 정규식 예시가 보정에서 빠진다.
+
+인라인 코드는 한 줄 안에 섞여 들어오니 따로 다룬다. 줄을 백틱 스팬 기준으로 쪼갠 뒤, 코드가 아닌 조각에서만 이스케이프를 되돌린다.
+
+```ts
+function restoreWikiOutsideInlineCode(text: string): string {
+  return text
+    .split(/(`+[^`]*`+)/) // 괄호가 있어 구분자(인라인 코드)도 배열에 남는다
+    .map((seg, i) => (i % 2 === 1 ? seg : seg.replace(/\\\[\\\[/g, '[[').replace(/\\\]\\\]/g, ']]')))
+    .join('');
+}
+```
+
+`split`의 정규식에 괄호를 둔 덕에 짝수 인덱스는 코드 밖, 홀수 인덱스는 인라인 코드가 된다. 홀수는 그대로 두고 짝수에서만 `\[\[`를 `[[`로 되돌리니, 코드 안에 쓴 백슬래시 예시까지 살아남는다.
 
 > [!WARNING]
 > 이 예외를 빠뜨리면 코드 안에 쓴 대괄호까지 보정 대상이 되어 멀쩡한 코드가 망가진다. 처음엔 실제로 그렇게 짰다가 코드가 손상되는 걸 발견하고 급히 막았다.

@@ -1,9 +1,9 @@
 ---
-title: "아직 완벽해지기엔 멀었다 !! 그래프 뷰를 다듬어보자"
-description: "새 기능을 추가하기보단, 읽고 쓰는 화면의 문제들을 깎아낸 과정들"
+title: "그래프가 멈추질 않는다: 조용한 무한 루프 잡기"
+description: "에너지가 0으로 안 떨어져 매 프레임 다시 그리던 버그를 프레임 상한으로 끝낸 이야기"
 pubDate: 2026-06-18
 updatedDate: 2026-06-20
-category: "개발"
+category: "블로그"
 tags: ["에디터", "ui", "그래프"]
 draft: false
 ---
@@ -24,7 +24,45 @@ draft: false
 
 휴대폰에서 글 머리의 읽기 시간/연결/조회수가 위쪽 날짜와 엉켜서 답답했다. 이것들을 제목 아래로 내려 한 텀 쉬어 가게 만들었다. 발행된 체크리스트 앞에 붙던 점도 떼어 체크박스만 단정하게 남겼다. 처음 홈 화면에서는 모바일에서 썸네일이 맨 위로 올라와 있었는데, 제목과 글을 먼저 보이고 썸네일을 아래로 내렸다.
 
-목차는 읽는 자리를 따라 하이라이트하는 기능을 추가했다. 스크롤하면 지금 보고 있는 단락이 목차에서 옅게 강조된다. 또한, 대표 이미지가 없는 글에는, 본문에 다이어그램이 있으면 그 첫 다이어그램을 그대로 작은 미리보기로 얹었다. 지금 이 글의 썸네일이 바로 그렇게 적용된다.
+목차는 읽는 자리를 따라 하이라이트하는 기능을 추가했다. 스크롤하면 지금 보고 있는 단락이 목차에서 옅게 강조된다.
+
+원리는 단순하다. 고정 헤더 약간 아래에 기준선을 하나 긋고, 그 선을 지난 마지막 제목을 '지금 보는 곳'으로 본다.
+
+```ts
+function initToc(nav) {
+  const links = [...nav.querySelectorAll('a[href^="#"]')];
+  const entries = links.map((a) => ({ a, el: document.getElementById(a.hash.slice(1)) }));
+  const LINE = 88; // 고정 헤더(66px) 약간 아래의 기준선
+  const update = () => {
+    let active = entries[0];
+    for (const e of entries) {
+      if (e.el.getBoundingClientRect().top <= LINE) active = e; // [!code highlight]
+      else break;
+    }
+    for (const { a } of entries) a.classList.toggle('active', a === active.a);
+  };
+  window.addEventListener('scroll', () => requestAnimationFrame(update), { passive: true });
+}
+```
+
+강조한 줄이 판단의 전부다. 제목들을 위에서부터 훑다가 기준선(`LINE`)보다 위에 있는 마지막 제목에서 멈춘다. 스크롤 이벤트는 `requestAnimationFrame`으로 묶어, 한 프레임에 한 번만 다시 계산하게 했다. 매 스크롤마다 위치를 재면 무거우니까.
+
+또한, 대표 이미지가 없는 글에는, 본문에 다이어그램이 있으면 그 첫 다이어그램을 그대로 작은 미리보기로 얹었다. 지금 이 글의 썸네일이 바로 그렇게 적용된다.
+
+이건 본문에서 첫 mermaid 블록을 찾아 펜스를 벗겨 내는 함수 하나로 끝난다.
+
+```ts
+export function firstDiagram(post) {
+  const { codeBlocks } = splitCode(post.body ?? '');
+  const block = codeBlocks.find((b) => /^\s*`{3,}\s*mermaid/.test(b)); // 첫 mermaid 블록
+  if (!block) return null; // 다이어그램이 없으면 썸네일도 없다
+  const inner = block.split('\n').slice(1); // 펜스 머리 줄 제거
+  if (/^\s*(`{3,}|~{3,})\s*$/.test(inner.at(-1) ?? '')) inner.pop(); // 닫는 펜스도 제거
+  return inner.join('\n').trim() || null;
+}
+```
+
+여기서 돌려준 다이어그램 소스를 카드가 본문과 똑같은 mermaid 렌더러로 그려, 커버 없는 글도 빈 카드로 남지 않는다.
 
 ## 조용히 돌고 있던 그래프 화면 수정
 
@@ -38,7 +76,37 @@ flowchart LR
     C -- 예 --> D[멈춤]
 ```
 
-해결은 단순했다. 배치가 자리를 잡거나 충분히 오래 돌면 루프를 끝내도록 상한을 뒀다. 그러자 그래프가 펼쳐진 뒤엔 한 프레임도 더 돌지 않는다. 휴대폰에서 칠하는 픽셀도 함께 줄였다. 나중에 노드가 많이 쌓이게 되어도 괜찮을 것으로 예상된다.
+해결은 단순했다. 배치가 자리를 잡거나 충분히 오래 돌면 루프를 끝내도록 상한을 뒀다. 프레임 수를 세는 변수 하나와, 끝내는 조건에 `또는` 하나를 더한 게 전부다.
+
+```ts
+let frames = 0;
+const loop = () => {
+  frames++; // [!code ++]
+  tick(); // 힘 계산 + 위치 갱신
+  draw(); // 캔버스에 다시 그리기
+  const energy = nodes.reduce((s, n) => s + Math.abs(n.vx) + Math.abs(n.vy), 0);
+  calmFrames = energy < 0.5 ? calmFrames + 1 : 0;
+  // 중력·척력 균형 탓에 에너지가 0까지 안 떨어질 수 있다 → 프레임 상한을 backstop으로
+  const maxFrames = isSmall() ? 180 : 300; // [!code ++]
+  if (calmFrames > 30 && !dragging) { // [!code --]
+  if ((calmFrames > 30 || frames > maxFrames) && !dragging) { // [!code ++]
+    running = false; // 루프 종료. 더 이상 rAF를 걸지 않는다
+    return;
+  }
+  requestAnimationFrame(loop);
+};
+```
+
+빨간 줄이 옛 조건이다. '잠잠해지면'(`calmFrames > 30`) 멈춘다는 건데, 에너지가 영영 0 근처로 안 내려오면 이 조건은 영원히 거짓이다. 초록 줄에 `frames > maxFrames`를 `또는`으로 더하니, 잠잠해지지 않아도 정해진 프레임 수가 지나면 무조건 멈춘다. 그러자 그래프가 펼쳐진 뒤엔 한 프레임도 더 돌지 않는다.
+
+휴대폰에서 칠하는 픽셀도 함께 줄였다. 고해상도 화면은 화소 배율이 2~3배라, 매 프레임 칠하는 픽셀이 폭주하기 쉽다. 배율을 2배로 잘랐다.
+
+```ts
+// 고DPR(모바일 2~3배) 백킹스토어가 매 프레임 칠하는 픽셀을 폭주시키지 않게 2배로 캡
+const dpr = Math.min(window.devicePixelRatio || 1, 2); // [!code ++]
+```
+
+`Math.min(..., 2)` 한 줄이다. 화면이 아무리 고해상도여도 캔버스는 2배까지만 칠한다. 나중에 노드가 많이 쌓이게 되어도 괜찮을 것으로 예상된다.
 
 ## 남은 것
 
