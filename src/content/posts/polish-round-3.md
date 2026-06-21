@@ -2,7 +2,7 @@
 title: "미래의 나 말고 다른 독자를 생각했다"
 description: "전문 용어에 짧은 풀이를 달고, 강조가 잘리던 코드 블록과 거짓 횟수를 말하던 만듦새를 함께 고친 과정"
 pubDate: 2026-06-21
-category: "블로그"
+category: "회고"
 tags: ["가독성", "글쓰기", "ui"]
 draft: false
 ---
