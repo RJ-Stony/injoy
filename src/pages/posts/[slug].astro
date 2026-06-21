@@ -8,6 +8,7 @@ import TableOfContents from '../../components/TableOfContents.astro';
 import ViewCount from '../../components/ViewCount.astro';
 import ReadingPath from '../../components/ReadingPath.astro';
 import TransparencyPanel from '../../components/TransparencyPanel.astro';
+import PostReading from '../../components/PostReading.astro';
 import { getPublishedPosts, readingMinutes } from '../../utils/post';
 import { getConnections } from '../../utils/graph';
 import { withBase } from '../../utils/url';
@@ -25,6 +26,27 @@ const { Content, headings } = await render(post);
 const minutes = readingMinutes(post);
 const cover = post.data.cover;
 const connections = await getConnections(post.id);
+
+// JSON-LD(BlogPosting) — 검색엔진이 제목·날짜·작성자를 또박또박 읽도록.
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const ogImageURL = new URL(cover?.src ?? withBase('/og-default.png'), Astro.site).href;
+const isEdited =
+  !!post.data.updatedDate &&
+  post.data.updatedDate.getTime() !== post.data.pubDate.getTime();
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  headline: post.data.title,
+  description: post.data.description,
+  datePublished: post.data.pubDate.toISOString(),
+  ...(isEdited ? { dateModified: post.data.updatedDate!.toISOString() } : {}),
+  author: { '@type': 'Person', name: '노준석' },
+  publisher: { '@type': 'Organization', name: 'Injoy' },
+  image: ogImageURL,
+  url: canonical,
+  mainEntityOfPage: canonical,
+  inLanguage: 'ko-KR',
+};
 ---
 
 <BaseLayout
@@ -34,6 +56,10 @@ const connections = await getConnections(post.id);
   ogImage={cover?.src}
   wide
 >
+  <script type="application/ld+json" slot="head" set:html={JSON.stringify(jsonLd).replace(/</g, '\\u003c')} />
+
+  <PostReading />
+
   <div class="post-grid">
   <article class="post" data-pagefind-body>
     <header class="post-header">
