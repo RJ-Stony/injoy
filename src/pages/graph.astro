@@ -29,7 +29,11 @@ const data = {
   </section>
 
   <div class="graph-wrap">
-    <canvas id="graph-canvas" aria-label="글 연결 그래프. 노드를 끌거나 눌러 글로 이동할 수 있어요"></canvas>
+    <canvas
+      id="graph-canvas"
+      tabindex="0"
+      aria-label="글 연결 그래프. 노드를 끌거나 눌러 글로 이동할 수 있어요. 키보드는 화살표로 노드를 옮기고 엔터로 그 글로 이동합니다"
+    ></canvas>
     <div id="graph-tooltip" hidden></div>
   </div>
 
@@ -193,9 +197,10 @@ const data = {
 
     let hovered = null;
     let dragging = null;
+    let selected = null; // 키보드로 고른 노드
 
     const highlightSet = () => {
-      const pivot = hovered ?? (focusTouched ? null : byId.get(focusId));
+      const pivot = hovered ?? selected ?? (focusTouched ? null : byId.get(focusId));
       if (!pivot) return null;
       const set = new Set([pivot.id, ...(neighbors.get(pivot.id) ?? [])]);
       return { pivot, set };
@@ -239,19 +244,24 @@ const data = {
         if (n.kind === 'post') {
           ctx.fillStyle = colors.accent;
           ctx.fill();
-          if ((hovered && hovered.id === n.id) || (!focusTouched && focusId === n.id)) {
-            ctx.strokeStyle = colors.accent;
-            ctx.lineWidth = 2;
-            ctx.setLineDash([]);
-            ctx.beginPath();
-            ctx.arc(n.x, n.y, r + 4, 0, Math.PI * 2);
-            ctx.stroke();
-          }
         } else {
           ctx.fillStyle = colors.surface;
           ctx.fill();
           ctx.strokeStyle = colors.muted;
           ctx.lineWidth = 1.2;
+          ctx.stroke();
+        }
+        // 강조 링 — 호버·키보드 선택·URL 포커스된 노드(글·태그 공통)
+        if (
+          (hovered && hovered.id === n.id) ||
+          (selected && selected.id === n.id) ||
+          (!focusTouched && focusId === n.id)
+        ) {
+          ctx.strokeStyle = colors.accent;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, r + 4, 0, Math.PI * 2);
           ctx.stroke();
         }
         // 라벨
@@ -405,6 +415,46 @@ const data = {
       if (reduceMotion) draw();
     });
 
+    // 키보드 탐색 — 화살표로 노드 순회, Enter로 그 글로 이동, Esc로 선택 해제.
+    // 배치는 이미 정착해 있으니 물리(wake)는 다시 돌리지 않고 draw()만 다시 그린다.
+    const showTipAt = (n) => {
+      tooltip.textContent =
+        n.kind === 'post' ? `${n.label}${n.category ? ` · ${n.category}` : ''}` : n.label;
+      tooltip.hidden = false;
+      tooltip.style.left = `${Math.min(n.x + 14, W - 160)}px`;
+      tooltip.style.top = `${n.y + 14}px`;
+    };
+    canvas.addEventListener('keydown', (ev) => {
+      const k = ev.key;
+      if (k === 'ArrowRight' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowUp') {
+        ev.preventDefault();
+        if (!nodes.length) return;
+        const dir = k === 'ArrowRight' || k === 'ArrowDown' ? 1 : -1;
+        const i = selected ? nodes.indexOf(selected) : -1;
+        selected = nodes[(i + dir + nodes.length) % nodes.length];
+        focusTouched = true;
+        showTipAt(selected);
+        draw();
+      } else if (k === 'Enter') {
+        if (selected) {
+          ev.preventDefault();
+          location.href = selected.url;
+        }
+      } else if (k === 'Escape') {
+        if (!selected) return;
+        selected = null;
+        tooltip.hidden = true;
+        draw();
+      }
+    });
+    canvas.addEventListener('blur', () => {
+      // 포커스를 잃으면 키보드 선택 강조·툴팁을 정리(마우스 호버와 섞이지 않게)
+      if (!selected) return;
+      selected = null;
+      tooltip.hidden = true;
+      draw();
+    });
+
     const restart = () => {
       readColors();
       resize();
@@ -491,6 +541,12 @@ const data = {
     width: 100%;
     /* 세로 스크롤은 허용 — 노드 드래그 시작 시에만 JS가 제스처를 가져간다 */
     touch-action: pan-y;
+  }
+
+  /* 키보드 포커스 — 캔버스에 또렷한 아웃라인(화살표·엔터로 노드 탐색) */
+  #graph-canvas:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   #graph-tooltip {
