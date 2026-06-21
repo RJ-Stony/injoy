@@ -1,8 +1,8 @@
 ---
 title: "글 올리기가 귀찮아서 만든 발행 구조"
-description: "관리자 페이지도 데이터베이스도 없이, 마크다운 파일 하나 추가하면 발행되는 흐름"
+description: "관리자 페이지도 데이터베이스도 없이, 마크다운 파일 하나만 있으면 바로 발행되는 흐름"
 pubDate: 2026-06-09
-updatedDate: 2026-06-20
+updatedDate: 2026-06-21
 category: "글쓰기"
 tags: ["astro", "markdown", "blog"]
 draft: false
@@ -55,7 +55,7 @@ draft: false
 | `title`       | ✅  | 글 제목                               |
 | `description` | ✅  | 한 줄 요약. 홈 카드와 OG 태그에 쓰인다           |
 | `pubDate`     | ✅  | 발행일 (`YYYY-MM-DD`)                 |
-| `category`    | ✅  | 카테고리 라벨 (예: 블로그, 글쓰기, 회고)           |
+| `category`    | ✅  | 카테고리 라벨 (예: 블로그, 글쓰기, 회고)          |
 | `tags`        | —  | 태그 배열. `/tags/태그명/` 페이지가 자동 생성된다   |
 | `draft`       | —  | `true`면 프로덕션 빌드에서 제외 (기본값 `false`) |
 | `cover`       | —  | 대표 이미지 경로                          |
@@ -105,8 +105,7 @@ npm run build     # 프로덕션 빌드
 npm run preview   # 빌드 결과 확인
 ```
 
-로컬에서 확인했다면 커밋하고 푸시한다. Vercel이나 GitHub Pages에 연결되어 있다면
-푸시하는 행위가 곧 배포로 이어진다. RSS(`/rss.xml`)와 사이트맵도 빌드할 때마다 자동으로 갱신되니
+로컬에서 확인했다면, 커밋하고 GitHub에 푸시한다. Vercel이나 GitHub Pages에 연결되어 있다면(현재는 **GitHub Pages**에 배포) 푸시하는 행위가 곧 배포로 이어진다. RSS(`/rss.xml`)와 사이트맵도 빌드할 때마다 자동으로 갱신되니
 따로 신경 쓸 것이 없다.
 
 ---
