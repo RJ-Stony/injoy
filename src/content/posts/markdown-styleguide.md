@@ -1,15 +1,15 @@
 ---
-title: "마크다운으로 이게 다 되네, Injoy 글쓰기 문법 총정리"
-description: "제목·코드·표·수식·다이어그램·콜아웃까지, Injoy에서 쓰는 모든 마크다운을 한 화면에서 점검"
+title: "Injoy 글쓰기(마크다운) 문법 총정리"
+description: "제목·코드·표·수식·다이어그램·콜아웃까지, Injoy에서 쓰는 모든 마크다운을 한 글에서 점검"
 pubDate: 2026-06-10
-updatedDate: 2026-06-20
+updatedDate: 2026-06-21
 category: "글쓰기"
 tags: ["markdown", "design"]
 draft: false
 cover: "../../assets/markdown-demo.svg"
 ---
 
-이 글은 Injoy에서 쓸 수 있는 마크다운 요소를 모두 모아 둔 스타일 점검용 글이다. 디자인을 손볼 때마다 이 글을 열어 고쳐야 할 곳이 없는지 확인한다. 글쓰기 문법이 궁금하다면
+이 글은 Injoy에서 쓸 수 있는 마크다운 요소를 모두 모아 둔 스타일 점검용 글이다. 디자인을 손볼 때마다 이 글을 열어 고쳐야 할 곳이 없는지 확인한다. 글쓰기 방법이 궁금하다면
 [이 블로그에 글 쓰는 법](/posts/how-to-write/)을 먼저 읽어 보자.
 
 ## 제목
