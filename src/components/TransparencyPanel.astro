@@ -4,7 +4,7 @@
  * 본문 길이·읽는 시간 계산 근거·연결의 모양(수치·분포)을 푼다.
  * '연결된 글' 목록과 겹치지 않게 개별 글은 절대 나열하지 않고 집계만 보여 준다.
  */
-import { postStats, type Post } from '../utils/post';
+import { postStats, formatDate, type Post } from '../utils/post';
 import { edgeLabel, type Connection } from '../utils/graph';
 import { withBase } from '../utils/url';
 
@@ -75,7 +75,7 @@ const edited =
         edited && (
           <div class="mk-row">
             <dt>수정</dt>
-            <dd>처음 발행한 뒤 한 번 다듬었어요.</dd>
+            <dd>{formatDate(post.data.pubDate)}에 처음 내고, {formatDate(post.data.updatedDate!)}까지 다듬었어요.</dd>
           </div>
         )
       }

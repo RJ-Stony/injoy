@@ -347,6 +347,10 @@ a:hover {
   font-family: inherit;
   background: none;
   padding: 0;
+  /* 강조 줄(.line.highlighted)의 100% 기준을 보이는 너비가 아니라 코드 전체
+     너비로 잡아, 가로로 넘치는 코드도 강조가 줄 끝까지 칠해지게 한다 */
+  display: block;
+  min-width: max-content;
 }
 
 /* Shiki 듀얼 테마 — 다크 모드(명시 선택 또는 시스템)에서 다크 팔레트로 전환 */
