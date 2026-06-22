@@ -11,7 +11,11 @@ export async function getPublishedPosts(): Promise<Post[]> {
   const posts = await getCollection('posts', ({ data }) =>
     import.meta.env.PROD ? !data.draft : true,
   );
-  return posts.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+  // 발행일 내림차순. 같은 날이면 슬러그 내림차순으로 — pubDate는 날짜뿐이라 시각이 없어,
+  // 같은 날 발행된 글(polish-round-4·5 등)은 슬러그가 큰 쪽(나중 글)을 위로 올린다.
+  return posts.sort(
+    (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf() || b.id.localeCompare(a.id),
+  );
 }
 
 /**

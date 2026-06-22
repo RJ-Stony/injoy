@@ -151,8 +151,9 @@
   }
 
   .prose .heading-link svg {
-    width: 0.72em;
-    height: 0.72em;
+    /* 버튼 기본 글꼴(약 13px)에 묶이지 않게 rem로 — em로는 키워도 거의 안 보였다 */
+    width: 0.95rem;
+    height: 0.95rem;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -179,7 +180,7 @@
 
   .prose .heading-link.copied::after {
     content: ' 복사됨';
-    font-size: 0.72em;
+    font-size: 0.8rem;
     font-weight: 500;
   }
 
