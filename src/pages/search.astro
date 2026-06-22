@@ -41,9 +41,9 @@ const bundlePath = withBase('/pagefind/'); // '/injoy/pagefind/'
         bundlePath,
         showSubResults: true,
         showImages: false,
-        // 기본 5라 글이 6편 넘으면 '결과 더 보기'가 뜨는데, 그 버튼 첫 클릭이 먹지 않는
-        // 버그가 있다. 글이 아직 적으니 한 번에 다 보이게 올린다(글 20편 넘으면 버튼 재점검).
-        pageSize: 20,
+        // 한 페이지에 글 결과 10개, 더 있으면 '결과 더 보기'로 이어 본다. 이 버튼 첫 클릭이
+        // 안 먹던 건 푸터가 화면 중간에 떠 생긴 레이아웃 튐이었고, 스티키 푸터로 고친 뒤 정상 동작한다.
+        pageSize: 10,
         // 결과 URL을 base('/injoy') 기준으로 바로잡는다(색인은 dist 루트 기준이라 prefix가 없다).
         processResult: (result) => {
           result.url = fix(result.url);
