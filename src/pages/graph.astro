@@ -222,7 +222,7 @@ const data = {
         // 형태: 언급·태그는 잔점선, 반박(contradicts)은 긴 점선(색 없이도 '긴장'을 구분), 그 외 실선.
         const dash = faint ? [4, 4] : e.type === 'contradicts' ? [9, 5] : [];
         const strong = hl && hl.set.has(e.a.id) && hl.set.has(e.b.id);
-        const alpha = Math.min(fade(e.a.id), fade(e.b.id)) * (faint ? 0.7 : 0.95);
+        const alpha = Math.min(fade(e.a.id), fade(e.b.id)) * (faint ? 0.45 : 0.95);
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.strokeStyle = stroke;

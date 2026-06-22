@@ -149,6 +149,11 @@ body {
   line-height: 1.8;
   word-break: keep-all;
   overflow-wrap: break-word;
+  /* 스티키 푸터 — 콘텐츠가 짧은 화면(검색·모바일)에서도 푸터가 떠오르지 않고
+     아래에 붙도록 본문(main)이 남는 높이를 채운다 */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 @media (min-width: 768px) {
@@ -285,10 +290,12 @@ a:hover {
 .prose img {
   border-radius: var(--radius);
   display: block;
+  /* 기본은 가운데 — 본문 폭보다 좁은 이미지도 단 한가운데에 놓인다 */
+  margin-inline: auto;
 }
 
 .prose figure {
-  margin-inline: 0;
+  margin-inline: auto;
 }
 
 .prose figcaption {
@@ -296,6 +303,41 @@ a:hover {
   color: var(--text-muted);
   text-align: center;
   margin-block-start: 0.6em;
+}
+
+/* 이미지 정렬 — title의 {align=left|center|right} 마커가 figure 클래스로 들어온다.
+   가운데(기본)는 단 중앙, 좌/우는 본문 글이 옆으로 흐르게 띄운다(float). */
+.prose figure.img-left,
+.prose figure.img-right {
+  max-width: min(50%, 340px);
+}
+
+.prose figure.img-left {
+  float: left;
+  margin: 0.4em 1.4em 0.8em 0;
+}
+
+.prose figure.img-right {
+  float: right;
+  margin: 0.4em 0 0.8em 1.4em;
+}
+
+/* 떠 있는 이미지를 다음 섹션이 타고 올라오지 않게 흐름을 끊는다 */
+.prose h2,
+.prose h3,
+.prose h4,
+.prose hr {
+  clear: both;
+}
+
+/* 좁은 화면: 플로트를 풀고 풀폭 가운데로 — 글자가 끼이거나 잘리지 않게 */
+@media (max-width: 640px) {
+  .prose figure.img-left,
+  .prose figure.img-right {
+    float: none;
+    max-width: 100%;
+    margin-inline: auto;
+  }
 }
 
 /* 표 (GFM) — 가로 스크롤은 래퍼가 담당해 표 시맨틱을 보존한다 */

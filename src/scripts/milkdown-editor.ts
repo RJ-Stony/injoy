@@ -706,16 +706,66 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
         nodeViews: {
           ...((prev as any).nodeViews ?? {}),
           image: (node: any, editorView: any, getPos: any) => {
-            // 이미지 + alt 입력칸을 함께 감싼다. 이미지를 누르면 바로 아래 입력칸이 펼쳐져
-            // alt(대체 텍스트)를 고친다 — 노션식 인라인 편집. 입력값은 image 노드 attr에 반영돼
-            // 마크다운에 그대로 직렬화된다. resolveImageSrc로 표시 src만 해석하고 attr은 불변.
+            // 이미지 + alt 입력칸 + 정렬 버튼을 함께 감싼다. 이미지를 누르면 바로 아래 패널이
+            // 펼쳐져 alt(대체 텍스트)와 정렬을 고친다 — 노션식 인라인 편집. 값은 image 노드 attr에
+            // 반영돼 마크다운에 직렬화된다. resolveImageSrc로 표시 src만 해석하고 attr은 불변.
+            //
+            // 정렬은 마크다운에 별도 문법이 없으므로 title 앞에 {align=left|right} 마커를 싣는다.
+            // 가운데(기본)는 마커 없이 둔다. rehype-figure가 발행 시 이 마커를 figure 클래스로 바꾼다.
+            const ALIGN_RE = /^\{align=(left|center|right)\}\s*/;
+            const parseTitle = (raw: any) => {
+              const t = typeof raw === 'string' ? raw : '';
+              const m = t.match(ALIGN_RE);
+              return { align: m ? m[1] : 'center', caption: m ? t.slice(m[0].length) : t };
+            };
+            const buildTitle = (align: string, caption: string) => {
+              const marker = align === 'left' || align === 'right' ? `{align=${align}}` : '';
+              const t = marker + (caption ?? '');
+              return t === '' ? null : t; // 빈 title은 attr에서 빼 ![](src "") 직렬화를 피한다
+            };
+
             const wrap = document.createElement('span');
             wrap.className = 'injoy-img';
             wrap.contentEditable = 'false';
             const img = document.createElement('img');
+
+            const panel = document.createElement('span');
+            panel.className = 'injoy-img-panel';
+            panel.hidden = true;
+
+            // 정렬 줄: 왼쪽 / 가운데 / 오른쪽
+            const alignRow = document.createElement('span');
+            alignRow.className = 'injoy-img-align';
+            const alignHint = document.createElement('span');
+            alignHint.className = 'injoy-img-hint';
+            alignHint.textContent = '정렬';
+            alignRow.append(alignHint);
+            const alignBtns: HTMLButtonElement[] = [];
+            for (const [val, label] of [['left', '왼쪽'], ['center', '가운데'], ['right', '오른쪽']]) {
+              const b = document.createElement('button');
+              b.type = 'button';
+              b.dataset.align = val;
+              b.textContent = label;
+              b.setAttribute('aria-label', `${label} 정렬`);
+              b.addEventListener('mousedown', (ev) => {
+                ev.preventDefault(); // 에디터 포커스·선택을 흔들지 않게
+                const pos = typeof getPos === 'function' ? getPos() : null;
+                if (pos == null) return;
+                const n = editorView.state.doc.nodeAt(pos);
+                if (!n || n.type.name !== 'image') return;
+                const { caption } = parseTitle(n.attrs.title);
+                const title = buildTitle(val, caption);
+                editorView.dispatch(
+                  editorView.state.tr.setNodeMarkup(pos, undefined, { ...n.attrs, title }),
+                );
+              });
+              alignBtns.push(b);
+              alignRow.append(b);
+            }
+
+            // alt 줄
             const altRow = document.createElement('span');
             altRow.className = 'injoy-img-alt';
-            altRow.hidden = true;
             const hint = document.createElement('span');
             hint.className = 'injoy-img-hint';
             hint.textContent = 'alt';
@@ -723,22 +773,27 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
             input.type = 'text';
             input.placeholder = '이미지 설명을 적어 주세요';
             altRow.append(hint, input);
-            wrap.append(img, altRow);
+
+            panel.append(alignRow, altRow);
+            wrap.append(img, panel);
 
             const apply = (n: any) => {
               const src = n.attrs.src ?? '';
               img.src = (opts.resolveImageSrc?.(src) ?? null) || src;
               img.alt = n.attrs.alt ?? '';
-              img.title = n.attrs.title || '';
+              const { align, caption } = parseTitle(n.attrs.title);
+              img.title = caption; // 툴팁엔 마커 없는 캡션만
+              wrap.dataset.align = align; // 에디터 안 미리보기(정렬)
+              for (const b of alignBtns) b.classList.toggle('is-active', b.dataset.align === align);
               if (document.activeElement !== input) input.value = n.attrs.alt ?? '';
             };
             apply(node);
 
-            // 이미지 클릭 → alt 입력칸 펼침/접힘.
+            // 이미지 클릭 → 편집 패널 펼침/접힘.
             img.addEventListener('mousedown', (ev) => {
               ev.preventDefault();
-              altRow.hidden = !altRow.hidden;
-              if (!altRow.hidden) {
+              panel.hidden = !panel.hidden;
+              if (!panel.hidden) {
                 input.focus();
                 input.select();
               }
@@ -758,7 +813,7 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
               ev.stopPropagation(); // ProseMirror 단축키가 입력을 가로채지 않게
               if (ev.key === 'Enter' || ev.key === 'Escape') {
                 ev.preventDefault();
-                altRow.hidden = true;
+                panel.hidden = true;
                 editorView.focus();
               }
             });
@@ -770,8 +825,8 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
                 apply(updated);
                 return true;
               },
-              // 입력칸에서 일어나는 이벤트·DOM 변화는 ProseMirror가 다루지 않게 한다.
-              stopEvent: (e: any) => e.target === input || altRow.contains(e.target),
+              // 패널(정렬·alt)에서 일어나는 이벤트·DOM 변화는 ProseMirror가 다루지 않게 한다.
+              stopEvent: (e: any) => e.target === input || panel.contains(e.target),
               ignoreMutation: () => true,
             };
           },

@@ -515,6 +515,10 @@ const categories = await getCategories();
     max-width: var(--width-wide);
     margin-inline: auto;
     padding: 2.5rem 1.25rem 5rem;
+    /* body가 flex column이므로 본문이 남는 세로 공간을 채워 푸터를 아래로 민다.
+       (width: 100%로 두어 max-width와 가운데 정렬이 그대로 유지되게) */
+    flex: 1 0 auto;
+    width: 100%;
   }
 
   /* 글 상세처럼 사이드바가 필요한 페이지는 와이드 화면에서만 넓어진다 */

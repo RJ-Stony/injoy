@@ -2255,11 +2255,54 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     display: inline-block;
     max-width: 100%;
   }
+  /* 에디터 안 미리보기 — 텍스트 줄바꿈(float) 없이 이미지가 어느 쪽에 놓일지만 보여 준다.
+     실제 글흐름 감김은 아래 '정밀 미리보기' 패널이 발행과 똑같이 그린다. */
+  .write-root .injoy-img[data-align='center'] {
+    display: block;
+    margin-inline: auto;
+  }
+  .write-root .injoy-img[data-align='left'] {
+    display: block;
+    margin-inline: 0 auto;
+    max-width: 60%;
+  }
+  .write-root .injoy-img[data-align='right'] {
+    display: block;
+    margin-inline: auto 0;
+    max-width: 60%;
+  }
   .write-root .injoy-img > img {
     max-width: 100%;
     height: auto;
     border-radius: 8px;
     cursor: pointer;
+  }
+  .write-root .injoy-img-panel[hidden] {
+    display: none;
+  }
+  .write-root .injoy-img-align {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    margin-top: 0.35rem;
+    padding: 0.3rem 0.55rem;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .write-root .injoy-img-align button {
+    font-size: 0.8rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background-color: var(--bg);
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .write-root .injoy-img-align button.is-active {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
   }
   .write-root .injoy-img-alt {
     display: flex;
