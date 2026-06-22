@@ -1,74 +1,187 @@
 ---
 /**
- * 검색 — Pagefind 정적 색인 위에 올린 검색 페이지.
- * 색인은 빌드 후 dist/pagefind/에 생기므로(npm run build) 'astro dev'에는 없다.
- * dev에서는 UI 스크립트 로드가 실패하므로 안내 문구로 우아하게 대체한다.
+ * 검색 — Pagefind 정적 색인 위에 올린 커스텀 검색.
+ * 기본 UI(PagefindUI) 대신 Pagefind JS API(pagefind.search)로 결과를 직접 그린다.
+ *  · 글당 매칭 구간(sub-result)을 3개로 자르지 않고 전부 보여 준다(기본 UI는 3개 고정).
+ *  · 결과 수를 "글 N개에서 M곳"으로 — N=맞은 글 수, M=맞은 구간 합.
+ *  · 더보기로 글 10개씩 이어 본다.
+ * 색인은 빌드 후 dist/pagefind/에만 생기므로(npm run build) 'astro dev'에는 없다 →
+ * pagefind.js 로드가 실패하면 안내 문구로 우아하게 대체한다.
  * 결과 URL은 dist 기준(/posts/..)이라 base('/injoy')를 앞에 붙여 바로잡는다.
  */
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { withBase } from '../utils/url';
-
-const cssHref = withBase('/pagefind/pagefind-ui.css');
-const jsSrc = withBase('/pagefind/pagefind-ui.js');
-const bundlePath = withBase('/pagefind/'); // '/injoy/pagefind/'
 ---
 
 <BaseLayout title="검색" description="Injoy의 글을 제목과 본문에서 찾아보세요.">
-  <link href={cssHref} rel="stylesheet" />
-
   <section class="search-page">
     <h1>검색</h1>
     <p class="search-sub">글 제목과 본문에서 찾아요.</p>
-    <div id="search"></div>
+
+    <div class="search-box">
+      <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+      <input
+        id="search-input"
+        type="search"
+        autocomplete="off"
+        placeholder="검색어를 입력하세요"
+        aria-label="Injoy 검색"
+      />
+    </div>
+
+    <p id="search-count" class="search-count" role="status" aria-live="polite"></p>
+    <div id="search-results" class="search-results" aria-live="polite" aria-label="검색 결과"></div>
+    <button id="search-more" class="search-more" type="button" hidden>결과 더 보기</button>
+
     <p id="search-fallback" class="search-fallback" hidden>
       검색 색인은 빌드된 사이트에서만 동작해요. 로컬에서는
       <code>npm run build &amp;&amp; npm run preview</code>로 확인하세요.
     </p>
   </section>
-
-  <script is:inline src={jsSrc} type="text/javascript"></script>
-  <script is:inline define:vars={{ bundlePath }}>
-    window.addEventListener('DOMContentLoaded', () => {
-      if (typeof window.PagefindUI === 'undefined') {
-        const fb = document.getElementById('search-fallback');
-        if (fb) fb.hidden = false;
-        return;
-      }
-      const base = bundlePath.replace(/\/pagefind\/$/, ''); // '/injoy'
-      const fix = (u) => (u && u.startsWith('/') && !u.startsWith(base + '/') ? base + u : u);
-      new window.PagefindUI({
-        element: '#search',
-        bundlePath,
-        showSubResults: true,
-        showImages: false,
-        // 한 페이지에 글 결과 10개, 더 있으면 '결과 더 보기'로 이어 본다. 이 버튼 첫 클릭이
-        // 안 먹던 건 푸터가 화면 중간에 떠 생긴 레이아웃 튐이었고, 스티키 푸터로 고친 뒤 정상 동작한다.
-        pageSize: 10,
-        // 결과 URL을 base('/injoy') 기준으로 바로잡는다(색인은 dist 루트 기준이라 prefix가 없다).
-        processResult: (result) => {
-          result.url = fix(result.url);
-          if (Array.isArray(result.sub_results)) {
-            for (const sr of result.sub_results) sr.url = fix(sr.url);
-          }
-          return result;
-        },
-        translations: {
-          placeholder: '검색어를 입력하세요',
-          clear_search: '지우기',
-          load_more: '결과 더 보기',
-          search_label: 'Injoy 검색',
-          filters_label: '필터',
-          zero_results: '[SEARCH_TERM]에 대한 결과가 없어요',
-          many_results: '[SEARCH_TERM] 결과 [COUNT]개',
-          one_result: '[SEARCH_TERM] 결과 [COUNT]개',
-          alt_search: '[SEARCH_TERM] 대신 [DIFFERENT_TERM]의 결과예요',
-          search_suggestion: '[SEARCH_TERM]에 대한 결과가 없어요. 다른 말로 찾아보세요',
-          searching: '[SEARCH_TERM] 찾는 중...',
-        },
-      });
-    });
-  </script>
 </BaseLayout>
+
+<script>
+  // 배포 base('/injoy/') — Astro가 빌드 때 치환한다. 색인은 base 없이 만들어져
+  // 결과 url이 '/posts/..'로 오므로 base를 앞에 붙여 바로잡는다.
+  const BASE = import.meta.env.BASE_URL;
+  const baseNoSlash = BASE.replace(/\/$/, ''); // '/injoy'
+  const fixUrl = (u: string) =>
+    u && u.startsWith('/') && !u.startsWith(baseNoSlash + '/') ? baseNoSlash + u : u;
+
+  const input = document.getElementById('search-input') as HTMLInputElement | null;
+  const countEl = document.getElementById('search-count');
+  const resultsEl = document.getElementById('search-results');
+  const moreBtn = document.getElementById('search-more') as HTMLButtonElement | null;
+  const fallbackEl = document.getElementById('search-fallback');
+
+  type SubResult = { title: string; url: string; excerpt: string };
+  type PageData = { url: string; meta?: { title?: string }; excerpt: string; sub_results?: SubResult[] };
+
+  // Pagefind 모듈(런타임 전용 경로라 Vite가 번들 분석을 하지 않게 @vite-ignore).
+  let pagefind: any = null;
+  let loadFailed = false;
+  async function ensurePagefind() {
+    if (pagefind || loadFailed) return;
+    try {
+      // BASE_URL이 '/injoy'(끝 슬래시 없이)로 올 수 있어 슬래시를 명시해 합친다.
+      pagefind = await import(/* @vite-ignore */ `${baseNoSlash}/pagefind/pagefind.js`);
+      await pagefind.init();
+    } catch {
+      loadFailed = true;
+      if (fallbackEl) fallbackEl.hidden = false;
+    }
+  }
+  // 입력에 포커스가 오면 미리 모듈을 받아 첫 검색을 빠르게 한다.
+  input?.addEventListener('focus', ensurePagefind, { once: true });
+
+  const BATCH = 10;
+  let loaded: PageData[] = []; // 이번 검색의 전체 결과 데이터
+  let shown = 0; // 지금까지 렌더한 글 수
+
+  const escapeText = (s: string) => s; // textContent로 넣으므로 별도 이스케이프 불필요
+
+  function renderBatch() {
+    if (!resultsEl) return;
+    const slice = loaded.slice(shown, shown + BATCH);
+    for (const d of slice) {
+      const card = document.createElement('article');
+      card.className = 'sr-result';
+
+      const title = document.createElement('a');
+      title.className = 'sr-title';
+      title.href = fixUrl(d.url);
+      title.textContent = d.meta?.title || d.url;
+      card.appendChild(title);
+
+      // Pagefind는 글 머리(첫 헤딩 앞) 매칭을 '앵커 없는' sub_result로, 각 섹션 매칭을
+      // '#헤딩' sub_result로 준다. 글 머리는 리드 발췌로 한 번만(페이지 발췌와 중복 방지),
+      // 헤딩 섹션들은 그 아래 목록으로 분리한다. innerHTML은 Pagefind가 이스케이프하고 <mark>만 넣음(안전).
+      const subs = d.sub_results ?? [];
+      const intro = subs.find((s) => !s.url.includes('#'));
+      const sections = subs.filter((s) => s.url.includes('#'));
+
+      const leadHtml = intro ? intro.excerpt : sections.length ? '' : d.excerpt;
+      if (leadHtml) {
+        const ex = document.createElement('p');
+        ex.className = 'sr-excerpt';
+        ex.innerHTML = leadHtml;
+        card.appendChild(ex);
+      }
+
+      if (sections.length) {
+        const list = document.createElement('div');
+        list.className = 'sr-subs';
+        for (const sr of sections) {
+          const sub = document.createElement('div');
+          sub.className = 'sr-sub';
+          const st = document.createElement('a');
+          st.className = 'sr-sub-title';
+          st.href = fixUrl(sr.url);
+          st.textContent = sr.title;
+          const se = document.createElement('div');
+          se.className = 'sr-sub-ex';
+          se.innerHTML = sr.excerpt;
+          sub.append(st, se);
+          list.appendChild(sub);
+        }
+        card.appendChild(list);
+      }
+      resultsEl.appendChild(card);
+    }
+    shown += slice.length;
+    if (moreBtn) moreBtn.hidden = shown >= loaded.length;
+  }
+
+  function reset() {
+    loaded = [];
+    shown = 0;
+    if (resultsEl) resultsEl.innerHTML = '';
+    if (countEl) countEl.textContent = '';
+    if (moreBtn) moreBtn.hidden = true;
+  }
+
+  async function run(term: string) {
+    if (!term) {
+      reset();
+      return;
+    }
+    await ensurePagefind();
+    if (loadFailed || !pagefind) return;
+    const search = await pagefind.debouncedSearch(term, {}, 300);
+    if (search === null) return; // 더 새 입력에 밀림 — 이 결과는 버린다
+    // 맞은 글 전체의 데이터를 받아 글 수(N)와 구간 합(M)을 정직하게 센다.
+    // ponytail: 전수 data() 로드는 수십 편까지 가볍다. 수백 편이면 배치 지연 로드로.
+    loaded = await Promise.all(search.results.map((r: any) => r.data() as Promise<PageData>));
+    shown = 0;
+    if (resultsEl) resultsEl.innerHTML = '';
+
+    const n = loaded.length;
+    if (n === 0) {
+      if (countEl) countEl.textContent = `‘${escapeText(term)}’에 대한 결과가 없어요`;
+      if (moreBtn) moreBtn.hidden = true;
+      return;
+    }
+    const m = loaded.reduce((sum, d) => sum + (d.sub_results?.length ?? 0), 0);
+    if (countEl) {
+      countEl.textContent =
+        m > 0 ? `‘${term}’ 결과 · 글 ${n}개에서 ${m}곳` : `‘${term}’ 결과 · 글 ${n}개`;
+    }
+    renderBatch();
+  }
+
+  let timer: ReturnType<typeof setTimeout>;
+  input?.addEventListener('input', () => {
+    const term = input.value.trim();
+    clearTimeout(timer);
+    // pagefind.debouncedSearch가 자체 디바운스를 하지만, 빈 입력 초기화는 즉시.
+    if (!term) {
+      reset();
+      return;
+    }
+    timer = setTimeout(() => run(term), 80);
+  });
+
+  moreBtn?.addEventListener('click', renderBatch);
+</script>
 
 <style>
   .search-page {
@@ -88,6 +201,85 @@ const bundlePath = withBase('/pagefind/'); // '/injoy/pagefind/'
     color: var(--text-muted);
   }
 
+  /* 검색 입력 */
+  .search-box {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--surface);
+    padding: 0.7rem 0.95rem;
+    transition: border-color 0.15s ease;
+  }
+
+  .search-box:focus-within {
+    border-color: var(--accent);
+  }
+
+  .search-icon {
+    flex-shrink: 0;
+    width: 1.05rem;
+    height: 1.05rem;
+    fill: none;
+    stroke: var(--text-muted);
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+
+  #search-input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    padding: 0;
+  }
+
+  #search-input:focus {
+    outline: none;
+  }
+
+  /* 결과 수 */
+  .search-count {
+    margin: 0;
+    padding: 1.2rem 0 0.2rem;
+    color: var(--text);
+    font-weight: 700;
+    font-size: 1rem;
+  }
+
+  .search-count:empty {
+    padding: 0;
+  }
+
+  /* 더보기 */
+  .search-more {
+    width: 100%;
+    margin-top: 1.6rem;
+    height: 46px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--accent);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .search-more[hidden] {
+    display: none;
+  }
+
+  .search-more:hover {
+    background-color: var(--surface);
+    border-color: var(--accent);
+  }
+
   .search-fallback {
     margin-top: 1rem;
     color: var(--text-muted);
@@ -102,17 +294,73 @@ const bundlePath = withBase('/pagefind/'); // '/injoy/pagefind/'
     padding: 0.1em 0.4em;
     border-radius: 6px;
   }
+</style>
 
-  /* Pagefind UI를 사이트 토큰에 맞춘다(라이트·다크 자동 전환). 자체 DOM이라 :global */
-  #search {
-    --pagefind-ui-scale: 0.9;
-    --pagefind-ui-primary: var(--accent);
-    --pagefind-ui-text: var(--text);
-    --pagefind-ui-background: var(--bg);
-    --pagefind-ui-border: var(--border);
-    --pagefind-ui-tag: var(--surface);
-    --pagefind-ui-border-width: 1px;
-    --pagefind-ui-border-radius: 10px;
-    --pagefind-ui-font: var(--font-sans);
+<!-- 결과 카드는 스크립트가 만들어 붙이므로(createElement) Astro 스코프 CSS가 안 붙는다.
+     전역으로 두되 검색 결과 컨테이너(.search-results)에 한정한다. 기본 Pagefind UI 모양을 따른다. -->
+<style is:global>
+  .search-results .sr-result {
+    border-top: 1px solid var(--border);
+    padding: 1.5rem 0 1.7rem;
+  }
+
+  .search-results .sr-title {
+    color: var(--text);
+    font-weight: 700;
+    font-size: 1.2rem;
+    line-height: 1.4;
+    text-decoration: none;
+  }
+
+  .search-results .sr-title:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .search-results .sr-excerpt {
+    margin: 0.45rem 0 0;
+    color: var(--text);
+    font-size: 0.92rem;
+    line-height: 1.75;
+  }
+
+  /* 글 안 구간(sub-result) — 전부 보여 준다. 기본 UI처럼 ⤷로 들여쓴다(왼쪽 선 없음) */
+  .search-results .sr-subs {
+    margin-top: 0.85rem;
+    padding-left: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .search-results .sr-sub-title {
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.92rem;
+    text-decoration: none;
+  }
+
+  .search-results .sr-sub-title::before {
+    content: '⤷\00a0\00a0';
+    color: var(--text-muted);
+  }
+
+  .search-results .sr-sub-title:hover {
+    color: var(--accent);
+  }
+
+  .search-results .sr-sub-ex {
+    margin-top: 0.15rem;
+    color: var(--text-muted);
+    font-size: 0.86rem;
+    line-height: 1.65;
+  }
+
+  /* 검색어 강조 — Pagefind excerpt의 <mark> */
+  .search-results mark {
+    background-color: #fde047;
+    color: #1a1b1e;
+    padding: 0 0.12em;
+    border-radius: 2px;
   }
 </style>
