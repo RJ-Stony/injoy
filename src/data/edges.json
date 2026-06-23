@@ -83,6 +83,12 @@
       "to": "polish-round-6",
       "type": "extends",
       "note": "그래프를 줌을 통해 보여주고 미리보기가 못 잡은 흔들림까지 잡은 과정"
+    },
+    {
+      "from": "polish-round-8",
+      "to": "polish-round-7",
+      "type": "extends",
+      "note": "그래프를 손본 데 이어, 발행 대기를 없애고 댓글·시리즈 묶기로 글의 앞뒤를 손본 과정"
     }
   ]
 }
