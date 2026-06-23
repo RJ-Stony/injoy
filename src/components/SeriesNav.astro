@@ -1,0 +1,144 @@
+---
+/**
+ * 시리즈 내비 — 같은 frontmatter `series` 값을 가진 글들을 읽는 순서(오래된 글 먼저)로 묶어 보여 준다.
+ * 현재 글은 링크 대신 강조해 위치(N/M)를 알려 준다. series가 없거나 1편뿐이면 렌더하지 않는다.
+ */
+import { getPublishedPosts, type Post } from '../utils/post';
+import { withBase } from '../utils/url';
+
+interface Props {
+  post: Post;
+}
+const { post } = Astro.props;
+const series = post.data.series;
+
+let items: Post[] = [];
+if (series) {
+  const all = await getPublishedPosts();
+  items = all
+    .filter((p) => p.data.series === series)
+    // 시리즈는 읽는 순서대로(오래된 글 먼저). pubDate 오름차순, 같은 날이면 슬러그 오름차순.
+    .sort((a, b) => a.data.pubDate.valueOf() - b.data.pubDate.valueOf() || a.id.localeCompare(b.id));
+}
+const currentIndex = items.findIndex((p) => p.id === post.id);
+const show = !!series && items.length > 1;
+---
+
+{
+  show && (
+    <nav class="series" aria-label={`시리즈 ${series}`} data-pagefind-ignore>
+      <p class="series-head">
+        <span class="series-label">시리즈</span>
+        <strong class="series-name">{series}</strong>
+        <span class="series-count">
+          {currentIndex + 1} / {items.length}
+        </span>
+      </p>
+      <ol class="series-list">
+        {items.map((p, i) => (
+          <li class:list={['series-item', { current: p.id === post.id }]}>
+            {p.id === post.id ? (
+              <span aria-current="true">
+                <span class="series-num">{i + 1}</span>
+                {p.data.title}
+              </span>
+            ) : (
+              <a href={withBase(`/posts/${p.id}/`)}>
+                <span class="series-num">{i + 1}</span>
+                {p.data.title}
+              </a>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  )
+}
+
+<style>
+  .series {
+    margin-top: 2.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.3rem 1.2rem;
+    background-color: var(--surface);
+  }
+
+  .series-head {
+    margin: 0 0 0.7rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+  }
+
+  .series-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    background-color: var(--accent-weak);
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+  }
+
+  .series-name {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .series-count {
+    margin-left: auto;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .series-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .series-item a,
+  .series-item span[aria-current] {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: 8px;
+    line-height: 1.5;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+
+  .series-item a:hover {
+    background-color: var(--accent-weak);
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .series-item.current span[aria-current] {
+    color: var(--text);
+    font-weight: 700;
+    background-color: color-mix(in srgb, var(--accent) 9%, transparent);
+  }
+
+  .series-num {
+    flex-shrink: 0;
+    width: 1.4rem;
+    text-align: right;
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+  }
+
+  .series-item.current .series-num {
+    color: var(--accent);
+    font-weight: 700;
+  }
+</style>

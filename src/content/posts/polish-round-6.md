@@ -4,6 +4,7 @@ description: "검색 페이지에서 실제로 무엇을 찾았는지 모두 보
 pubDate: 2026-06-23
 category: "블로그"
 tags: ["검색", "ui"]
+series: "다듬기 기록"
 draft: false
 ---
 

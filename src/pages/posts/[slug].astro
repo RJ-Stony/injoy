@@ -7,6 +7,7 @@ import PostStats from '../../components/PostStats.astro';
 import TableOfContents from '../../components/TableOfContents.astro';
 import ViewCount from '../../components/ViewCount.astro';
 import ReadingPath from '../../components/ReadingPath.astro';
+import SeriesNav from '../../components/SeriesNav.astro';
 import TransparencyPanel from '../../components/TransparencyPanel.astro';
 import PostReading from '../../components/PostReading.astro';
 import { getPublishedPosts, readingMinutes } from '../../utils/post';
@@ -110,6 +111,8 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
       )
     }
 
+    <SeriesNav post={post} />
+
     <ReadingPath slug={post.id} title={post.data.title} />
 
     {
@@ -212,8 +215,13 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
 
     let timer: ReturnType<typeof setTimeout>;
     button.addEventListener('click', async () => {
+      // diff 블록이면 지운 줄(-- 표시)은 빼고, 남는 최종 코드만 복사한다
+      const lines = code.querySelectorAll<HTMLElement>('.line');
+      const text = lines.length
+        ? [...lines].filter((l) => !l.classList.contains('remove')).map((l) => l.textContent).join('\n')
+        : code.innerText;
       try {
-        await navigator.clipboard.writeText(code.innerText);
+        await navigator.clipboard.writeText(text);
         button.textContent = '복사됨';
         clearTimeout(timer);
         timer = setTimeout(() => {

@@ -5,6 +5,7 @@ pubDate: 2026-06-21
 updatedDate: 2026-06-22
 category: "회고"
 tags: ["가독성", "글쓰기", "ui"]
+series: "다듬기 기록"
 draft: false
 ---
 

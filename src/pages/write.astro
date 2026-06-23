@@ -1070,8 +1070,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     return edgesToString({ ...data, edges: kept });
   }
 
+  // 배포(GitHub Actions) 결과만 조용히 폴링해 돌려준다 — 화면 표시는 trackDeploy가 맡는다.
   async function waitForDeploy(sha: string) {
-    const status = $('publish-status');
     for (let i = 0; i < 60; i++) {
       await new Promise((r) => setTimeout(r, 4000));
       try {
@@ -1080,10 +1080,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         );
         const run = runs.workflow_runs?.[0];
         if (!run) continue;
-        if (run.status !== 'completed') {
-          status.textContent = `배포 중… (${run.status})`;
-          continue;
-        }
+        if (run.status !== 'completed') continue;
         // 취소·건너뜀은 실패가 아니라 '더 최신 발행으로 대체됨' — 별도 신호로 구분한다.
         if (run.conclusion === 'cancelled' || run.conclusion === 'skipped') return 'superseded';
         return run.conclusion === 'success';
@@ -1092,6 +1089,55 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       }
     }
     return null;
+  }
+
+  // 발행은 커밋 순간 끝난다. 배포(빌드)는 사이트에 퍼지는 시간일 뿐이라 기다리게 하지 않는다.
+  // 바로 성공을 알리고, 배포 확인은 백그라운드에서 — 그동안 즐거운 진행 표시를 보여 준다(논블로킹).
+  // 동시에 두 번 발행해도 옛 진행표시가 최신 것을 덮거나 인터벌이 겹치지 않게 세대 토큰으로 가드.
+  let deployRun = 0;
+  let deployRot: ReturnType<typeof setInterval> | null = null;
+  function trackDeploy(sha: string, url: string, verbPast: string) {
+    const gen = ++deployRun;
+    if (deployRot) clearInterval(deployRot);
+    const status = $('publish-status');
+    const link = `<a href="${url}">글 보러 가기</a>`;
+    const msgs = ['GitHub에 올렸어요', '사이트 짓는 중…', '거의 다 됐어요'];
+    let step = 0;
+    status.innerHTML =
+      `<span class="pub-ok">✓ ${verbPast}!</span>` +
+      ` <span class="pub-progress"><span class="pub-spin" aria-hidden="true"></span>` +
+      `<span class="pub-msg">${msgs[0]}</span></span> · ${link}`;
+    deployRot = setInterval(() => {
+      if (gen !== deployRun) return;
+      step = (step + 1) % msgs.length;
+      const m = status.querySelector('.pub-msg');
+      if (m) m.textContent = msgs[step];
+    }, 5000);
+    const stop = () => {
+      if (deployRot) {
+        clearInterval(deployRot);
+        deployRot = null;
+      }
+    };
+    waitForDeploy(sha)
+      .then((ok) => {
+        if (gen !== deployRun) return; // 더 최신 발행이 있으면 이 결과는 버린다
+        stop();
+        if (ok === true) {
+          status.innerHTML = `<span class="pub-ok">✓ 사이트에 반영됐어요</span> · ${link} <span class="tossface">🌱</span>`;
+        } else if (ok === 'superseded') {
+          status.innerHTML = `<span class="pub-ok">✓ ${verbPast}.</span> 더 최신 발행으로 대체됐어요. 최신 내용이 곧 반영됩니다.`;
+        } else if (ok === false) {
+          status.innerHTML = `⚠ ${verbPast}(커밋은 됐어요)만 배포가 실패했어요. GitHub Actions 로그를 확인해 주세요.`;
+        } else {
+          status.innerHTML = `<span class="pub-ok">✓ ${verbPast}.</span> 배포 확인이 늦어지고 있어요 · ${link}`;
+        }
+      })
+      .catch(() => {
+        if (gen !== deployRun) return;
+        stop();
+        status.innerHTML = `<span class="pub-ok">✓ ${verbPast}</span> · ${link}`;
+      });
   }
 
   $('publish').addEventListener('click', async () => {
@@ -1129,33 +1175,28 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       const verb = state.mode === 'edit' ? '수정' : '발행';
       const sha = await commitFiles(files, [], `post: ${($('fm-title') as HTMLInputElement).value.trim()} ${verb} (/write)`);
 
-      status.textContent = '커밋 완료, 배포를 기다리는 중…';
-      const ok = await waitForDeploy(sha);
-      if (ok === true) {
-        const url = `${CFG.base}posts/${slug}/`;
-        status.innerHTML = `✓ 발행 완료 · <a href="${url}">글 보러 가기</a>`;
-        state.pendingFiles.clear();
-        state.coverPendingPath = null;
-        // acceptedEdges는 비우지 않는다 — 방금 쓴 '이 글의 연결' 상태라, 유지해야
-        // 재발행 시 reconcile가 같은 집합으로 멱등 동작하고 실수로 지워지지 않는다.
-        state.mode = 'edit';
-        state.editingSlug = slug;
-        // 발행되면 슬러그를 잠근다 — 잠그지 않으면 슬러그를 바꿔 재발행했을 때
-        // 옛 .md가 고아로 남고 중복 점검도 edit 모드라 건너뛴다(이름 변경은 새 글로).
-        ($('fm-slug') as HTMLInputElement).disabled = true;
-        $('delete-post').hidden = false;
+      // 커밋이 곧 발행이다 — 바로 성공을 알리고 에디터를 풀어 준다. 발행 후 상태 정리도 여기서.
+      const url = `${CFG.base}posts/${slug}/`;
+      state.pendingFiles.clear();
+      state.coverPendingPath = null;
+      // acceptedEdges는 비우지 않는다 — 방금 쓴 '이 글의 연결' 상태라, 재발행 reconcile가 멱등이게.
+      state.mode = 'edit';
+      state.editingSlug = slug;
+      // 발행되면 슬러그를 잠근다(이름 변경은 새 글로 — 옛 .md 고아 방지).
+      ($('fm-slug') as HTMLInputElement).disabled = true;
+      $('delete-post').hidden = false;
+      btn.disabled = false;
+      // 배포 확인은 백그라운드 + 즐거운 진행 표시(논블로킹) — 끝나면 '반영됐어요'로 바뀐다.
+      trackDeploy(sha, url, verb === '수정' ? '수정됐어요' : '발행됐어요');
+      // 목록·인덱스 갱신은 발행과 별개라 따로 감싼다(여기서 실패해도 '발행 실패'로 오인하지 않게).
+      try {
         await loadIndex();
         await loadPostList();
-      } else if (ok === 'superseded') {
-        status.textContent = '더 최신 발행으로 대체됐어요. 최신 내용이 곧 반영됩니다.';
-      } else if (ok === false) {
-        status.textContent = '✕ 배포에 실패했어요. GitHub Actions 로그를 확인해 주세요.';
-      } else {
-        status.textContent = '커밋은 됐지만 배포 확인이 늦어지고 있어요. Actions에서 직접 확인해 주세요.';
+      } catch {
+        /* 목록 갱신 실패는 다음 로드에서 회복 */
       }
     } catch (e) {
-      status.textContent = `✕ 발행 실패: ${e}`;
-    } finally {
+      $('publish-status').textContent = `✕ 발행 실패: ${e}`;
       btn.disabled = false;
     }
   });
@@ -2830,6 +2871,40 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     font-size: 0.88rem;
     color: var(--text-muted);
     text-align: right;
+  }
+
+  /* 발행 진행 표시 — innerHTML로 주입되므로 전역(.write-root)으로 둔다 */
+  .write-root #publish-status .pub-ok {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .write-root #publish-status .pub-progress {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .write-root #publish-status .pub-spin {
+    width: 0.8rem;
+    height: 0.8rem;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    display: inline-block;
+    animation: pub-spin 0.7s linear infinite;
+  }
+
+  @keyframes pub-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .write-root #publish-status .pub-spin {
+      animation: none;
+    }
   }
 
   .write-root .settings {

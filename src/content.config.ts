@@ -12,6 +12,8 @@ const posts = defineCollection({
       updatedDate: z.coerce.date().optional(),
       category: z.string(),
       tags: z.array(z.string()).default([]),
+      // 같은 series 값을 가진 글끼리 '이 시리즈의 글'로 묶인다(선택). 없으면 시리즈 내비 미표시.
+      series: z.string().optional(),
       draft: z.boolean().default(false),
       cover: image().optional(),
     }),
