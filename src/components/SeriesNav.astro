@@ -34,7 +34,9 @@ const show = !!series && items.length > 1;
         <span class="series-count">
           {currentIndex + 1} / {items.length}
         </span>
-        <span class="series-caret" aria-hidden="true" />
+        <svg class="series-caret" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M4 6l4 4 4-4" />
+        </svg>
       </summary>
       <ol class="series-list">
         {items.map((p, i) => (
@@ -103,22 +105,26 @@ const show = !!series && items.length > 1;
     font-variant-numeric: tabular-nums;
   }
 
+  /* viewBox 중앙에 그린 셰브론 — 180° 회전해도 잉크가 대칭이라 접힘·펼침 정렬이 같다 */
   .series-caret {
     align-self: center;
-    width: 0.46em;
-    height: 0.46em;
-    border-right: 1.6px solid var(--text-muted);
-    border-bottom: 1.6px solid var(--text-muted);
-    transform: rotate(45deg);
-    transition: transform 0.15s ease;
+    flex-shrink: 0;
+    width: 0.85em;
+    height: 0.85em;
+    fill: none;
+    stroke: var(--text-muted);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.15s ease, stroke 0.15s ease;
   }
 
   .series[open] .series-caret {
-    transform: rotate(-135deg);
+    transform: rotate(180deg);
   }
 
   .series-head:hover .series-caret {
-    border-color: var(--accent);
+    stroke: var(--accent);
   }
 
   .series-list {
