@@ -97,8 +97,12 @@ const data = {
     let dpr = 1;
     // ---- 팬·줌 뷰 변환: 화면(CSS px) = 레이아웃좌표 * view.scale + view.t ----
     const view = { scale: 1, tx: 0, ty: 0 };
-    const baseView = { scale: 1, tx: 0, ty: 0 }; // fit-to-view가 잡는 기준(리셋·줌 한계의 기준)
-    let autoFit = true; // 사용자가 팬/줌/노드드래그 하기 전까지 자동으로 화면에 맞춘다
+    const baseView = { scale: 1, tx: 0, ty: 0 }; // 마지막으로 맞춘 기준(리셋·줌 한계의 기준)
+    let pendingFit = true; // 다음 '정착' 때 딱 한 번 노드에 꼭 맞춘다(매 프레임이 아니라)
+    // 레이아웃을 담는 고정 박스(원점 중심 반너비·반높이). 글이 많이 늘면 살짝 키워 덜 겹치게.
+    const spread = Math.min(2.2, Math.max(1, Math.sqrt(nodes.length / 28)));
+    let BX = 0, BY = 0;
+    const LBL = 48; // 라벨이 노드 밖으로 삐져나가는 여유(박스 가장자리 패딩)
     const toWorldX = (sx) => (sx - view.tx) / view.scale;
     const toWorldY = (sy) => (sy - view.ty) / view.scale;
     const clampScale = (s) => Math.min(baseView.scale * 6, Math.max(baseView.scale * 0.5, s));
@@ -132,6 +136,8 @@ const data = {
       const rect = canvas.parentElement.getBoundingClientRect();
       W = rect.width;
       H = Math.max(360, Math.min(560, Math.round(rect.width * 0.62)));
+      BX = (W / 2) * spread; // 레이아웃 박스 반너비·반높이(원점 중심)
+      BY = (H / 2) * spread;
       // 고DPR(모바일 2~3배) 백킹스토어가 매 프레임 칠하는 픽셀을 폭주시키지 않게 2배로 캡
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = W * dpr;
@@ -141,12 +147,11 @@ const data = {
     };
 
     const seed = (n, i) => {
-      // 결정적 초기 배치(원형, 원점 중심) — 새로고침마다 모양이 널뛰지 않게.
-      // 화면 좌표가 아니라 '레이아웃 좌표'다(원점 0,0 기준). 화면엔 fit-to-view로 맞춘다.
+      // 결정적 초기 배치(원형, 원점 중심·박스 안) — 새로고침마다 모양이 안 널뛰게.
       const angle = (i / nodes.length) * Math.PI * 2;
-      const r = 90 + nodes.length * 5;
-      n.x = Math.cos(angle) * r * (n.kind === 'tag' ? 1.15 : 0.85);
-      n.y = Math.sin(angle) * r * (n.kind === 'tag' ? 1.15 : 0.85);
+      const r = Math.min(BX, BY) * 0.62;
+      n.x = Math.cos(angle) * r * (n.kind === 'tag' ? 1.1 : 0.8);
+      n.y = Math.sin(angle) * r * (n.kind === 'tag' ? 1.1 : 0.8);
     };
 
     // 힘 시뮬레이션 한 스텝. 노드 간 척력은 O(n²)라 글이 수십 개로 늘면
@@ -199,10 +204,10 @@ const data = {
         n.vy *= damp;
         n.x += n.vx;
         n.y += n.vy;
-        // 폭주 방지용 넉넉한 안전 경계만(실제 크기는 힘이 정한다). fit-to-view가 화면에 맞춘다.
-        const LIM = 4000;
-        n.x = Math.max(-LIM, Math.min(LIM, n.x));
-        n.y = Math.max(-LIM, Math.min(LIM, n.y));
+        // 노드를 고정 박스(원점 중심) 안에 가둔다 — 화면엔 박스를 한 번 맞춰 두니
+        // 박스 안 노드는 시뮬레이션이 움직여도 항상 화면 안(가장자리 잘림 0).
+        n.x = Math.max(-BX, Math.min(BX, n.x));
+        n.y = Math.max(-BY, Math.min(BY, n.y));
       }
     };
 
@@ -290,8 +295,24 @@ const data = {
       }
     };
 
-    // 모든 노드(원+라벨 추정 크기 포함)의 경계상자를 캔버스에 맞춘다.
-    // autoFit인 동안 매 프레임 호출 — 글이 몇 개든 전부 화면에 들어온다(가장자리 잘림 해결).
+    // 고정 박스(+라벨 여유)를 캔버스에 한 번 맞춘다(원점→캔버스 중앙). 박스가 불변이라
+    // 이 뷰도 불변 → 시뮬레이션이 도는 동안 화면이 흔들리지 않는다(애니메이션용 기본 뷰).
+    const homeView = () => {
+      if (W <= 0 || H <= 0) return;
+      const pad = 8;
+      const s = Math.max(
+        Math.min((W / 2 - pad) / (BX + LBL), (H / 2 - pad) / (BY + LBL)),
+        0.05,
+      );
+      baseView.scale = s;
+      baseView.tx = W / 2;
+      baseView.ty = H / 2;
+      view.scale = s;
+      view.tx = W / 2;
+      view.ty = H / 2;
+    };
+
+    // 실제 노드들의 경계상자에 꼭 맞춘다 — '정착했을 때 한 번만' 호출(매 프레임 아님).
     const fitToBbox = () => {
       if (!nodes.length || W <= 0 || H <= 0) return;
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -326,7 +347,7 @@ const data = {
       view.scale = ns;
       view.tx = cx - wx * ns;
       view.ty = cy - wy * ns;
-      autoFit = false;
+      pendingFit = false; // 사용자가 줌했으니 정착 시 자동 맞춤이 덮어쓰지 않게
       draw();
     };
 
@@ -343,7 +364,7 @@ const data = {
       if (dx || dy) {
         view.tx += dx;
         view.ty += dy;
-        autoFit = false; // 직접 옮겼으니 자동 맞춤이 덮어쓰지 않게
+        pendingFit = false; // 직접 옮겼으니 정착 시 자동 맞춤이 덮어쓰지 않게
       }
     };
 
@@ -353,7 +374,6 @@ const data = {
     const loop = () => {
       frames++;
       tick();
-      if (autoFit) fitToBbox();
       draw();
       const energy = nodes.reduce((s, n) => s + Math.abs(n.vx) + Math.abs(n.vy), 0);
       calmFrames = energy < 0.5 ? calmFrames + 1 : 0;
@@ -363,7 +383,10 @@ const data = {
       const maxFrames = isSmall() ? 180 : 300;
       if ((calmFrames > calmLimit || frames > maxFrames) && !dragging) {
         running = false;
-        autoFit = false; // 정착 후엔 hover로 wake돼도 다시 맞추지 않는다(흔들림 방지)
+        if (pendingFit) { // 정착했을 때 딱 한 번 노드에 꼭 맞춘다(이후 hover로 wake돼도 다시 안 함)
+          fitToBbox();
+          pendingFit = false;
+        }
         return;
       }
       requestAnimationFrame(loop);
@@ -371,7 +394,6 @@ const data = {
     const wake = () => {
       if (reduceMotion) {
         for (let i = 0; i < 60; i++) tick();
-        if (autoFit) fitToBbox();
         draw();
         return;
       }
@@ -461,7 +483,7 @@ const data = {
         view.scale = ns;
         view.tx = mx - wx * ns;
         view.ty = my - wy * ns;
-        autoFit = false;
+        pendingFit = false;
         draw();
         return;
       }
@@ -471,7 +493,7 @@ const data = {
         // 슬롭 이내의 미세 이동은 탭으로 취급 — 노드도 밀리지 않게 보류
         if (!moved && Math.hypot(x - dragStart.x, y - dragStart.y) < dragStart.slop) return;
         moved = true;
-        autoFit = false; // 손으로 옮기기 시작하면 자동 맞춤을 멈춘다
+        pendingFit = false; // 손으로 옮기기 시작하면 자동 맞춤을 멈춘다
         dragging.x = toWorldX(x);
         dragging.y = toWorldY(y);
         wake();
@@ -482,7 +504,7 @@ const data = {
       if (panStart && ev.pointerId === panStart.pointerId) {
         view.tx = panStart.tx + (x - panStart.x);
         view.ty = panStart.ty + (y - panStart.y);
-        autoFit = false;
+        pendingFit = false;
         draw();
         return;
       }
@@ -557,7 +579,8 @@ const data = {
       const { x, y } = pos(ev);
       if (nodeAt(x, y)) return;
       ev.preventDefault();
-      fitToBbox(); // 한 번 다시 맞춘다(처음 크기로)
+      fitToBbox(); // 현재 노드들에 꼭 맞춰 되돌린다
+      pendingFit = false;
       draw();
     });
 
@@ -631,11 +654,12 @@ const data = {
       readColors();
       resize();
       nodes.forEach(seed);
-      autoFit = true; // 새로 배치하면 다시 화면에 맞춘다
+      homeView(); // 애니메이션 동안 쓸 기본 뷰(고정 박스 맞춤). 정착하면 노드에 꼭 맞춘다.
+      pendingFit = true;
       if (reduceMotion) {
         for (let i = 0; i < 400; i++) tick();
         fitToBbox();
-        autoFit = false; // 정착 완료 — hover로 다시 맞추지 않게
+        pendingFit = false;
         draw();
       } else {
         wake();
@@ -664,7 +688,7 @@ const data = {
     restart();
 
     // 개발·테스트용 좌표 핸들 (외부 의존 없음)
-    window.__injoyGraph = { nodes, view, baseView, fit: () => { autoFit = true; fitToBbox(); draw(); } };
+    window.__injoyGraph = { nodes, view, baseView, homeView, fit: () => { fitToBbox(); draw(); } };
   })();
 </script>
 
