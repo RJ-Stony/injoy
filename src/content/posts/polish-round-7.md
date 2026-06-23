@@ -2,6 +2,7 @@
 title: "화면 밖으로 자꾸만 도망가던 그래프"
 description: "그래프 화면을 버튼으로 확대할 수 있는 기능 추가"
 pubDate: 2026-06-23
+updatedDate: 2026-06-24
 category: "블로그"
 tags: ["그래프", "ui"]
 draft: false
