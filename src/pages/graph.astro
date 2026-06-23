@@ -18,7 +18,7 @@ const data = {
 >
   <section class="graph-head">
     <h1>그래프</h1>
-    <p class="lead">글은 쌓이기만 하지 않고 서로 연결됩니다. 노드를 끌어 보고, 눌러서 이동하세요.</p>
+    <p class="lead">글은 쌓이기만 하지 않고 서로 연결됩니다. 노드를 끌어 옮기고 눌러서 이동해요. 빈 곳은 끌어서 옮기고, 핀치(또는 Ctrl+휠)로 확대, 두 번 누르면 처음 크기로 돌아가요.</p>
     <p class="stats">
       <span><strong>{graph.stats.posts}</strong> 글</span>
       <span class="divider" aria-hidden="true">·</span>
@@ -94,6 +94,14 @@ const data = {
 
     let W = 0;
     let H = 0;
+    let dpr = 1;
+    // ---- 팬·줌 뷰 변환: 화면(CSS px) = 레이아웃좌표 * view.scale + view.t ----
+    const view = { scale: 1, tx: 0, ty: 0 };
+    const baseView = { scale: 1, tx: 0, ty: 0 }; // fit-to-view가 잡는 기준(리셋·줌 한계의 기준)
+    let autoFit = true; // 사용자가 팬/줌/노드드래그 하기 전까지 자동으로 화면에 맞춘다
+    const toWorldX = (sx) => (sx - view.tx) / view.scale;
+    const toWorldY = (sy) => (sy - view.ty) / view.scale;
+    const clampScale = (s) => Math.min(baseView.scale * 6, Math.max(baseView.scale * 0.5, s));
     const radius = (n) =>
       n.kind === 'post' ? Math.min(9 + n.degree * 1.5, 17) : 5 + Math.min(n.degree, 3);
 
@@ -125,7 +133,7 @@ const data = {
       W = rect.width;
       H = Math.max(360, Math.min(560, Math.round(rect.width * 0.62)));
       // 고DPR(모바일 2~3배) 백킹스토어가 매 프레임 칠하는 픽셀을 폭주시키지 않게 2배로 캡
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = W * dpr;
       canvas.height = H * dpr;
       canvas.style.height = `${H}px`;
@@ -133,11 +141,12 @@ const data = {
     };
 
     const seed = (n, i) => {
-      // 결정적 초기 배치(원형) — 새로고침마다 모양이 널뛰지 않게
+      // 결정적 초기 배치(원형, 원점 중심) — 새로고침마다 모양이 널뛰지 않게.
+      // 화면 좌표가 아니라 '레이아웃 좌표'다(원점 0,0 기준). 화면엔 fit-to-view로 맞춘다.
       const angle = (i / nodes.length) * Math.PI * 2;
-      const r = Math.min(W, H) * 0.32;
-      n.x = W / 2 + Math.cos(angle) * r * (n.kind === 'tag' ? 1.15 : 0.85);
-      n.y = H / 2 + Math.sin(angle) * r * (n.kind === 'tag' ? 1.15 : 0.85);
+      const r = 90 + nodes.length * 5;
+      n.x = Math.cos(angle) * r * (n.kind === 'tag' ? 1.15 : 0.85);
+      n.y = Math.sin(angle) * r * (n.kind === 'tag' ? 1.15 : 0.85);
     };
 
     // 힘 시뮬레이션 한 스텝. 노드 간 척력은 O(n²)라 글이 수십 개로 늘면
@@ -178,8 +187,9 @@ const data = {
       }
       const damp = isSmall() ? 0.78 : 0.82; // 작은 화면은 감쇠를 키워 더 빨리 정착(데스크톱 0.82 유지)
       for (const n of nodes) {
-        n.vx += (W / 2 - n.x) * GRAVITY;
-        n.vy += (H / 2 - n.y) * GRAVITY;
+        // 중력은 좌표 원점(레이아웃 중심)으로 — 화면 중심이 아니다
+        n.vx += (0 - n.x) * GRAVITY;
+        n.vy += (0 - n.y) * GRAVITY;
         if (n === dragging) {
           n.vx = 0;
           n.vy = 0;
@@ -189,9 +199,10 @@ const data = {
         n.vy *= damp;
         n.x += n.vx;
         n.y += n.vy;
-        const m = 24;
-        n.x = Math.max(m, Math.min(W - m, n.x));
-        n.y = Math.max(m, Math.min(H - m, n.y));
+        // 폭주 방지용 넉넉한 안전 경계만(실제 크기는 힘이 정한다). fit-to-view가 화면에 맞춘다.
+        const LIM = 4000;
+        n.x = Math.max(-LIM, Math.min(LIM, n.x));
+        n.y = Math.max(-LIM, Math.min(LIM, n.y));
       }
     };
 
@@ -209,7 +220,10 @@ const data = {
     let focusTouched = false;
 
     const draw = () => {
-      ctx.clearRect(0, 0, W, H);
+      // 매 프레임 변환을 새로 깐다: device 픽셀 전체를 지우고, dpr·팬·줌을 합친 변환으로 그린다.
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.setTransform(dpr * view.scale, 0, 0, dpr * view.scale, dpr * view.tx, dpr * view.ty);
       const hl = highlightSet();
       const fade = (id) => (hl && !hl.set.has(id) ? 0.14 : 1);
 
@@ -276,12 +290,70 @@ const data = {
       }
     };
 
+    // 모든 노드(원+라벨 추정 크기 포함)의 경계상자를 캔버스에 맞춘다.
+    // autoFit인 동안 매 프레임 호출 — 글이 몇 개든 전부 화면에 들어온다(가장자리 잘림 해결).
+    const fitToBbox = () => {
+      if (!nodes.length || W <= 0 || H <= 0) return;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const n of nodes) {
+        const r = radius(n);
+        const fs = n.kind === 'post' ? 12.5 : 11.5;
+        const halfLabel = (Math.min(n.label.length, 16) * fs * 0.55) / 2; // 라벨 반너비 추정
+        const ext = Math.max(r, halfLabel);
+        if (n.x - ext < minX) minX = n.x - ext;
+        if (n.x + ext > maxX) maxX = n.x + ext;
+        if (n.y - r < minY) minY = n.y - r;
+        if (n.y + r + fs + 6 > maxY) maxY = n.y + r + fs + 6; // 라벨은 노드 아래
+      }
+      const bw = Math.max(maxX - minX, 1);
+      const bh = Math.max(maxY - minY, 1);
+      const pad = 12;
+      // 음수·0 스케일(거울상·0으로 나눔) 방지용 작은 양수 하한
+      const s = Math.max(Math.min((W - pad * 2) / bw, (H - pad * 2) / bh), 0.05);
+      baseView.scale = s;
+      baseView.tx = (W - bw * s) / 2 - minX * s;
+      baseView.ty = (H - bh * s) / 2 - minY * s;
+      view.scale = baseView.scale;
+      view.tx = baseView.tx;
+      view.ty = baseView.ty;
+    };
+
+    // 한 점(화면 px)을 기준으로 줌 — 그 점 아래 좌표가 제자리에 남도록 tx,ty를 다시 잡는다.
+    const zoomAtPoint = (cx, cy, targetScale) => {
+      const ns = clampScale(targetScale);
+      const wx = (cx - view.tx) / view.scale;
+      const wy = (cy - view.ty) / view.scale;
+      view.scale = ns;
+      view.tx = cx - wx * ns;
+      view.ty = cy - wy * ns;
+      autoFit = false;
+      draw();
+    };
+
+    // 선택한 노드가 화면 밖이면 화면 안으로 살짝 끌어온다(스케일 유지) — 키보드 탐색용.
+    const ensureVisible = (n) => {
+      const margin = 44;
+      const sx = n.x * view.scale + view.tx;
+      const sy = n.y * view.scale + view.ty;
+      let dx = 0, dy = 0;
+      if (sx < margin) dx = margin - sx;
+      else if (sx > W - margin) dx = W - margin - sx;
+      if (sy < margin) dy = margin - sy;
+      else if (sy > H - margin) dy = H - margin - sy;
+      if (dx || dy) {
+        view.tx += dx;
+        view.ty += dy;
+        autoFit = false; // 직접 옮겼으니 자동 맞춤이 덮어쓰지 않게
+      }
+    };
+
     let running = false;
     let calmFrames = 0;
     let frames = 0;
     const loop = () => {
       frames++;
       tick();
+      if (autoFit) fitToBbox();
       draw();
       const energy = nodes.reduce((s, n) => s + Math.abs(n.vx) + Math.abs(n.vy), 0);
       calmFrames = energy < 0.5 ? calmFrames + 1 : 0;
@@ -291,6 +363,7 @@ const data = {
       const maxFrames = isSmall() ? 180 : 300;
       if ((calmFrames > calmLimit || frames > maxFrames) && !dragging) {
         running = false;
+        autoFit = false; // 정착 후엔 hover로 wake돼도 다시 맞추지 않는다(흔들림 방지)
         return;
       }
       requestAnimationFrame(loop);
@@ -298,6 +371,7 @@ const data = {
     const wake = () => {
       if (reduceMotion) {
         for (let i = 0; i < 60; i++) tick();
+        if (autoFit) fitToBbox();
         draw();
         return;
       }
@@ -309,10 +383,12 @@ const data = {
       }
     };
 
-    const nodeAt = (x, y) => {
+    const nodeAt = (sx, sy) => {
+      const x = toWorldX(sx);
+      const y = toWorldY(sy);
       for (let i = nodes.length - 1; i >= 0; i--) {
         const n = nodes[i];
-        const r = radius(n) + 6;
+        const r = radius(n) + 6 / view.scale; // 6px 슬롭을 레이아웃 단위로 환산
         if ((n.x - x) ** 2 + (n.y - y) ** 2 <= r * r) return n;
       }
       return null;
@@ -324,42 +400,95 @@ const data = {
     };
 
     let moved = false;
-    let dragStart = null; // { x, y, pointerId, slop }
+    let dragStart = null; // 노드 드래그: { x, y, pointerId, slop }
+    let panStart = null; // 빈 곳 팬: { x, y, tx, ty, pointerId }
+    let pinchStart = null; // 핀치 줌: { dist, cx, cy, scale, tx, ty }
+    const pointers = new Map(); // 활성 포인터 id → 화면좌표(핀치 판정용)
+
     canvas.addEventListener('pointerdown', (ev) => {
-      // 주 버튼·주 포인터만 드래그/탐색 대상 (휠클릭·우클릭·멀티터치 제외)
-      if (ev.button !== 0 || ev.isPrimary === false) return;
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return; // 마우스는 주 버튼만
       const { x, y } = pos(ev);
+      pointers.set(ev.pointerId, { x, y });
+
+      // 두 포인터 → 핀치 줌(+두 손가락 팬). 진행 중이던 노드드래그·팬은 취소.
+      if (pointers.size === 2) {
+        dragging = null;
+        dragStart = null;
+        panStart = null;
+        const p = [...pointers.values()];
+        pinchStart = {
+          dist: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1,
+          cx: (p[0].x + p[1].x) / 2,
+          cy: (p[0].y + p[1].y) / 2,
+          scale: view.scale,
+          tx: view.tx,
+          ty: view.ty,
+        };
+        try { canvas.setPointerCapture(ev.pointerId); } catch {}
+        return;
+      }
+      if (pointers.size !== 1) return;
+
       const n = nodeAt(x, y);
       if (n) {
         dragging = n;
         moved = false;
-        dragStart = {
-          x,
-          y,
-          pointerId: ev.pointerId,
-          slop: ev.pointerType === 'touch' ? 10 : 5, // 탭 떨림 허용 범위
-        };
+        dragStart = { x, y, pointerId: ev.pointerId, slop: ev.pointerType === 'touch' ? 10 : 5 };
         focusTouched = true;
-        try {
-          canvas.setPointerCapture(ev.pointerId);
-        } catch {
-          /* 일부 환경의 합성 포인터는 캡처 불가 — 드래그 품질만 떨어질 뿐 동작엔 지장 없음 */
-        }
+        try { canvas.setPointerCapture(ev.pointerId); } catch {}
         wake();
+      } else if (ev.pointerType !== 'touch') {
+        // 빈 곳 드래그 = 팬. 단 터치 한 손가락은 페이지 세로 스크롤을 위해 팬하지 않는다.
+        panStart = { x, y, tx: view.tx, ty: view.ty, pointerId: ev.pointerId };
+        try { canvas.setPointerCapture(ev.pointerId); } catch {}
       }
     });
+
     canvas.addEventListener('pointermove', (ev) => {
       const { x, y } = pos(ev);
+      if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, { x, y });
+
+      // 핀치 줌 + 두 손가락 팬
+      if (pinchStart && pointers.size === 2) {
+        const p = [...pointers.values()];
+        const dist = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1;
+        const mx = (p[0].x + p[1].x) / 2;
+        const my = (p[0].y + p[1].y) / 2;
+        const ns = clampScale((pinchStart.scale * dist) / pinchStart.dist);
+        // 시작 중점 아래 좌표를 현재 중점으로 옮긴다(벌림=줌, 함께 이동=팬)
+        const wx = (pinchStart.cx - pinchStart.tx) / pinchStart.scale;
+        const wy = (pinchStart.cy - pinchStart.ty) / pinchStart.scale;
+        view.scale = ns;
+        view.tx = mx - wx * ns;
+        view.ty = my - wy * ns;
+        autoFit = false;
+        draw();
+        return;
+      }
+
+      // 노드 드래그
       if (dragging && dragStart && ev.pointerId === dragStart.pointerId) {
         // 슬롭 이내의 미세 이동은 탭으로 취급 — 노드도 밀리지 않게 보류
         if (!moved && Math.hypot(x - dragStart.x, y - dragStart.y) < dragStart.slop) return;
         moved = true;
-        dragging.x = x;
-        dragging.y = y;
+        autoFit = false; // 손으로 옮기기 시작하면 자동 맞춤을 멈춘다
+        dragging.x = toWorldX(x);
+        dragging.y = toWorldY(y);
         wake();
         return;
       }
-      if (dragging) return;
+
+      // 빈 곳 팬
+      if (panStart && ev.pointerId === panStart.pointerId) {
+        view.tx = panStart.tx + (x - panStart.x);
+        view.ty = panStart.ty + (y - panStart.y);
+        autoFit = false;
+        draw();
+        return;
+      }
+
+      if (dragging || panStart || pinchStart) return;
+
       const n = nodeAt(x, y);
       if (n !== hovered) {
         hovered = n;
@@ -381,27 +510,66 @@ const data = {
         tooltip.style.top = `${y + 14}px`;
       }
     });
+
+    const dropPointer = (ev) => {
+      pointers.delete(ev.pointerId);
+      if (pointers.size < 2) pinchStart = null;
+    };
     canvas.addEventListener('pointerup', (ev) => {
-      if (dragStart && ev.pointerId !== dragStart.pointerId) return;
-      if (dragging && !moved) {
-        location.href = dragging.url;
+      const wasDrag = dragStart && ev.pointerId === dragStart.pointerId;
+      const wasPan = panStart && ev.pointerId === panStart.pointerId;
+      dropPointer(ev);
+      if (wasDrag) {
+        if (dragging && !moved) location.href = dragging.url; // 안 움직였으면 탭 = 글로 이동
+        dragging = null;
+        dragStart = null;
+        wake();
+      } else if (wasPan) {
+        panStart = null;
       }
-      dragging = null;
-      dragStart = null;
-      wake();
     });
-    // 드래그가 시스템 제스처 등으로 끊겨도 상태가 고착되지 않게 (탐색은 하지 않음)
-    const endDrag = () => {
+    // 드래그·팬·핀치가 시스템 제스처로 끊겨도 상태가 고착되지 않게
+    const endGesture = (ev) => {
+      if (ev) dropPointer(ev);
       dragging = null;
       dragStart = null;
+      panStart = null;
       wake();
     };
-    canvas.addEventListener('pointercancel', endDrag);
-    canvas.addEventListener('lostpointercapture', endDrag);
-    // 세로 스크롤은 통과시키고, 노드를 잡았을 때만 제스처를 캔버스가 가져간다
+    canvas.addEventListener('pointercancel', endGesture);
+    canvas.addEventListener('lostpointercapture', endGesture);
+
+    // 줌은 Ctrl+휠(또는 트랙패드 핀치=ctrlKey)로만 — 일반 휠은 페이지 스크롤로 흘려보낸다.
+    // (캔버스가 화면을 크게 차지해서, 무조건 줌으로 먹으면 그래프 위에서 스크롤이 갇힌다.)
+    canvas.addEventListener(
+      'wheel',
+      (ev) => {
+        if (!ev.ctrlKey && !ev.metaKey) return;
+        ev.preventDefault();
+        const { x, y } = pos(ev);
+        zoomAtPoint(x, y, view.scale * Math.exp(-ev.deltaY * 0.0015));
+      },
+      { passive: false },
+    );
+
+    // 빈 곳 더블클릭 = 처음 크기로 되돌리기(자동 맞춤 재개)
+    canvas.addEventListener('dblclick', (ev) => {
+      const { x, y } = pos(ev);
+      if (nodeAt(x, y)) return;
+      ev.preventDefault();
+      fitToBbox(); // 한 번 다시 맞춘다(처음 크기로)
+      draw();
+    });
+
+    // 터치: 한 손가락이 노드 위면(=드래그) 또는 두 손가락(핀치)이면 제스처를 가져온다.
+    // 빈 곳 한 손가락은 페이지 세로 스크롤을 위해 그대로 흘려보낸다(touch-action: pan-y).
     canvas.addEventListener(
       'touchstart',
       (ev) => {
+        if (ev.touches.length >= 2) {
+          ev.preventDefault();
+          return;
+        }
         const t = ev.touches[0];
         if (!t) return;
         const rect = canvas.getBoundingClientRect();
@@ -410,6 +578,7 @@ const data = {
       { passive: false },
     );
     canvas.addEventListener('pointerleave', () => {
+      if (dragging || panStart || pinchStart) return;
       hovered = null;
       tooltip.hidden = true;
       if (reduceMotion) draw();
@@ -421,8 +590,10 @@ const data = {
       tooltip.textContent =
         n.kind === 'post' ? `${n.label}${n.category ? ` · ${n.category}` : ''}` : n.label;
       tooltip.hidden = false;
-      tooltip.style.left = `${Math.min(n.x + 14, W - 160)}px`;
-      tooltip.style.top = `${n.y + 14}px`;
+      const sx = n.x * view.scale + view.tx;
+      const sy = n.y * view.scale + view.ty;
+      tooltip.style.left = `${Math.min(sx + 14, W - 160)}px`;
+      tooltip.style.top = `${sy + 14}px`;
     };
     canvas.addEventListener('keydown', (ev) => {
       const k = ev.key;
@@ -433,6 +604,7 @@ const data = {
         const i = selected ? nodes.indexOf(selected) : -1;
         selected = nodes[(i + dir + nodes.length) % nodes.length];
         focusTouched = true;
+        ensureVisible(selected);
         showTipAt(selected);
         draw();
       } else if (k === 'Enter') {
@@ -459,8 +631,11 @@ const data = {
       readColors();
       resize();
       nodes.forEach(seed);
+      autoFit = true; // 새로 배치하면 다시 화면에 맞춘다
       if (reduceMotion) {
         for (let i = 0; i < 400; i++) tick();
+        fitToBbox();
+        autoFit = false; // 정착 완료 — hover로 다시 맞추지 않게
         draw();
       } else {
         wake();
@@ -489,7 +664,7 @@ const data = {
     restart();
 
     // 개발·테스트용 좌표 핸들 (외부 의존 없음)
-    window.__injoyGraph = { nodes };
+    window.__injoyGraph = { nodes, view, baseView, fit: () => { autoFit = true; fitToBbox(); draw(); } };
   })();
 </script>
 

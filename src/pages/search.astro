@@ -82,6 +82,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   function renderBatch() {
     if (!resultsEl) return;
     const slice = loaded.slice(shown, shown + BATCH);
+    let firstNew: HTMLElement | null = null;
     for (const d of slice) {
       const card = document.createElement('article');
       card.className = 'sr-result';
@@ -126,9 +127,18 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         card.appendChild(list);
       }
       resultsEl.appendChild(card);
+      if (!firstNew) firstNew = card;
     }
     shown += slice.length;
-    if (moreBtn) moreBtn.hidden = shown >= loaded.length;
+    const done = shown >= loaded.length;
+    // 마지막 묶음을 부르면 더보기 버튼을 숨긴다. 그런데 방금 그 버튼을 눌러 포커스가 거기 있고,
+    // 포커스 잡은 요소가 display:none이 되면 포커스가 <body>로 떨어진다 → 브라우저가 그 포커스를
+    // 따라 문서 맨 위로 스크롤한다(html scroll-behavior:smooth라 위로 미끄러져 올라가 보임).
+    // 그래서 숨기기 전에 포커스를 방금 뜬 첫 결과로 옮긴다(preventScroll로 스크롤은 막는다).
+    if (done && moreBtn?.contains(document.activeElement) && firstNew) {
+      firstNew.querySelector<HTMLElement>('.sr-title')?.focus({ preventScroll: true });
+    }
+    if (moreBtn) moreBtn.hidden = done;
   }
 
   function reset() {
@@ -146,7 +156,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     }
     await ensurePagefind();
     if (loadFailed || !pagefind) return;
-    const search = await pagefind.debouncedSearch(term, {}, 300);
+    // 정렬을 날짜 내림차순으로 — 관련도 대신 최신 글이 위로 온다(글마다 data-pagefind-sort="date:…").
+    const search = await pagefind.debouncedSearch(term, { sort: { date: 'desc' } }, 300);
     if (search === null) return; // 더 새 입력에 밀림 — 이 결과는 버린다
     // 맞은 글 전체의 데이터를 받아 글 수(N)와 구간 합(M)을 정직하게 센다.
     // ponytail: 전수 data() 로드는 수십 편까지 가볍다. 수백 편이면 배치 지연 로드로.

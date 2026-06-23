@@ -47,6 +47,13 @@ const jsonLd = {
   mainEntityOfPage: canonical,
   inLanguage: 'ko-KR',
 };
+
+// 검색 결과를 최신 글 먼저로 정렬하기 위한 Pagefind 정렬 키.
+// 값 = 발행일(YYYY-MM-DD)/슬러그 → 내림차순이면 날짜 최신순, 같은 날이면 슬러그 역순
+// (홈 목록의 pubDate desc + 슬러그 타이브레이크와 같은 순서).
+// 주의: search.astro가 sort:{date:'desc'}를 거는 순간, 이 정렬 키가 없는 인덱스 본문은
+// 검색 결과에서 통째로 빠진다. data-pagefind-body를 새로 붙이는 곳마다 date 키를 반드시 함께 둘 것.
+const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}`;
 ---
 
 <BaseLayout
@@ -61,7 +68,7 @@ const jsonLd = {
   <PostReading />
 
   <div class="post-grid">
-  <article class="post" data-pagefind-body>
+  <article class="post" data-pagefind-body data-pagefind-sort={`date:${pagefindSort}`}>
     <header class="post-header">
       <div class="meta-line" data-pagefind-ignore>
         <PostMeta

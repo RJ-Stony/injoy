@@ -17,6 +17,7 @@ import rehypeBaseLinks from './src/plugins/rehype-base-links.mjs';
 import rehypeFigure from './src/plugins/rehype-figure.mjs';
 import rehypeTossface from './src/plugins/rehype-tossface.mjs';
 import remarkWikiLinks from './src/plugins/remark-wiki-links.mjs';
+import remarkBoldFix from './src/plugins/remark-bold-fix.mjs';
 import { alertOptions } from './src/utils/callout-config.mjs';
 
 // [[위키링크]]의 표시 텍스트로 쓸 글 제목 맵 (config 로드 시 1회 스캔 —
@@ -67,6 +68,7 @@ export default defineConfig({
       remarkMath, // $인라인$ / $$블록$$ 수식
       [remarkEmoji, { accessible: true }], // :rocket: 숏코드
       [remarkWikiLinks, { titles: postTitles, base: BASE }], // [[슬러그]] 글 연결
+      remarkBoldFix, // 구두점에 막혀 깨진 **…** 굵게를 strong으로 보정
     ],
     rehypePlugins: [
       [rehypeGithubAlerts, alertOptions],
