@@ -1,0 +1,74 @@
+---
+/**
+ * 댓글 — giscus(GitHub Discussions 기반). 글 페이지에만 1회 포함.
+ * 키·백엔드 0(정적 사이트 유지). 사이트 테마(수동 토글 + 시스템)와 동기화한다.
+ * 매핑은 pathname — localhost와 배포가 같은 경로라 같은 토론을 가리킨다.
+ */
+---
+
+<section class="comments" aria-label="댓글" data-pagefind-ignore>
+  <h2 class="comments-title">댓글</h2>
+  <div class="giscus"></div>
+</section>
+
+<script>
+  // 현재 사이트 테마 → giscus 테마(수동 data-theme 우선, 없으면 시스템 설정)
+  const resolveTheme = () =>
+    document.documentElement.dataset.theme ||
+    (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+  const mount = document.querySelector('.comments .giscus');
+  if (mount) {
+    const s = document.createElement('script');
+    s.src = 'https://giscus.app/client.js';
+    const attrs: Record<string, string> = {
+      'data-repo': 'RJ-Stony/injoy',
+      'data-repo-id': 'R_kgDOS3iDNg',
+      'data-category': 'Comments',
+      'data-category-id': 'DIC_kwDOS3iDNs4C_wi6',
+      'data-mapping': 'pathname',
+      'data-strict': '0',
+      'data-reactions-enabled': '1',
+      'data-emit-metadata': '0',
+      'data-input-position': 'bottom',
+      'data-theme': resolveTheme(),
+      'data-lang': 'ko',
+      'data-loading': 'lazy',
+    };
+    for (const [k, v] of Object.entries(attrs)) s.setAttribute(k, v);
+    s.crossOrigin = 'anonymous';
+    s.async = true;
+    mount.appendChild(s);
+  }
+
+  // 사이트 테마가 바뀌면(토글·시스템) giscus iframe에 새 테마를 전달한다
+  const sendTheme = () => {
+    const iframe = document.querySelector<HTMLIFrameElement>('iframe.giscus-frame');
+    iframe?.contentWindow?.postMessage(
+      { giscus: { setConfig: { theme: resolveTheme() } } },
+      'https://giscus.app',
+    );
+  };
+  window.addEventListener('injoy:theme-change', sendTheme);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', sendTheme);
+</script>
+
+<style>
+  .comments {
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .comments-title {
+    margin: 0 0 1.2rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  /* giscus가 로드되기 전 빈 칸이 튀지 않게 최소 높이 */
+  .comments .giscus {
+    min-height: 8rem;
+  }
+</style>

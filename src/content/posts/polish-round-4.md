@@ -4,7 +4,7 @@ description: "링크로 공유되면 휑하던 공유 화면부터 읽는 동안
 pubDate: 2026-06-22
 category: "블로그"
 tags: ["ui", "공유", "접근성"]
-series: "다듬기 기록"
+series: "블로그 다듬기 기록"
 draft: false
 ---
 

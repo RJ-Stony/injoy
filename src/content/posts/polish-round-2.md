@@ -5,7 +5,7 @@ pubDate: 2026-06-20
 updatedDate: 2026-06-21
 category: "블로그"
 tags: ["에디터", "ui", "카테고리", "그래프"]
-series: "다듬기 기록"
+series: "블로그 다듬기 기록"
 draft: false
 ---
 

@@ -8,6 +8,7 @@ import TableOfContents from '../../components/TableOfContents.astro';
 import ViewCount from '../../components/ViewCount.astro';
 import ReadingPath from '../../components/ReadingPath.astro';
 import SeriesNav from '../../components/SeriesNav.astro';
+import Comments from '../../components/Comments.astro';
 import TransparencyPanel from '../../components/TransparencyPanel.astro';
 import PostReading from '../../components/PostReading.astro';
 import { getPublishedPosts, readingMinutes } from '../../utils/post';
@@ -159,6 +160,8 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
         </nav>
       )
     }
+
+    <Comments />
   </article>
 
   <aside class="toc-aside">
