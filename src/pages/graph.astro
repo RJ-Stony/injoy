@@ -435,15 +435,15 @@ const data = {
     let moved = false;
     let dragStart = null; // 노드 드래그: { x, y, pointerId, slop }
     let panStart = null; // 빈 곳 팬: { x, y, tx, ty, pointerId }
-    let pinchStart = null; // 핀치 줌: { dist, cx, cy, scale, tx, ty }
-    const pointers = new Map(); // 활성 포인터 id → 화면좌표(핀치 판정용)
+    let pinchStart = null; // 두 손가락 확대: { dist, cx, cy, scale, tx, ty }
+    const pointers = new Map(); // 활성 포인터 id → 화면좌표(두 손가락 판정용)
 
     canvas.addEventListener('pointerdown', (ev) => {
       if (ev.pointerType === 'mouse' && ev.button !== 0) return; // 마우스는 주 버튼만
       const { x, y } = pos(ev);
       pointers.set(ev.pointerId, { x, y });
 
-      // 두 포인터 → 핀치 줌(+두 손가락 팬). 진행 중이던 노드드래그·팬은 취소.
+      // 두 포인터 → 두 손가락 확대(+이동). 진행 중이던 노드드래그·팬은 취소.
       if (pointers.size === 2) {
         dragging = null;
         dragStart = null;
@@ -481,7 +481,7 @@ const data = {
       const { x, y } = pos(ev);
       if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, { x, y });
 
-      // 핀치 줌 + 두 손가락 팬
+      // 두 손가락 확대 + 이동
       if (pinchStart && pointers.size === 2) {
         const p = [...pointers.values()];
         const dist = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1;
@@ -561,7 +561,7 @@ const data = {
         panStart = null;
       }
     });
-    // 드래그·팬·핀치가 시스템 제스처로 끊겨도 상태가 고착되지 않게
+    // 드래그·이동·두 손가락 동작이 시스템 제스처로 끊겨도 상태가 고착되지 않게
     const endGesture = (ev) => {
       if (ev) dropPointer(ev);
       dragging = null;
@@ -572,7 +572,7 @@ const data = {
     canvas.addEventListener('pointercancel', endGesture);
     canvas.addEventListener('lostpointercapture', endGesture);
 
-    // 줌은 Ctrl+휠(또는 트랙패드 핀치=ctrlKey)로만 — 일반 휠은 페이지 스크롤로 흘려보낸다.
+    // 줌은 Ctrl+휠(또는 트랙패드 오므렸다 펴기=ctrlKey)로만 — 일반 휠은 페이지 스크롤로 흘려보낸다.
     // (캔버스가 화면을 크게 차지해서, 무조건 줌으로 먹으면 그래프 위에서 스크롤이 갇힌다.)
     canvas.addEventListener(
       'wheel',
@@ -595,7 +595,7 @@ const data = {
       draw();
     });
 
-    // 터치: 한 손가락이 노드 위면(=드래그) 또는 두 손가락(핀치)이면 제스처를 가져온다.
+    // 터치: 한 손가락이 노드 위면(=드래그) 또는 두 손가락이면 제스처를 가져온다.
     // 빈 곳 한 손가락은 페이지 세로 스크롤을 위해 그대로 흘려보낸다(touch-action: pan-y).
     canvas.addEventListener(
       'touchstart',
