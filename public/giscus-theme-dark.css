@@ -121,3 +121,10 @@ main .gsc-comment-box-tabs,
 main textarea {
   border-radius: 12px;
 }
+
+/* 반응 영역: 칩·버튼을 둥글게(색·hover·내가 누른 표시는 위 변수로 적용) */
+main [class*='reaction'] button,
+main button[class*='reaction'],
+main [class*='social-reaction-summary'] {
+  border-radius: 999px;
+}
