@@ -12,10 +12,21 @@
 </section>
 
 <script>
-  // 현재 사이트 테마 → giscus 테마(수동 data-theme 우선, 없으면 시스템 설정)
-  const resolveTheme = () =>
-    document.documentElement.dataset.theme ||
-    (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  import { withBase } from '../utils/url';
+
+  // 현재 사이트 테마 → 우리 톤을 입힌 커스텀 giscus 테마 CSS의 절대 URL.
+  // (giscus는 빌트인 이름 대신 CSS URL을 받으면 iframe에 그 스타일을 주입한다. 절대 URL 필수.)
+  const themeUrl = (mode: 'light' | 'dark') =>
+    new URL(withBase(`/giscus-theme-${mode}.css`), location.origin).href;
+  const resolveTheme = () => {
+    const mode =
+      document.documentElement.dataset.theme === 'dark' ||
+      (!document.documentElement.dataset.theme &&
+        matchMedia('(prefers-color-scheme: dark)').matches)
+        ? 'dark'
+        : 'light';
+    return themeUrl(mode);
+  };
 
   const mount = document.querySelector('.comments .giscus');
   if (mount) {
