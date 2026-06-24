@@ -25,7 +25,7 @@ export async function getSeriesGroups() {
     map.get(p.data.series).push(p);
   }
   return [...map.entries()]
-    .filter(([, ps]) => ps.length > 1) // 두 편 이상일 때만 폴더로
+    .filter(([, ps]) => ps.length > 1) // [!code highlight]
     .map(([series, ps]) => ({ series, posts: ps }));
 }
 ```
@@ -39,7 +39,7 @@ export async function getSeriesGroups() {
 ```ts
 export async function getStaticPaths({ paginate }) {
   const posts = await getStandalonePosts();
-  return paginate(posts, { pageSize: 10 }); // 결국, 열 개씩 끊어 페이지를 만든다
+  return paginate(posts, { pageSize: 10 }); // [!code highlight]
 }
 ```
 
@@ -59,11 +59,11 @@ export async function getStaticPaths({ paginate }) {
 
 ```css
 details::details-content {
-  block-size: 0; /* 닫히면 높이 0, 열리면 실제 높이로 */
+  block-size: 0; /* 닫히면 높이 0 */
   overflow: clip;
-  transition: block-size 0.28s ease, content-visibility 0.28s allow-discrete;
+  transition: block-size 0.28s ease, content-visibility 0.28s allow-discrete; /* [!code highlight] */
 }
-details[open]::details-content { block-size: auto; }
+details[open]::details-content { block-size: auto; } /* 열리면 실제 높이로 */
 ```
 
 `::details-content`(펼쳐지는 영역만 따로 가리키는 새 CSS 선택자)와 높이를 '자동'까지 부드럽게 잇게 해 주는 설정 덕에, 자바스크립트 없이 여닫이가 매끈해졌다. 아직 이 기능을 모르는 브라우저에선 예전처럼 즉시 열린다. 망가지지 않고 그냥 덜 부드러울 뿐이다.
