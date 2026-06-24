@@ -15,11 +15,22 @@ export const effectiveTheme = (): 'light' | 'dark' => {
   return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
 
+// mermaid는 단일 인스턴스라 동시 호출이 겹치면 일부가 실패한다. 여러 컴포넌트(글 카드·시리즈 카드·
+// 미리보기)가 각자 호출해도 안전하도록, 모든 호출을 모듈 단위 큐로 직렬화한다.
+let renderQueue: Promise<void> = Promise.resolve();
+
 /**
  * `.mermaid-diagram` 컨테이너(dataset.source에 원본 보유)들을 렌더한다.
  * 테마가 바뀌면 같은 컨테이너 목록으로 다시 호출하면 된다.
+ * 호출은 내부 큐로 직렬화되어 동시 호출에도 안전하다.
  */
-export async function renderMermaidDiagrams(containers: HTMLElement[]): Promise<void> {
+export function renderMermaidDiagrams(containers: HTMLElement[]): Promise<void> {
+  const run = renderQueue.then(() => doRender(containers));
+  renderQueue = run.catch(() => {}); // 한 번 실패해도 큐는 이어지게
+  return run;
+}
+
+async function doRender(containers: HTMLElement[]): Promise<void> {
   if (containers.length === 0) return;
 
   let mermaid: any;

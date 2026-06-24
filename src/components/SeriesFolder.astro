@@ -1,10 +1,12 @@
 ---
 /**
  * 홈 시리즈 폴더 — 같은 시리즈의 글을 폴더 하나로 묶는다.
- * 기본 닫힘(<details>). 폴더를 누르면 제자리에서 글들이 폴더 안에 파일처럼 펼쳐진다.
- * 펼치면 시리즈의 모든 글이 읽는 순서(오래된 글 먼저)로, 읽는 시간·조회수와 함께 보인다.
+ * 기본 닫힘(<details>). 폴더를 누르면 제자리에서 글들이 가로로 넘기는 카드로 펼쳐진다.
+ * 각 카드는 썸네일(커버 > 본문 첫 다이어그램 > 번호 플레이스홀더) + 번호 + 제목 + 조회수.
+ * 모바일은 손가락 스와이프, 데스크톱은 트랙패드·스크롤로 넘긴다.
  */
-import { readingMinutes, type Post } from '../utils/post';
+import { Image } from 'astro:assets';
+import { readingMinutes, firstDiagram, type Post } from '../utils/post';
 import { withBase } from '../utils/url';
 import ViewCount from './ViewCount.astro';
 
@@ -14,6 +16,14 @@ interface Props {
 }
 const { series, posts } = Astro.props;
 const latest = posts[posts.length - 1]; // 마지막 = 가장 최근 글
+const cards = posts.map((p, i) => ({
+  post: p,
+  n: i + 1,
+  href: withBase(`/posts/${p.id}/`),
+  cover: p.data.cover,
+  diagram: p.data.cover ? null : firstDiagram(p),
+  minutes: readingMinutes(p),
+}));
 ---
 
 <details class="series-folder">
@@ -30,23 +40,70 @@ const latest = posts[posts.length - 1]; // 마지막 = 가장 최근 글
       <path d="M4 6l4 4 4-4"></path>
     </svg>
   </summary>
-  <ol class="folder-list">
+
+  <div class="folder-track" role="list">
     {
-      posts.map((p, i) => (
-        <li class="folder-file">
-          <a href={withBase(`/posts/${p.id}/`)}>
-            <span class="file-num">{i + 1}</span>
-            <span class="file-title">{p.data.title}</span>
-            <span class="file-meta">
-              <ViewCount slug={p.id} increment={false} />
-              <span class="file-time">{readingMinutes(p)}분</span>
-            </span>
-          </a>
-        </li>
+      cards.map((c) => (
+        <a class="s-card" role="listitem" href={c.href}>
+          <span class="s-thumb">
+            {c.cover ? (
+              <Image src={c.cover} alt="" width={300} height={169} />
+            ) : c.diagram ? (
+              <span class="mermaid-diagram" data-source={c.diagram} />
+            ) : (
+              <span class="s-thumb-ph">{c.n}</span>
+            )}
+          </span>
+          <span class="s-meta">
+            <span class="s-num">{c.n}</span>
+            <span class="s-title">{c.post.data.title}</span>
+          </span>
+          <span class="s-foot">
+            <ViewCount slug={c.post.id} increment={false} />
+            <span class="s-time">{c.minutes}분</span>
+          </span>
+        </a>
       ))
     }
-  </ol>
+  </div>
 </details>
+
+<script>
+  // 캐러셀 카드의 mermaid 썸네일 — 화면(폴더)이 열려 보일 때만 렌더한다.
+  // 공용 렌더러는 내부 큐로 직렬화되어 홈의 일반 카드 썸네일과 동시에 그려도 안전하다.
+  import { renderMermaidDiagrams } from '../scripts/mermaid-render';
+
+  const diagrams = Array.from(
+    document.querySelectorAll<HTMLElement>('.series-folder .folder-track .mermaid-diagram'),
+  );
+  if (diagrams.length > 0) {
+    const drawn: HTMLElement[] = [];
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver(
+        (entries, obs) => {
+          for (const e of entries) {
+            if (!e.isIntersecting) continue;
+            const el = e.target as HTMLElement;
+            drawn.push(el);
+            renderMermaidDiagrams([el]);
+            obs.unobserve(el);
+          }
+        },
+        { rootMargin: '200px' },
+      );
+      diagrams.forEach((d) => io.observe(d));
+    } else {
+      drawn.push(...diagrams);
+      renderMermaidDiagrams(diagrams);
+    }
+    // 라이트/다크 전환 시 이미 그린 썸네일을 다시 그린다(글 카드와 같은 패턴).
+    const rerender = () => {
+      if (drawn.length > 0) renderMermaidDiagrams(drawn);
+    };
+    window.addEventListener('injoy:theme-change', rerender);
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rerender);
+  }
+</script>
 
 <style>
   .series-folder {
@@ -69,7 +126,6 @@ const latest = posts[posts.length - 1]; // 마지막 = 가장 최근 글
     display: none;
   }
 
-  /* 채운 폴더 — accent로 또렷하게 */
   .folder-ic {
     flex-shrink: 0;
     width: 1.3rem;
@@ -91,7 +147,6 @@ const latest = posts[posts.length - 1]; // 마지막 = 가장 최근 글
     font-variant-numeric: tabular-nums;
   }
 
-  /* 닫혔을 때만 보이는 최근 글 미리보기 — 캐럿을 오른쪽으로 민다 */
   .folder-recent {
     margin-left: auto;
     font-size: 0.82rem;
@@ -106,8 +161,6 @@ const latest = posts[posts.length - 1]; // 마지막 = 가장 최근 글
     display: none;
   }
 
-  /* 캐럿은 펼침·접힘 모두 맨 오른쪽 고정. 닫힘=최근 미리보기 뒤(0.6rem),
-     펼침=최근이 사라지므로 캐럿이 auto로 직접 오른쪽을 잡는다. viewBox 중앙 셰브론이라 회전해도 대칭. */
   .folder-caret {
     flex-shrink: 0;
     margin-left: 0.6rem;
@@ -132,73 +185,133 @@ const latest = posts[posts.length - 1]; // 마지막 = 가장 최근 글
     stroke: var(--accent);
   }
 
-  /* 폴더 안 파일 목록 — 왼쪽 세로선으로 '안에 들어있는' 느낌 */
-  .folder-list {
-    list-style: none;
-    margin: 0 0.8rem 0.5rem 1.5rem;
-    padding: 0.2rem 0 0.2rem 0.7rem;
-    border-left: 2px solid var(--border);
+  /* 가로로 넘기는 카드 트랙 */
+  .folder-track {
+    display: flex;
+    gap: 0.7rem;
+    margin: 0;
+    padding: 0.2rem 1.1rem 1.05rem;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .folder-track::-webkit-scrollbar {
+    height: 6px;
+  }
+  .folder-track::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 999px;
+  }
+
+  .s-card {
+    flex: 0 0 9.5rem;
+    scroll-snap-align: start;
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background-color: var(--bg);
+    overflow: hidden;
+    text-decoration: none;
+    transition:
+      border-color 0.15s ease,
+      transform 0.15s ease;
   }
 
-  .folder-file a {
+  .s-card:hover {
+    border-color: var(--accent);
+    text-decoration: none;
+    transform: translateY(-2px);
+  }
+
+  .s-thumb {
+    height: 5.3rem;
+    background-color: var(--surface);
     display: flex;
     align-items: center;
-    gap: 0.55rem;
-    padding: 0.45rem 0.5rem;
-    border-radius: 8px;
-    color: var(--text-muted);
-    text-decoration: none;
-    line-height: 1.5;
-  }
-
-  .folder-file a:hover {
-    background-color: var(--accent-weak);
-    color: var(--accent);
-    text-decoration: none;
-  }
-
-  .file-num {
-    flex-shrink: 0;
-    width: 1.2rem;
-    text-align: right;
-    font-size: 0.82rem;
-    font-variant-numeric: tabular-nums;
-    color: var(--accent);
-    font-weight: 700;
-  }
-
-  .file-title {
-    flex: 1;
-    min-width: 0;
-    font-size: 0.95rem;
-    color: var(--text);
+    justify-content: center;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 0;
   }
 
-  .folder-file a:hover .file-title {
+  .s-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .s-thumb .mermaid-diagram {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.3rem;
+    line-height: normal;
+  }
+
+  .s-thumb .mermaid-diagram svg {
+    max-width: 100%;
+    max-height: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .s-thumb-ph {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: var(--accent);
+    opacity: 0.35;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .s-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0.55rem 0.6rem 0.25rem;
+  }
+
+  .s-num {
+    flex-shrink: 0;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .s-title {
+    font-size: 0.85rem;
+    line-height: 1.35;
+    color: var(--text);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .s-card:hover .s-title {
     color: var(--accent);
   }
 
-  /* 오른쪽: 조회수 + 읽는 시간 */
-  .file-meta {
-    flex-shrink: 0;
-    display: inline-flex;
+  .s-foot {
+    display: flex;
     align-items: center;
-    gap: 0.55rem;
+    gap: 0.5rem;
+    margin-top: auto;
+    padding: 0 0.65rem 0.6rem;
   }
 
-  .file-meta :global(.meta-stat) {
+  .s-foot :global(.meta-stat) {
     margin-left: 0;
-    font-size: 0.78rem;
+    font-size: 0.72rem;
   }
 
-  .file-time {
-    font-size: 0.78rem;
+  .s-time {
+    font-size: 0.72rem;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
   }
@@ -209,6 +322,9 @@ const latest = posts[posts.length - 1]; // 마지막 = 가장 최근 글
     }
     .folder-caret {
       margin-left: auto;
+    }
+    .s-card {
+      flex-basis: 8.5rem;
     }
   }
 </style>
