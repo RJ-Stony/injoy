@@ -104,6 +104,11 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
             <span class="field-name">태그(쉼표로 구분)</span>
             <input id="fm-tags" type="text" placeholder="astro, blog" />
           </label>
+          <label class="field">
+            <span class="field-name">시리즈(선택)</span>
+            <input id="fm-series" type="text" list="series-options" placeholder="여러 글을 묶는 이름" />
+            <datalist id="series-options"></datalist>
+          </label>
           <div class="field date-field">
             <span class="field-name">발행일</span>
             <input type="hidden" id="fm-date" />
@@ -425,6 +430,18 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       target.add(new Option(p.title, p.slug));
       wikiTitles[p.slug] = p.title;
     }
+    // 시리즈 입력 자동완성 — 기존 시리즈 이름을 datalist로(오타·중복 방지, 새 시리즈는 자유 입력)
+    const dl = $('series-options') as HTMLDataListElement | null;
+    if (dl) {
+      dl.innerHTML = '';
+      const seen = new Set<string>();
+      for (const p of state.index.posts as any[]) {
+        if (p.series && !seen.has(p.series)) {
+          seen.add(p.series);
+          dl.appendChild(Object.assign(document.createElement('option'), { value: p.series }));
+        }
+      }
+    }
   }
 
   async function loadPostList() {
@@ -460,6 +477,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
+    const series = ($('fm-series') as HTMLInputElement).value.trim();
     const lines = [
       '---',
       `title: "${yamlEscape(($('fm-title') as HTMLInputElement).value.trim())}"`,
@@ -475,6 +493,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       if (today !== ($('fm-date') as HTMLInputElement).value) lines.splice(4, 0, `updatedDate: ${today}`);
     }
+    if (series) lines.push(`series: "${yamlEscape(series)}"`);
     if (state.coverPath) lines.push(`cover: "${state.coverPath}"`);
     lines.push('---', '', ($('fm-body') as HTMLTextAreaElement).value.trimEnd(), '');
     return { slug, content: lines.join('\n') };
@@ -496,6 +515,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       pubDate: pick('pubDate').slice(0, 10),
       category: pick('category'),
       tags,
+      series: pick('series'),
       draft: /^draft:\s*true/m.test(fm),
       cover: pick('cover') || null,
       body,
@@ -1105,8 +1125,9 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     let step = 0;
     status.innerHTML =
       `<span class="pub-ok">✓ ${verbPast}!</span>` +
-      ` <span class="pub-progress"><span class="pub-spin" aria-hidden="true"></span>` +
-      `<span class="pub-msg">${msgs[0]}</span></span> · ${link}`;
+      `<span class="pub-progress"><span class="pub-spin" aria-hidden="true"></span>` +
+      `<span class="pub-msg">${msgs[0]}</span></span>` +
+      `<span class="pub-sep" aria-hidden="true">·</span>${link}`;
     deployRot = setInterval(() => {
       if (gen !== deployRun) return;
       step = (step + 1) % msgs.length;
@@ -1124,7 +1145,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         if (gen !== deployRun) return; // 더 최신 발행이 있으면 이 결과는 버린다
         stop();
         if (ok === true) {
-          status.innerHTML = `<span class="pub-ok">✓ 사이트에 반영됐어요</span> · ${link} <span class="tossface">🌱</span>`;
+          status.innerHTML = `<span class="pub-ok pub-done"><span aria-hidden="true">✓</span> 사이트에 반영됐어요</span><span class="pub-sep" aria-hidden="true">·</span>${link} <span class="tossface pub-sprout">🌱</span>`;
         } else if (ok === 'superseded') {
           status.innerHTML = `<span class="pub-ok">✓ ${verbPast}.</span> 더 최신 발행으로 대체됐어요. 최신 내용이 곧 반영됩니다.`;
         } else if (ok === false) {
@@ -1238,6 +1259,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     ($('fm-description') as HTMLInputElement).value = parsed.description;
     ($('fm-category') as HTMLInputElement).value = parsed.category;
     ($('fm-tags') as HTMLInputElement).value = parsed.tags.join(', ');
+    ($('fm-series') as HTMLInputElement).value = parsed.series ?? '';
     datePicker.set(parsed.pubDate);
     ($('fm-draft') as HTMLInputElement).checked = parsed.draft;
     setBody(parsed.body);
@@ -1290,7 +1312,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     slugEl.disabled = false;
     slugEl.value = '';
     delete slugEl.dataset.touched;
-    for (const id of ['fm-title', 'fm-description', 'fm-tags']) ($(id) as HTMLInputElement).value = '';
+    for (const id of ['fm-title', 'fm-description', 'fm-tags', 'fm-series'])
+      ($(id) as HTMLInputElement).value = '';
     ($('fm-category') as HTMLInputElement).value = '개발';
     datePicker.set(todayISO());
     ($('fm-draft') as HTMLInputElement).checked = true;
@@ -2370,6 +2393,25 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     background: transparent;
     padding: 0.1rem 0;
   }
+  /* 캡션 줄 — alt 줄과 같은 모습(아래 figcaption으로 발행) */
+  .write-root .injoy-img-caption {
+    display: flex;
+    align-items: center;
+    gap: 0.45em;
+    margin-top: 0.35rem;
+    padding: 0.3rem 0.55rem;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .write-root .injoy-img-caption input[type='text'] {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.85rem;
+    border: 0;
+    background: transparent;
+    padding: 0.1rem 0;
+  }
 
   @media (prefers-reduced-motion: no-preference) {
     .write-root .md-popover:not([hidden]) {
@@ -2868,9 +2910,65 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   }
 
   .write-root #publish-status {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.4rem 0.5rem;
     font-size: 0.88rem;
     color: var(--text-muted);
     text-align: right;
+  }
+
+  .write-root #publish-status .pub-sep {
+    color: var(--border);
+  }
+
+  /* 완료 순간 축하 칩 — 스피너가 체크로 바뀌며 살짝 튄다 */
+  .write-root #publish-status .pub-done {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background-color: var(--accent-weak);
+    border-radius: 999px;
+    padding: 0.12rem 0.6rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .write-root #publish-status .pub-done {
+      animation: pub-celebrate 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+    .write-root #publish-status .pub-sprout {
+      display: inline-block;
+      animation: pub-sprout 0.6s ease 0.1s both;
+    }
+  }
+
+  @keyframes pub-celebrate {
+    0% {
+      transform: scale(0.9);
+    }
+    45% {
+      transform: scale(1.08);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes pub-sprout {
+    0% {
+      transform: scale(0.6);
+      opacity: 0;
+    }
+    60% {
+      transform: scale(1.15);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
   }
 
   /* 발행 진행 표시 — innerHTML로 주입되므로 전역(.write-root)으로 둔다 */

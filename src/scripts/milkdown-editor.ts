@@ -774,7 +774,18 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
             input.placeholder = '이미지 설명을 적어 주세요';
             altRow.append(hint, input);
 
-            panel.append(alignRow, altRow);
+            // 캡션 줄 — 그림 아래 figcaption으로 발행된다(title 마커로 왕복, 정렬과 같은 칸 공유).
+            const captionRow = document.createElement('span');
+            captionRow.className = 'injoy-img-caption';
+            const capHint = document.createElement('span');
+            capHint.className = 'injoy-img-hint';
+            capHint.textContent = '캡션';
+            const captionInput = document.createElement('input');
+            captionInput.type = 'text';
+            captionInput.placeholder = '그림 아래에 보일 설명 (선택)';
+            captionRow.append(capHint, captionInput);
+
+            panel.append(alignRow, altRow, captionRow);
             wrap.append(img, panel);
 
             const apply = (n: any) => {
@@ -786,6 +797,7 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
               wrap.dataset.align = align; // 에디터 안 미리보기(정렬)
               for (const b of alignBtns) b.classList.toggle('is-active', b.dataset.align === align);
               if (document.activeElement !== input) input.value = n.attrs.alt ?? '';
+              if (document.activeElement !== captionInput) captionInput.value = caption;
             };
             apply(node);
 
@@ -811,6 +823,28 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
             input.addEventListener('input', commit);
             input.addEventListener('keydown', (ev: KeyboardEvent) => {
               ev.stopPropagation(); // ProseMirror 단축키가 입력을 가로채지 않게
+              if (ev.key === 'Enter' || ev.key === 'Escape') {
+                ev.preventDefault();
+                panel.hidden = true;
+                editorView.focus();
+              }
+            });
+            // 캡션 입력 → title 마커 재구성. 현재 정렬을 읽어 보존한다(가운데=마커 없음).
+            const commitCaption = () => {
+              const pos = typeof getPos === 'function' ? getPos() : null;
+              if (pos == null) return;
+              const n = editorView.state.doc.nodeAt(pos);
+              if (!n || n.type.name !== 'image') return;
+              const { align, caption } = parseTitle(n.attrs.title);
+              if (caption === captionInput.value) return;
+              const title = buildTitle(align, captionInput.value);
+              editorView.dispatch(
+                editorView.state.tr.setNodeMarkup(pos, undefined, { ...n.attrs, title }),
+              );
+            };
+            captionInput.addEventListener('input', commitCaption);
+            captionInput.addEventListener('keydown', (ev: KeyboardEvent) => {
+              ev.stopPropagation();
               if (ev.key === 'Enter' || ev.key === 'Escape') {
                 ev.preventDefault();
                 panel.hidden = true;
