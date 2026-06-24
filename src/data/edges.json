@@ -43,58 +43,106 @@
       "note": "보이는 대로 편집으로 바꾼 뒤에도 글을 올리는 전체 절차는 이 글에 그대로 정리해 두었다"
     },
     {
-      "from": "polish-round",
-      "to": "slash-menu",
+      "from": "polish-round-4",
+      "to": "polish-round-3",
       "type": "extends",
-      "note": "슬래시 메뉴를 붙인 뒤 남은 디테일 수정 과정에 이어, 쓰는 화면과 읽는 화면을 두루 다듬은 회차"
+      "note": "용어 풀이와 코드 한 문장으로 '글 안'을 비개발자에게 연 데 이어, 공유 카드·읽기 장치·검색·키보드까지 '글 바깥'에서 독자를 맞이하는 길목을 손본 과정"
+    },
+    {
+      "from": "polish-round-3",
+      "to": "welcome",
+      "type": "related",
+      "note": "'미래의 나에게 보내는 기록'이라던 첫 글의 독자관을, 검색하다 우연히 들어온 비개발자 독자까지 끌어안도록 넓힌 글"
+    },
+    {
+      "from": "polish-round-3",
+      "to": "how-to-write",
+      "type": "supports",
+      "note": "용어가 빽빽한 글부터 풀이를 단 사례로 how-to-write를 가장 먼저 손봤다. 발행 안내 글이 비개발자에게도 읽히도록 보탠 근거"
+    },
+    {
+      "from": "polish-round-3",
+      "to": "markdown-styleguide",
+      "type": "related",
+      "note": "가독성 손질에서 markdown-styleguide는 원래 개발자가 보는 글이라 가볍게만 짚었다. 글마다 풀이 강도를 달리한 판단의 대상"
+    },
+    {
+      "from": "polish-round-3",
+      "to": "polish-round",
+      "type": "supports",
+      "note": "강조한 한 줄이 판단의 전부라던 polish-round의 코드 설명 버릇을, 빠진 코드까지 메워 원칙으로 굳힌 근거"
+    },
+    {
+      "from": "polish-round-7",
+      "to": "polish-round",
+      "type": "extends",
+      "note": "멈추지 않던 그래프 무한 루프를 잡은 데 이어, 이번엔 점이 화면 밖으로 도망가는 문제를 줌·뷰포트 맞춤으로 잡은 그래프 시뮬레이션 발전"
     },
     {
       "from": "polish-round-2",
       "to": "polish-round",
-      "type": "extends",
-      "note": "지난 다듬기 회차를 이어받아 쓰고 읽는 화면을 또 깎고, 카테고리로 모아 보는 기능까지 추가한 과정"
-    },
-    {
-      "from": "polish-round-3",
-      "to": "polish-round-2",
-      "type": "extends",
-      "note": "용어 풀이와 코드 한 문장으로 글을 비개발자에게도 읽히기 쉽게 하고, 다듬기의 작업을 추가로 이어간 과정"
-    },
-    {
-      "from": "polish-round-4",
-      "to": "polish-round-3",
-      "type": "extends",
-      "note": "글 내부를 독자에게 더 활짝 연 데 이어, 공유될 때의 카드와 읽는 동안의 장치·검색·키보드 접근성까지 글 바깥과 둘레를 손본 과정"
+      "type": "refines",
+      "note": "그래프 태그 점선이 거의 안 보이던 걸 회색으로 끌어올려, 무한 루프를 잡아 만든 그래프 화면을 시각적으로 더 또렷이 다듬은 과정"
     },
     {
       "from": "polish-round-5",
-      "to": "polish-round-4",
-      "type": "extends",
-      "note": "공유와 읽는 순간을 손본 데 이어, 작동은 하지만 반 박자 어긋나 있던 여러 문제들을 맞춘 과정"
+      "to": "polish-round-2",
+      "type": "refines",
+      "note": "태그 점선을 회색으로 올렸더니 이번엔 너무 또렷해 글 사이 선을 가렸다. 투명도를 0.7에서 0.45로 다시 낮춰 균형을 맞춘 재조정"
     },
     {
       "from": "polish-round-6",
       "to": "polish-round-5",
       "type": "extends",
-      "note": "결과 수가 글 개수만 세고 글당 구간이 잘리던 검색을 직접 구현해 실제 매칭을 모두 보여주게 만든 과정"
+      "note": "'결과 더 보기' 버튼을 손본 데 이어, 결과 수가 글 개수만 세던 검색을 직접 구현해 '글 N개에서 M곳'으로 실제 매칭을 모두 보여 준 검색 발전"
     },
     {
       "from": "polish-round-7",
       "to": "polish-round-6",
-      "type": "extends",
-      "note": "그래프를 줌을 통해 보여주고 미리보기가 못 잡은 흔들림까지 잡은 과정"
+      "type": "supports",
+      "note": "검색을 직접 그리게 만든 뒤 남아 있던 '결과 더 보기' 포커스 튐을 잡아, 새로 그린 검색이 매끄럽게 작동함을 보탠 마무리"
+    },
+    {
+      "from": "polish-round",
+      "to": "wysiwyg-editor",
+      "type": "supports",
+      "note": "위지윅 직렬화가 발행 결과를 어긋내지 않는지, 새로 더한 밑줄 서식 버블도 wysiwyg 때처럼 왕복 검증을 거쳐 안전함을 보탠 근거"
+    },
+    {
+      "from": "polish-round",
+      "to": "how-to-write",
+      "type": "related",
+      "note": "서식 버블·이미지 alt·각주 자동 번호로 쓰는 화면을 다듬었지만, 글을 올리는 전체 절차는 여전히 how-to-write 그대로임을 짚은 글"
     },
     {
       "from": "polish-round-8",
-      "to": "polish-round-7",
-      "type": "extends",
-      "note": "그래프를 손본 데 이어, 발행 대기 시간을 없애고 댓글·시리즈로 글의 앞뒤를 손본 과정"
+      "to": "how-to-write",
+      "type": "related",
+      "note": "'파일 하나, 푸시'로 끝낸다던 발행 절차에서, 푸시 뒤 1분을 멍하니 기다리던 대기마저 없앤 발행 다듬기"
     },
     {
       "from": "polish-round-9",
       "to": "polish-round-8",
       "type": "extends",
-      "note": "댓글·시리즈를 들인 데 이어, 글이 쌓이기 시작하자 시리즈를 폴더로 묶고 목록을 페이지로 나눠 모아 보여 준 과정"
+      "note": "발행 대기 시간을 없애고 시리즈로 묶은 데 이어, 시리즈를 폴더로 접고 발행이 끝나는 순간을 축하 모션으로 마무리한 발행·시리즈 발전"
+    },
+    {
+      "from": "polish-round-8",
+      "to": "wysiwyg-editor",
+      "type": "supports",
+      "note": "giscus 댓글이 정적 사이트인데도 서버·시크릿 키 없이 붙는다. 무거운 에디터를 방문자에겐 안 보내던 wysiwyg의 '정적 유지' 원칙을 같은 방식으로 이어받은 근거"
+    },
+    {
+      "from": "polish-round-7",
+      "to": "wysiwyg-editor",
+      "type": "supports",
+      "note": "빌드는 통과해도 미리보기로는 못 잡은 그래프 흔들림. 직렬화처럼 빌드 통과가 오히려 위험하다던 wysiwyg의 교훈을 그래프에서 다시 확인한 근거"
+    },
+    {
+      "from": "polish-round-5",
+      "to": "markdown-styleguide",
+      "type": "related",
+      "note": "LLM Wiki를 만들지 않기로 하며 보니, 위키링크로 글을 잇고 타입 연결로 그래프를 짜는 이 체계가 이미 그 뼈대였음을 확인한 글"
     }
   ]
 }
