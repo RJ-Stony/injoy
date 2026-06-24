@@ -1,0 +1,116 @@
+---
+/**
+ * 목록 페이지 매기기 — 홈·카테고리·태그가 공유한다.
+ * URL은 page.url 대신 prefix + 번호로 직접 만든다(base 접두 모호함을 피하고 withBase 관습에 맞춤).
+ * prefix는 1페이지 경로(끝 슬래시 포함). 예) 홈 '/', 카테고리 '/categories/회고/'.
+ * 2페이지부터도 끝 슬래시를 붙여(/categories/회고/2/) 생성된 페이지의 canonical과 일치시킨다
+ * (안 그러면 GitHub Pages가 슬래시 형으로 301 리다이렉트해 링크와 canonical이 어긋난다).
+ * 1페이지뿐이면 렌더하지 않는다.
+ */
+import { withBase } from '../utils/url';
+
+interface Props {
+  currentPage: number;
+  lastPage: number;
+  prefix: string;
+}
+const { currentPage, lastPage, prefix } = Astro.props;
+const pageHref = (n: number) => withBase(n <= 1 ? prefix : `${prefix}${n}/`);
+const pages = Array.from({ length: lastPage }, (_, i) => i + 1);
+---
+
+{
+  lastPage > 1 && (
+    <nav class="pagination" aria-label="페이지 매기기">
+      {currentPage > 1 ? (
+        <a class="page-edge" href={pageHref(currentPage - 1)} rel="prev">
+          ‹ 이전
+        </a>
+      ) : (
+        <span class="page-edge disabled" aria-hidden="true">
+          ‹ 이전
+        </span>
+      )}
+      <ol class="page-nums">
+        {pages.map((n) => (
+          <li>
+            {n === currentPage ? (
+              <span class="page-num current" aria-current="page">
+                {n}
+              </span>
+            ) : (
+              <a class="page-num" href={pageHref(n)}>
+                {n}
+              </a>
+            )}
+          </li>
+        ))}
+      </ol>
+      {currentPage < lastPage ? (
+        <a class="page-edge" href={pageHref(currentPage + 1)} rel="next">
+          다음 ›
+        </a>
+      ) : (
+        <span class="page-edge disabled" aria-hidden="true">
+          다음 ›
+        </span>
+      )}
+    </nav>
+  )
+}
+
+<style>
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 2.5rem;
+  }
+
+  .page-nums {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .page-num,
+  .page-edge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0 0.55rem;
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    text-decoration: none;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .page-num:hover,
+  .page-edge:not(.disabled):hover {
+    background-color: var(--accent-weak);
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .page-num.current {
+    background-color: var(--accent);
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .page-edge {
+    color: var(--accent);
+  }
+
+  .page-edge.disabled {
+    color: var(--border);
+    pointer-events: none;
+  }
+</style>

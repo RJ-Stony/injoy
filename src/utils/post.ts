@@ -31,6 +31,45 @@ export async function getCategories(): Promise<{ name: string; count: number }[]
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'ko'));
 }
 
+/** 같은 series로 묶인 글 그룹(읽는 순서=오래된 글 먼저). 홈 시리즈 폴더가 쓴다. */
+export interface SeriesGroup {
+  series: string;
+  posts: Post[];
+  /** 가장 최근 글의 발행 시각(그룹을 피드 상단에 정렬할 때 기준) */
+  latest: number;
+}
+
+/** 글이 2편 이상인 시리즈만 그룹으로. 최근 활동 순(desc). */
+export async function getSeriesGroups(): Promise<SeriesGroup[]> {
+  const posts = await getPublishedPosts();
+  const map = new Map<string, Post[]>();
+  for (const p of posts) {
+    const s = p.data.series;
+    if (!s) continue;
+    if (!map.has(s)) map.set(s, []);
+    map.get(s)!.push(p);
+  }
+  return [...map.entries()]
+    .filter(([, ps]) => ps.length > 1)
+    .map(([series, ps]) => ({
+      series,
+      // 읽는 순서: 오래된 글 먼저(같은 날이면 슬러그 오름차순)
+      posts: [...ps].sort(
+        (a, b) => a.data.pubDate.valueOf() - b.data.pubDate.valueOf() || a.id.localeCompare(b.id),
+      ),
+      latest: Math.max(...ps.map((p) => p.data.pubDate.valueOf())),
+    }))
+    .sort((a, b) => b.latest - a.latest);
+}
+
+/** 어떤 (2편 이상) 시리즈에도 속하지 않은 글 — 홈 피드는 이들만 페이지로 나눈다(시리즈는 폴더로). */
+export async function getStandalonePosts(): Promise<Post[]> {
+  const groups = await getSeriesGroups();
+  const inSeries = new Set(groups.flatMap((g) => g.posts.map((p) => p.id)));
+  const posts = await getPublishedPosts();
+  return posts.filter((p) => !inSeries.has(p.id));
+}
+
 /** 본문 통계 — 읽는 시간 계산과 '만듦새' 패널이 함께 쓰는 단일 출처 */
 export interface PostStats {
   /** 읽는 시간(분) */

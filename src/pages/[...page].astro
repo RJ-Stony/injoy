@@ -1,0 +1,152 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PostCard from '../components/PostCard.astro';
+import Pagination from '../components/Pagination.astro';
+import SeriesFolder from '../components/SeriesFolder.astro';
+import { getStandalonePosts, getSeriesGroups } from '../utils/post';
+
+// 시리즈(2편 이상)는 폴더로 묶고, 그 밖의 글만 10개씩 정적 페이지로 나눈다.
+// rest 라우트라 1페이지는 '/', 2페이지부터 '/2', '/3'…
+export async function getStaticPaths({ paginate }) {
+  const posts = await getStandalonePosts();
+  return paginate(posts, { pageSize: 10 });
+}
+
+const { page } = Astro.props;
+const onFirst = page.currentPage === 1;
+// 시리즈 폴더는 1페이지에만(최근 활동 순).
+const seriesGroups = onFirst ? await getSeriesGroups() : [];
+const showSort = onFirst && page.data.length > 1;
+---
+
+<BaseLayout title="Injoy" description="마크다운으로 쓰고 즐겁게 기록하는 개인 블로그, Injoy.">
+  {
+    onFirst && (
+      <section class="intro">
+        <div class="intro-row">
+          <div>
+            <h1>Injoy</h1>
+            <p>즐거움 안에서.</p>
+          </div>
+          {showSort && (
+            <div class="sort-toggle" role="group" aria-label="글 정렬">
+              <button type="button" data-sort="recent" aria-pressed="true">
+                최신순
+              </button>
+              <button type="button" data-sort="popular" aria-pressed="false">
+                인기순
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+    )
+  }
+
+  {seriesGroups.map((g) => <SeriesFolder series={g.series} posts={g.posts} />)}
+
+  <section class="post-list" aria-label="글 목록">
+    {page.data.map((post) => <PostCard post={post} />)}
+  </section>
+
+  <Pagination currentPage={page.currentPage} lastPage={page.lastPage} prefix="/" />
+</BaseLayout>
+
+<style>
+  .intro {
+    padding: 1rem 0 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .intro-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .intro h1 {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .intro p {
+    margin: 0.4rem 0 0;
+    color: var(--text-muted);
+  }
+
+  .sort-toggle {
+    display: inline-flex;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .sort-toggle button {
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    padding: 0.35rem 0.9rem;
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .sort-toggle button[aria-pressed='true'] {
+    background-color: var(--accent);
+    color: #fff;
+  }
+
+  /* 시리즈 폴더와 첫 글 사이 여백 */
+  .post-list {
+    margin-top: 0.5rem;
+  }
+</style>
+
+<script>
+  // 인기순(조회순) 정렬 — 조회수가 빌드에 없어(클라이언트 Abacus) 현재 페이지 카드만 재정렬한다.
+  // ponytail: page-local. 전역 인기순은 모든 조회수가 빌드에 있어야 가능 → 글이 아주 많아지면 재검토.
+  const list = document.querySelector('.post-list');
+  const toggle = document.querySelector<HTMLElement>('.sort-toggle');
+  if (list && toggle) {
+    const KEY = 'injoy:home-sort';
+    Array.from(list.querySelectorAll<HTMLElement>('.post-card')).forEach((c, i) => {
+      c.dataset.ord = String(i);
+    });
+    const countOf = (card: Element) => {
+      const v = card.querySelector('.view-count .value');
+      const n = v ? parseInt((v.textContent || '').replace(/[^0-9]/g, ''), 10) : NaN;
+      return Number.isFinite(n) ? n : -1; // 미로드·실패는 맨 뒤로
+    };
+    const apply = (mode: string) => {
+      const cards = Array.from(list.querySelectorAll<HTMLElement>('.post-card'));
+      cards.sort((a, b) =>
+        mode === 'popular'
+          ? countOf(b) - countOf(a) || Number(a.dataset.ord) - Number(b.dataset.ord)
+          : Number(a.dataset.ord) - Number(b.dataset.ord),
+      );
+      for (const c of cards) list.appendChild(c);
+      toggle.querySelectorAll<HTMLButtonElement>('button').forEach((b) =>
+        b.setAttribute('aria-pressed', String(b.dataset.sort === mode)),
+      );
+    };
+    let mode = localStorage.getItem(KEY) === 'popular' ? 'popular' : 'recent';
+    apply(mode);
+    toggle.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('button');
+      if (!btn) return;
+      mode = btn.dataset.sort === 'popular' ? 'popular' : 'recent';
+      localStorage.setItem(KEY, mode);
+      apply(mode);
+    });
+    // 조회수가 늦게 도착하면(인기순일 때) 다시 정렬
+    document.addEventListener('injoy:viewcount', () => {
+      if (mode === 'popular') apply('popular');
+    });
+  }
+</script>

@@ -44,6 +44,8 @@ const safeKey = `post-${slug.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
           const n = data.value.toLocaleString('ko-KR');
           value.textContent = n;
           el.setAttribute('aria-label', `조회수 ${n}`);
+          // 홈 인기순 정렬이 늦게 도착한 조회수에도 다시 줄 세우도록 알린다
+          document.dispatchEvent(new CustomEvent('injoy:viewcount'));
         }
       })
       .catch(() => {

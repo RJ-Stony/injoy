@@ -18,6 +18,7 @@ export const GET: APIRoute = async () => {
         description: p.data.description,
         category: p.data.category,
         tags: p.data.tags,
+        series: p.data.series ?? null,
         pubDate: isoDate(p.data.pubDate),
       })),
       edges: graph.edges.filter((e) => !e.to.startsWith('tag:')),
