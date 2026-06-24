@@ -647,3 +647,25 @@ a:hover {
   background-color: var(--accent-weak);
   text-decoration-style: solid;
 }
+
+/* 펼침·접힘(<details>)을 부드럽게.
+   ::details-content + interpolate-size를 지원하는 브라우저(요즘 크로미움 등)에서만 동작하고,
+   미지원 브라우저는 예전처럼 즉시 토글된다(점진적 향상). 시리즈 폴더, 시리즈 내비,
+   만듦새 패널, 글쓰기 미리보기, 연결 안내 등 사이트의 모든 details에 공통 적용된다. */
+@media (prefers-reduced-motion: no-preference) {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+
+  details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition:
+      block-size 0.28s ease,
+      content-visibility 0.28s allow-discrete;
+  }
+
+  details[open]::details-content {
+    block-size: auto;
+  }
+}
