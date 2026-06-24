@@ -114,7 +114,8 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
 
     <SeriesNav post={post} />
 
-    <ReadingPath slug={post.id} title={post.data.title} />
+    {/* 읽기 경로는 시리즈가 아닌 글에만 — 시리즈 글의 순서는 위 SeriesNav가 담당(중복 방지) */}
+    {!post.data.series && <ReadingPath slug={post.id} title={post.data.title} />}
 
     {
       connections.length > 0 && (

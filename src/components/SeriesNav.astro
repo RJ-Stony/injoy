@@ -23,6 +23,8 @@ if (series) {
 }
 const currentIndex = items.findIndex((p) => p.id === post.id);
 const show = !!series && items.length > 1;
+// 읽는 순서(오래된 글 먼저)에서 바로 다음 글 — '다음 글 →' CTA로 항상 보여 준다.
+const next = currentIndex >= 0 ? items[currentIndex + 1] : undefined;
 ---
 
 {
@@ -56,6 +58,20 @@ const show = !!series && items.length > 1;
         ))}
       </ol>
     </details>
+  )
+}
+
+{
+  show && next && (
+    <a class="series-next" href={withBase(`/posts/${next.id}/`)}>
+      <span class="series-next-label">
+        이 시리즈의 다음 글
+        <svg class="series-next-arrow" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M6 4l4 4-4 4" />
+        </svg>
+      </span>
+      <span class="series-next-title">{next.data.title}</span>
+    </a>
   )
 }
 
@@ -174,5 +190,60 @@ const show = !!series && items.length > 1;
   .series-item.current .series-num {
     color: var(--accent);
     font-weight: 700;
+  }
+
+  /* 폴더 아래 항상 보이는 '다음 글' CTA — 다음 편을 어디서 읽을지 분명히 한다 */
+  .series-next {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    margin-top: 0.6rem;
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--accent-weak);
+    text-decoration: none;
+  }
+
+  .series-next:hover {
+    border-color: var(--accent);
+    text-decoration: none;
+  }
+
+  /* 안내줄(이 시리즈의 다음 글) — 하단 post-nav의 '다음 글'과 구분 */
+  .series-next-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--accent);
+  }
+
+  .series-next-title {
+    max-width: 100%;
+    color: var(--text);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .series-next-arrow {
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.15s ease;
+  }
+
+  .series-next:hover .series-next-arrow {
+    transform: translateX(2px);
   }
 </style>
