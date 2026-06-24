@@ -54,8 +54,7 @@ const showSort = onFirst && page.data.length > 1;
 
 <style>
   .intro {
-    padding: 1rem 0 1.5rem;
-    border-bottom: 1px solid var(--border);
+    padding: 1rem 0 1.25rem;
   }
 
   .intro-row {
@@ -89,6 +88,7 @@ const showSort = onFirst && page.data.length > 1;
     border: 0;
     background: transparent;
     color: var(--text-muted);
+    font-family: inherit; /* 버튼은 기본적으로 폰트 상속을 안 해 사이트 폰트로 맞춘다 */
     font-size: 0.85rem;
     padding: 0.35rem 0.9rem;
     cursor: pointer;

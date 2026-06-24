@@ -35,10 +35,6 @@ const latest = posts[posts.length - 1]; // 마지막 = 가장 최근 글
       posts.map((p, i) => (
         <li class="folder-file">
           <a href={withBase(`/posts/${p.id}/`)}>
-            <svg class="file-ic" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6 3h8l4 4v14a0 0 0 0 1 0 0H6a0 0 0 0 1 0 0V3Z" />
-              <path d="M14 3v4h4" />
-            </svg>
             <span class="file-num">{i + 1}</span>
             <span class="file-title">{p.data.title}</span>
             <span class="file-meta">
@@ -164,28 +160,20 @@ const latest = posts[posts.length - 1]; // 마지막 = 가장 최근 글
     text-decoration: none;
   }
 
-  .file-ic {
-    flex-shrink: 0;
-    width: 1rem;
-    height: 1rem;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.7;
-    stroke-linejoin: round;
-    opacity: 0.7;
-  }
-
   .file-num {
     flex-shrink: 0;
-    width: 1.1rem;
+    width: 1.2rem;
     text-align: right;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     font-variant-numeric: tabular-nums;
+    color: var(--accent);
+    font-weight: 700;
   }
 
   .file-title {
     flex: 1;
     min-width: 0;
+    font-size: 0.95rem;
     color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
