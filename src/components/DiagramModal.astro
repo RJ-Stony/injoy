@@ -1,0 +1,335 @@
+---
+/**
+ * 본문 다이어그램 확대 모달.
+ * 본문 mermaid([slug].astro가 .mermaid-diagram[data-source]로 만든 것)의 우상단 '확대' 버튼이
+ * window.__injoyDiagramModal.open(source)를 부르면, 같은 공용 renderMermaidDiagrams로 크게 다시 그린다.
+ * 줌/팬은 graph.astro의 zoomAtPoint 수식을 SVG 래퍼 transform에 이식 — 휠·핀치·드래그·줌버튼.
+ * <dialog>를 써서 top-layer(헤더 위)·ESC 닫기·focus trap·backdrop을 추가 비용 없이 얻는다.
+ */
+---
+
+<dialog class="diagram-modal" aria-label="다이어그램 크게 보기">
+  <div class="dm-stage" id="dm-stage">
+    <div class="dm-pan" id="dm-pan">
+      <div class="dm-diagram" id="dm-diagram"></div>
+    </div>
+  </div>
+  <button type="button" class="dm-close" id="dm-close" aria-label="닫기">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+  </button>
+  <div class="dm-zoom">
+    <button type="button" class="dm-zbtn" data-zoom="in" aria-label="확대">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+    </button>
+    <button type="button" class="dm-zbtn" data-zoom="out" aria-label="축소">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>
+    </button>
+    <button type="button" class="dm-zbtn dm-reset" data-zoom="reset" aria-label="처음 크기로">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg>
+    </button>
+  </div>
+</dialog>
+
+<script>
+  import { renderMermaidDiagrams } from '../scripts/mermaid-render';
+
+  const dialog = document.querySelector<HTMLDialogElement>('.diagram-modal');
+  if (dialog) {
+    const stage = dialog.querySelector<HTMLElement>('#dm-stage')!;
+    const pan = dialog.querySelector<HTMLElement>('#dm-pan')!;
+    const diagram = dialog.querySelector<HTMLElement>('#dm-diagram')!;
+
+    // 화면 = 다이어그램좌표 * scale + t (graph.astro view 모델과 동형)
+    const view = { scale: 1, tx: 0, ty: 0 };
+    let prevBodyOverflow = ''; // 모달 열기 전 body overflow를 저장했다 닫을 때 되돌린다
+    const clamp = (s: number) => Math.min(8, Math.max(0.3, s));
+    const apply = () => {
+      pan.style.transform = `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`;
+    };
+
+    // 한 점(화면 좌표) 아래 지점이 제자리에 남도록 t를 재계산하는 표준 줌 (graph.astro:zoomAtPoint)
+    const zoomAt = (clientX: number, clientY: number, target: number) => {
+      const r = stage.getBoundingClientRect();
+      const x = clientX - r.left;
+      const y = clientY - r.top;
+      const ns = clamp(target);
+      const wx = (x - view.tx) / view.scale;
+      const wy = (y - view.ty) / view.scale;
+      view.scale = ns;
+      view.tx = x - wx * ns;
+      view.ty = y - wy * ns;
+      apply();
+    };
+
+    // 다이어그램을 무대에 맞춰 가운데 정렬(처음 열 때·리셋). 자연 크기를 재고 여백 두고 맞춘다.
+    const fit = () => {
+      view.scale = 1;
+      view.tx = 0;
+      view.ty = 0;
+      apply();
+      const svg = diagram.querySelector('svg');
+      const r = stage.getBoundingClientRect();
+      if (!svg) return;
+      const sb = svg.getBoundingClientRect();
+      if (!sb.width || !sb.height) return;
+      const s = Math.min((r.width * 0.92) / sb.width, (r.height * 0.92) / sb.height, 3);
+      view.scale = s;
+      view.tx = (r.width - sb.width * s) / 2;
+      view.ty = (r.height - sb.height * s) / 2;
+      apply();
+    };
+
+    // 휠 줌 — 모달은 전체 화면이라 일반 휠로 줌(배경 스크롤은 막는다)
+    stage.addEventListener(
+      'wheel',
+      (ev) => {
+        ev.preventDefault();
+        zoomAt(ev.clientX, ev.clientY, view.scale * Math.exp(-ev.deltaY * 0.0015));
+      },
+      { passive: false },
+    );
+
+    // 드래그 팬 + 두 손가락 핀치 (graph.astro 패턴)
+    const pointers = new Map<number, { x: number; y: number }>();
+    let panStart: { x: number; y: number; tx: number; ty: number } | null = null;
+    let pinch: { dist: number; scale: number; tx: number; ty: number; cx: number; cy: number } | null = null;
+    stage.addEventListener('pointerdown', (ev) => {
+      stage.setPointerCapture(ev.pointerId);
+      pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        pinch = {
+          dist: Math.hypot(a.x - b.x, a.y - b.y),
+          scale: view.scale,
+          tx: view.tx,
+          ty: view.ty,
+          cx: (a.x + b.x) / 2,
+          cy: (a.y + b.y) / 2,
+        };
+        panStart = null;
+      } else {
+        panStart = { x: ev.clientX, y: ev.clientY, tx: view.tx, ty: view.ty };
+      }
+    });
+    stage.addEventListener('pointermove', (ev) => {
+      if (!pointers.has(ev.pointerId)) return;
+      pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (pinch && pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        const r = stage.getBoundingClientRect();
+        const ns = clamp((pinch.scale * dist) / (pinch.dist || 1));
+        // 핀치 시작 중점 아래 지점을 두 손가락의 '현재' 중점으로 옮긴다 → 줌과 동시에 두 손가락 팬
+        const wx = (pinch.cx - r.left - pinch.tx) / pinch.scale;
+        const wy = (pinch.cy - r.top - pinch.ty) / pinch.scale;
+        view.scale = ns;
+        view.tx = (a.x + b.x) / 2 - r.left - wx * ns;
+        view.ty = (a.y + b.y) / 2 - r.top - wy * ns;
+        apply();
+      } else if (panStart) {
+        view.tx = panStart.tx + (ev.clientX - panStart.x);
+        view.ty = panStart.ty + (ev.clientY - panStart.y);
+        apply();
+      }
+    });
+    const endPointer = (ev: PointerEvent) => {
+      pointers.delete(ev.pointerId);
+      if (pointers.size < 2) pinch = null;
+      if (pointers.size === 0) panStart = null;
+    };
+    stage.addEventListener('pointerup', endPointer);
+    stage.addEventListener('pointercancel', endPointer);
+
+    // 줌 버튼 — 무대 중앙 기준 1.3배 곱/나눗셈, 리셋은 fit
+    dialog.querySelectorAll<HTMLElement>('.dm-zbtn').forEach((b) => {
+      b.addEventListener('click', () => {
+        const k = b.dataset.zoom;
+        if (k === 'reset') return fit();
+        const r = stage.getBoundingClientRect();
+        zoomAt(r.left + r.width / 2, r.top + r.height / 2, view.scale * (k === 'in' ? 1.3 : 1 / 1.3));
+      });
+    });
+
+    // 닫기 — 버튼·backdrop 클릭·ESC(<dialog> 기본)
+    const close = () => dialog.close();
+    dialog.querySelector('#dm-close')!.addEventListener('click', close);
+    dialog.addEventListener('click', (ev) => {
+      if (ev.target === dialog) close(); // backdrop(다이얼로그 자체) 클릭
+    });
+    dialog.addEventListener('close', () => {
+      document.body.style.overflow = prevBodyOverflow;
+    });
+
+    // 다크/라이트 전환 시 다시 그린다 — transform은 dm-pan에 있어 view가 그대로 유지된다.
+    let drawn = false;
+    const rerender = () => {
+      if (dialog.open && drawn) renderMermaidDiagrams([diagram]);
+    };
+    window.addEventListener('injoy:theme-change', rerender);
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rerender);
+
+    // 공개 API — [slug].astro의 '확대' 버튼이 호출한다.
+    (window as any).__injoyDiagramModal = {
+      view,
+      open: async (source: string) => {
+        if (dialog.open) return; // 이미 열려 있으면 showModal() InvalidStateError 방지
+        diagram.dataset.source = source;
+        diagram.innerHTML = '';
+        view.scale = 1;
+        view.tx = 0;
+        view.ty = 0;
+        apply();
+        prevBodyOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden'; // 배경 스크롤 잠금(showModal 보강)
+        dialog.showModal();
+        await renderMermaidDiagrams([diagram]);
+        drawn = true;
+        fit();
+      },
+      close,
+    };
+  }
+</script>
+
+<style>
+  .diagram-modal {
+    width: 92vw;
+    height: 88vh;
+    max-width: 1100px;
+    max-height: 920px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background-color: var(--surface);
+    color: var(--text);
+    overflow: hidden;
+  }
+
+  .diagram-modal::backdrop {
+    background-color: rgb(0 0 0 / 55%);
+    backdrop-filter: blur(2px);
+  }
+
+  .dm-stage {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    touch-action: none; /* 핀치·팬이 페이지로 새지 않게 */
+    cursor: grab;
+  }
+
+  .dm-stage:active {
+    cursor: grabbing;
+  }
+
+  .dm-pan {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+
+  /* 모달 안 다이어그램은 본문의 max-width 제약을 풀어 자연 크기로 그린다(fit이 맞춤) */
+  .dm-diagram :global(svg) {
+    max-width: none;
+    height: auto;
+    display: block;
+  }
+
+  .dm-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 2;
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    cursor: pointer;
+    box-shadow: 0 1px 5px rgb(0 0 0 / 12%);
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .dm-close:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .dm-close svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* 줌 버튼 — graph.astro의 .graph-zoom과 같은 톤(우하단) */
+  .dm-zoom {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .dm-zoom .dm-zbtn {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    cursor: pointer;
+    box-shadow: 0 1px 5px rgb(0 0 0 / 10%);
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .dm-zoom .dm-zbtn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .dm-zoom .dm-zbtn svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .dm-zoom .dm-reset svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* 열림 트랜지션 — reduced-motion이면 즉시 */
+  @media (prefers-reduced-motion: no-preference) {
+    .diagram-modal[open] {
+      animation: dm-in 0.18s ease both;
+    }
+  }
+
+  @keyframes dm-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.99);
+    }
+  }
+</style>

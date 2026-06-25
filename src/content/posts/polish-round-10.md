@@ -1,0 +1,122 @@
+---
+title: "코드블록을 다시 짜고 다이어그램을 키웠다"
+description: "글 속 코드·다이어그램·표를 손보고, 그 손질을 글쓰기 화면에서도 다룰 수 있게 한 과정"
+pubDate: 2026-06-25
+category: "블로그"
+tags: ["ui", "에디터"]
+draft: false
+series: "블로그 다듬기 기록"
+---
+
+글 한 편을 열면 글자만 흐르는 게 아니다. 코드블록이 있고, 다이어그램이 있고, 가끔 표가 있다. 그런데 정작 이 *블록*들은 그동안 가만히 놓여만 있었다. 다이어그램은 본문 폭에 눌려 작게 그려졌고, 코드는 길어지면 글이 늘어질까 봐 핵심만 짧게 잘라 넣었고, 표는 줄이 많아지면 어느 행을 보고 있었는지 금세 놓쳤다.
+
+이번엔 글을 더 쓰는 대신, 글 안의 블록들이 더 잘 보이도록 손봤다. 그리고 한 가지를 처음부터 못 박았다. 무엇을 더하든 [[wysiwyg-editor|글쓰기 화면]]에서도 만들고 고치고 지울 수 있어야 한다는 것.
+
+## 작은 다이어그램을 크게 보기
+
+가장 답답했던 건 다이어그램이었다. 순서도 하나가 본문 폭에 갇혀 작게 그려지면, 글자가 뭉개져 읽기 어려웠다. 그래서 다이어그램 오른쪽 위에 작은 *확대* 버튼을 달고, 누르면 화면을 거의 채우는 큰 창에서 보도록 했다. 휠로 줌인·줌아웃하고, 모바일에선 두 손가락으로 키우고, 오른쪽 아래 버튼으로도 키우고 줄인다. [그래프 화면](/graph/)에서 쓰던 줌 방식을 그대로 가져왔다.
+
+핵심은 *커서(또는 두 손가락 중점) 아래 지점이 화면에서 제자리에 남도록* 위치를 다시 계산하는 한 함수다. 그래프에서 이미 검증된 수식이라 그대로 옮겼다.
+
+```ts src/components/DiagramModal.astro
+// 한 점(화면 좌표) 아래 지점이 제자리에 남도록 t를 재계산하는 표준 줌
+const zoomAt = (clientX: number, clientY: number, target: number) => {
+  const r = stage.getBoundingClientRect();
+  const x = clientX - r.left;
+  const y = clientY - r.top;
+  const ns = clamp(target);
+  const wx = (x - view.tx) / view.scale;
+  const wy = (y - view.ty) / view.scale;
+  view.scale = ns;
+  view.tx = x - wx * ns; // [!code highlight]
+  view.ty = y - wy * ns; // [!code highlight]
+  apply();
+};
+```
+
+강조한 두 줄이 전부다. 줌 배율(`scale`)을 바꾸기 전에 커서 아래에 있던 지점을 기억해 두고, 배율을 바꾼 뒤 그 지점이 같은 화면 위치에 오도록 이동값(`t`)을 다시 맞춘다. 그래서 휠을 굴려도 마우스가 가리키던 곳이 화면에서 튀지 않는다.
+
+큰 창은 별도 라이브러리 없이 브라우저 기본 `<dialog>`로 만들었다. 한 줄(`showModal()`)로 헤더 위에 띄우고, ESC로 닫고, 바깥을 누르면 닫히고, 뒤 배경은 가려지는 동작까지 공짜로 따라온다. 다이어그램을 다시 그릴 땐 카드 썸네일과 똑같은 공용 렌더러를 쓴다. 큰 창이라고 다른 색으로 그려지면 안 되니까.
+
+## 코드블록에 머리를 달았다
+
+코드블록은 통째로 다시 짰다. 위에 머리 한 줄을 얹어서, 왼쪽엔 언어 칩과 파일명을, 오른쪽엔 접기·복사 버튼을 두었다.
+
+가장 신경 쓴 건 *내부 스크롤*이다. 코드가 길어도 블록 안에서만 스크롤되니, 이제 글 흐름을 끊지 않고도 긴 코드를 그대로 담을 수 있다. 그동안 코드를 짧게 자르던 이유가 사라진 셈이다.
+
+언어는 빌드가 이미 알고 있었다. 코드펜스에 적은 언어가 `pre` 요소의 `data-language`에 그대로 박혀 나오기 때문이다. 없던 건 파일명이었다. 그래서 펜스 뒤에 적은 글자를 파일명으로 읽어 `data-title`로 실어 보내는 작은 변환기(transformer)를 빌드에 끼웠다.
+
+```js astro.config.mjs
+// 코드 펜스의 언어 뒤 메타(파일명)를 pre의 data-title로 실어 보낸다
+const fenceTitle = {
+  name: 'injoy-fence-title',
+  pre(node) {
+    const raw = (this.options.meta?.__raw ?? '').trim();
+    if (raw) node.properties['data-title'] = raw; // [!code highlight]
+  },
+};
+```
+
+이 변환기가 결국 하는 일은, ` ```ts src/foo.ts `처럼 적으면 `src/foo.ts`를 코드블록 머리의 파일명으로 띄워 주는 것이다. 줄을 강조하거나 지우는 표시(`// [!code highlight]` 같은)는 코드 *주석*에서 처리되니, 펜스 뒤 메타와는 서로 다른 자리라 부딪히지 않는다.
+
+표도 같이 손봤다. 줄이 많은 표에서 보고 있던 행을 놓치지 않도록, 마우스를 올린 행에 은은한 강조를 넣었다. 자바스크립트 없이 CSS 한 줄이면 됐다.
+
+```css src/styles/global.css
+.prose table tbody tr:hover {
+  background-color: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+```
+
+## 파일명을 달자, 저장할 때마다 조용히 사라졌다
+
+여기까지는 순조로웠다. 문제는 그다음이었다.
+
+파일명을 코드블록 머리에 띄우는 데까진 됐는데, 정작 그 파일명을 *글쓰기 화면에서 고칠 수 있어야* 했다. [[wysiwyg-editor|보이는 대로 편집하는 에디터]]는 화면 내용을 다시 마크다운으로 되돌려 저장한다. 그래서 파일명을 단 코드블록을 에디터에서 한 번 열었다가 저장해 봤더니, ` ```ts src/foo.ts `가 ` ```ts `로 돌아왔다. 파일명이 *조용히* 지워진 것이다.
+
+[[polish-round-8|발행 대기를 없앤 글]]에서 비슷한 사고가 있었다. 그때는 글을 고쳐 저장하면 시리즈 정보가 증발했다. 이번에도 같은 결의 조용한 버그다. 화면엔 멀쩡한데 저장하는 순간 한 조각이 사라지는.
+
+원인은 에디터가 쓰는 Milkdown이 코드블록을 다룰 때 *언어만 기억하고 그 뒤 메타(파일명)는 버리도록* 되어 있었기 때문이다. 그래서 코드블록의 내부 구조에 `meta` 칸을 하나 더 만들어, 읽을 때도 저장할 때도 파일명을 챙기도록 덮어썼다.
+
+```ts src/scripts/milkdown-editor.ts
+const codeBlockWithMeta = codeBlockSchema.extendSchema((prev) => (ctx) => {
+  const base = prev(ctx);
+  return {
+    ...base,
+    attrs: { ...base.attrs, meta: { default: '', validate: 'string' } }, // [!code ++]
+    parseMarkdown: {
+      match: base.parseMarkdown.match,
+      runner: (state, node, type) => {
+        state.openNode(type, { language: node.lang ?? '', meta: node.meta ?? '' }); // [!code ++]
+        if (node.value) state.addText(node.value);
+        state.closeNode();
+      },
+    },
+    toMarkdown: {
+      match: base.toMarkdown.match,
+      runner: (state, node) => {
+        state.addNode('code', undefined, node.content.firstChild?.text || '', {
+          lang: node.attrs.language,
+          meta: node.attrs.meta || undefined, // [!code ++]
+        });
+      },
+    },
+  };
+});
+```
+
+이 코드가 결국 하는 일은, 코드블록을 마크다운으로 되돌릴 때 파일명을 빠뜨리지 않게 만드는 것이다. 더한 줄은 세 군데뿐이다. 칸을 하나 만들고(`attrs`), 읽을 때 채우고(`parseMarkdown`), 저장할 때 다시 적는다(`toMarkdown`).
+
+그러고 나서 에디터의 코드블록 위에 파일명 입력칸을 붙였다. 이미지에 alt·정렬 입력칸을 다는 방식과 똑같이, 코드 본문은 그대로 두고 머리만 얹었다. 이제 글쓰기 화면에서 코드블록을 넣고, 파일명을 적고, 비우고, 블록째 지우는 일이 다 된다. 발행은 예전 그대로다. 화면 뒤에서 흘러가는 마크다운만 파일명을 챙겨 갈 뿐이다.
+
+겁이 났던 건 코드블록이 글쓰기에서 가장 많이 쓰는 블록이라는 점이었다. 입력칸을 잘못 얹으면 코드 타이핑 자체가 깨질 수 있었다. 그래서 [[wysiwyg-editor|위지윅으로 바꿀 때]]처럼 왕복 검증을 거쳤다. 파일명을 넣고 저장했다가 다시 불러와도 그대로인지, 코드 본문은 멀쩡히 고쳐지는지 하나씩 확인했다.
+
+## 나머지 손질들
+
+블록 말고도 자잘하게 손본 것들이 있다.
+
+- **배포 완료 알림.** 글을 발행하고 *글 보러 가기*를 누르면 그 페이지로 넘어가는데, 그 뒤로 사이트가 다 지어졌는지는 알 길이 없었다. 이제 어느 페이지에 있든, 배포가 끝나면 화면 아래에 작은 알림이 살짝 떴다 사라진다. 발행한 내 브라우저에서만 도니 읽으러 온 사람에겐 아무 일도 일어나지 않는다.
+- **에디터 두 글을 시리즈로.** [[wysiwyg-editor|에디터를 갈아엎은 글]]과 [[slash-menu|슬래시 메뉴 글]]이 피드에 흩어져 있어서, 이 *블로그 다듬기 기록* 시리즈 맨 앞으로 모았다.
+- **모바일 발행 문구.** 글쓰기 화면에서 발행 상태 문구가 버튼 위에 어정쩡하게 떠 있던 걸 왼쪽으로 옮겼다.
+- **관계도와 태그 정리.** 글 사이 연결을 한 번 훑어, 너무 센 연결은 낮추고 빠진 연결은 더했다. 태그도 `blog`와 `블로그`처럼 같은 뜻인데 갈라져 있던 걸 하나로 합쳤다.
+
+블록 하나하나는 작지만, 글을 읽는 사람이 코드를 접어 두거나 다이어그램을 키워 보는 그 잠깐이 글을 덜 답답하게 만든다고 생각한다. 다음엔 이 블록들을 글쓰기 화면에서 더 매끄럽게 다루는 쪽을 볼 것 같다. 🌱

@@ -6,6 +6,7 @@ updatedDate: 2026-06-21
 category: "블로그"
 tags: ["에디터", "milkdown", "notion"]
 draft: false
+series: "블로그 다듬기 기록"
 ---
 
 지난 글 [[wysiwyg-editor]]에서 에디터를 위지윅으로 바꾸고는 끝에 숙제 두 개를 적어 두었다. 슬래시(`/`) 메뉴가 아직 없다는 것과  콜아웃 맨 앞에서 글자를 지우면 숨은 마커가 지워져서 평범한 인용으로 강등된다는 것. 이번엔 그 두 기능을 손보게 되었다.
@@ -23,7 +24,7 @@ draft: false
 
 고른 항목이 어디로 가는지는 `choose` 함수에 담겨 있다.
 
-```ts
+```ts src/scripts/milkdown-editor.ts
 const choose = (view, item) => {
   const to = view.state.selection.from;
   // '/질의' 글자를 선택 상태로 만들어 한 트랜잭션에 치환되게 한다
@@ -45,7 +46,7 @@ const choose = (view, item) => {
 
 이 판단은 정규식(문자열에서 패턴을 찾는 규칙) 한 줄이 한다. 커서 앞의 텍스트를 보고, 조건에 맞는 `/`만 잡는다.
 
-```ts
+```ts src/scripts/milkdown-editor.ts
 // 커서 앞 텍스트(before)에서 '/질의'를 줄머리나 공백 뒤에서만 찾는다
 const m = before.match(/(?:^|\s)\/([^\s/]*)$/);
 if (!m) return null; // 못 찾으면 메뉴를 열지 않는다
@@ -58,7 +59,7 @@ if (!m) return null; // 못 찾으면 메뉴를 열지 않는다
 
 조합을 지키는 것도 한 줄이다. 메뉴의 키 처리 맨 앞에서, 조합 중이면 곧장 손을 뗀다.
 
-```ts
+```ts src/scripts/milkdown-editor.ts
 handleKeyDown: (view, event) => {
   if (!open) return false;
   if (view.composing || event.isComposing) return false; // [!code highlight]
@@ -74,7 +75,7 @@ handleKeyDown: (view, event) => {
 
 가로채는 코드는 콜아웃 앞 부분에서만 작동한다.
 
-```ts
+```ts src/scripts/milkdown-editor.ts
 handleKeyDown(view, event) {
   if (event.key !== 'Backspace' && event.key !== 'Delete') return false;
   if (view.composing || event.isComposing) return false; // 조합 중엔 손대지 않는다

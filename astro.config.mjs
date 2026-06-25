@@ -52,6 +52,17 @@ const stripAdmin = {
   },
 };
 
+// 코드 펜스의 언어 뒤 메타를 파일명으로 — pre에 data-title로 실어 보낸다(클라이언트 헤더가 읽음).
+// 표기: 백틱3 + 언어 + 공백 + 파일명 (대괄호 금지 — Milkdown 왕복에서 이스케이프되므로).
+// 줄강조 [!code]는 코드 주석에서 처리되어 펜스 메타와 다른 노드라 충돌하지 않는다.
+const fenceTitle = {
+  name: 'injoy-fence-title',
+  pre(node) {
+    const raw = (this.options.meta?.__raw ?? '').trim();
+    if (raw) node.properties['data-title'] = raw;
+  },
+};
+
 // https://astro.build/config
 export default defineConfig({
   site: SITE,
@@ -90,7 +101,7 @@ export default defineConfig({
         dark: 'github-dark',
       },
       // 코드블록 주석 표기: [!code highlight], [!code ++], [!code --]
-      transformers: [transformerNotationDiff(), transformerNotationHighlight()],
+      transformers: [transformerNotationDiff(), transformerNotationHighlight(), fenceTitle],
     },
   },
 });

@@ -11,6 +11,7 @@ import SeriesNav from '../../components/SeriesNav.astro';
 import Comments from '../../components/Comments.astro';
 import TransparencyPanel from '../../components/TransparencyPanel.astro';
 import PostReading from '../../components/PostReading.astro';
+import DiagramModal from '../../components/DiagramModal.astro';
 import { getPublishedPosts, readingMinutes } from '../../utils/post';
 import { getConnections } from '../../utils/graph';
 import { withBase } from '../../utils/url';
@@ -68,6 +69,7 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
   <script type="application/ld+json" slot="head" set:html={JSON.stringify(jsonLd).replace(/</g, '\\u003c')} />
 
   <PostReading />
+  <DiagramModal />
 
   <div class="post-grid">
   <article class="post" data-pagefind-body data-pagefind-sort={`date:${pagefindSort}`}>
@@ -187,10 +189,25 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
   if (mermaidBlocks.length > 0) {
     const containers: HTMLDivElement[] = [];
     for (const pre of mermaidBlocks) {
+      // 래퍼로 감싸 '확대' 버튼을 다이어그램의 형제로 둔다 —
+      // renderMermaidDiagrams가 다이어그램 innerHTML을 갈아끼워도 버튼이 지워지지 않게.
+      const wrap = document.createElement('div');
+      wrap.className = 'diagram-wrap';
       const div = document.createElement('div');
       div.className = 'mermaid-diagram';
       div.dataset.source = pre.textContent ?? '';
-      (pre.closest('.code-block') ?? pre).replaceWith(div);
+
+      const expand = document.createElement('button');
+      expand.type = 'button';
+      expand.className = 'diagram-expand';
+      expand.setAttribute('aria-label', '다이어그램 확대');
+      expand.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"/></svg>';
+      expand.addEventListener('click', () =>
+        (window as any).__injoyDiagramModal?.open(div.dataset.source ?? ''),
+      );
+
+      wrap.append(div, expand);
+      (pre.closest('.code-block') ?? pre).replaceWith(wrap);
       containers.push(div);
     }
 
@@ -200,25 +217,93 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll);
   }
 
-  // 코드블록 복사 버튼 — 언어 지정 시 Shiki가 만든 pre.astro-code에 부착
+  // 코드블록 재설계: 헤더 바(언어 칩 + 파일명 / 접기·복사) + 높이제한 내부 스크롤.
+  // Shiki가 만든 pre.astro-code를 .code-block으로 감싼다. (mermaid는 위에서 이미 div로 치환돼 제외)
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // 언어 칩 — 브랜드 색 라벨(자체 배경이라 라이트·다크 모두 또렷). 미정의 언어는 중립 칩으로 폴백.
+  const LANG_CHIP: Record<string, { label: string; bg: string; fg: string }> = {
+    ts: { label: 'TS', bg: '#3178c6', fg: '#fff' },
+    tsx: { label: 'TSX', bg: '#3178c6', fg: '#fff' },
+    js: { label: 'JS', bg: '#f7df1e', fg: '#1a1a1a' },
+    jsx: { label: 'JSX', bg: '#f7df1e', fg: '#1a1a1a' },
+    json: { label: 'JSON', bg: '#5b6470', fg: '#fff' },
+    css: { label: 'CSS', bg: '#2965f1', fg: '#fff' },
+    html: { label: 'HTML', bg: '#e34f26', fg: '#fff' },
+    astro: { label: 'ASTRO', bg: '#ff5d01', fg: '#fff' },
+    bash: { label: 'SH', bg: '#4f5b66', fg: '#fff' },
+    shell: { label: 'SH', bg: '#4f5b66', fg: '#fff' },
+    sh: { label: 'SH', bg: '#4f5b66', fg: '#fff' },
+    yaml: { label: 'YAML', bg: '#cb171e', fg: '#fff' },
+    yml: { label: 'YAML', bg: '#cb171e', fg: '#fff' },
+    md: { label: 'MD', bg: '#519aba', fg: '#fff' },
+    markdown: { label: 'MD', bg: '#519aba', fg: '#fff' },
+    py: { label: 'PY', bg: '#3776ab', fg: '#fff' },
+    python: { label: 'PY', bg: '#3776ab', fg: '#fff' },
+    go: { label: 'GO', bg: '#00add8', fg: '#fff' },
+    rust: { label: 'RS', bg: '#b7410e', fg: '#fff' },
+    rs: { label: 'RS', bg: '#b7410e', fg: '#fff' },
+    sql: { label: 'SQL', bg: '#336791', fg: '#fff' },
+    diff: { label: 'DIFF', bg: '#4f5b66', fg: '#fff' },
+    text: { label: 'TXT', bg: '#8a8f98', fg: '#fff' },
+    plaintext: { label: 'TXT', bg: '#8a8f98', fg: '#fff' },
+  };
+
   for (const pre of document.querySelectorAll<HTMLPreElement>('.prose pre')) {
+    if (pre.closest('.code-block')) continue; // 재진입 가드(view-transition 등 재실행 시 중복 래핑 방지)
     const code = pre.querySelector('code');
     if (!code) continue;
 
-    const wrapper = document.createElement('div');
-    wrapper.className = 'code-block';
-    pre.replaceWith(wrapper);
-    wrapper.appendChild(pre);
+    const lang = (pre.dataset.language || 'text').toLowerCase();
+    const title = pre.dataset.title || '';
+    const chip = LANG_CHIP[lang] ?? { label: lang.toUpperCase().slice(0, 6), bg: '', fg: '' };
 
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'copy-button';
-    button.textContent = '복사';
-    button.setAttribute('aria-label', '코드 복사');
-    wrapper.appendChild(button);
+    const block = document.createElement('div');
+    block.className = 'code-block';
+    pre.replaceWith(block);
+
+    const head = document.createElement('div');
+    head.className = 'code-head';
+    const chipStyle = chip.bg ? ` style="background:${chip.bg};color:${chip.fg}"` : '';
+    head.innerHTML =
+      `<span class="code-lang${chip.bg ? '' : ' code-lang-plain'}"${chipStyle}>${escapeHtml(chip.label)}</span>` +
+      (title ? `<span class="code-file">${escapeHtml(title)}</span>` : '');
+
+    const actions = document.createElement('div');
+    actions.className = 'code-actions';
+
+    const collapseBtn = document.createElement('button');
+    collapseBtn.type = 'button';
+    collapseBtn.className = 'code-btn collapse-button';
+    collapseBtn.setAttribute('aria-expanded', 'true');
+    collapseBtn.setAttribute('aria-label', '코드 접기');
+    collapseBtn.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'code-btn copy-button';
+    copyBtn.textContent = '복사';
+    copyBtn.setAttribute('aria-label', '코드 복사');
+
+    actions.append(collapseBtn, copyBtn);
+    head.appendChild(actions);
+
+    const scroll = document.createElement('div');
+    scroll.className = 'code-scroll';
+    scroll.appendChild(pre);
+
+    block.append(head, scroll);
+
+    collapseBtn.addEventListener('click', () => {
+      const collapsed = block.getAttribute('data-collapsed') === 'true';
+      block.setAttribute('data-collapsed', String(!collapsed));
+      collapseBtn.setAttribute('aria-expanded', String(collapsed));
+      collapseBtn.setAttribute('aria-label', collapsed ? '코드 접기' : '코드 펼치기');
+    });
 
     let timer: ReturnType<typeof setTimeout>;
-    button.addEventListener('click', async () => {
+    copyBtn.addEventListener('click', async () => {
       // diff 블록이면 지운 줄(-- 표시)은 빼고, 남는 최종 코드만 복사한다
       const lines = code.querySelectorAll<HTMLElement>('.line');
       const text = lines.length
@@ -226,13 +311,13 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
         : code.innerText;
       try {
         await navigator.clipboard.writeText(text);
-        button.textContent = '복사됨';
+        copyBtn.textContent = '복사됨';
         clearTimeout(timer);
         timer = setTimeout(() => {
-          button.textContent = '복사';
+          copyBtn.textContent = '복사';
         }, 2000);
       } catch {
-        button.textContent = '실패';
+        copyBtn.textContent = '실패';
       }
     });
   }
@@ -557,15 +642,69 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
 </style>
 
 <style is:global>
-  /* 복사 버튼은 스크립트로 만들어지므로 전역 스타일로 정의 */
-  .code-block {
-    position: relative;
+  /* 코드블록: 헤더 바(언어 칩 + 파일명 / 접기·복사) + 높이제한 내부 스크롤.
+     스크립트로 만들어지는 DOM이라 전역(.code-block)으로 정의한다. */
+  .prose .code-block {
+    margin: 1.4em 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background-color: var(--code-bg);
   }
 
-  .code-block .copy-button {
-    position: absolute;
-    top: 0.6rem;
-    right: 0.6rem;
+  .code-block .code-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.55rem 0.45rem 0.7rem;
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-sans);
+  }
+
+  .code-block[data-collapsed='true'] .code-head {
+    border-bottom: 0;
+  }
+
+  .code-block .code-lang {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 0.18em 0.5em;
+    border-radius: 6px;
+    line-height: 1.35;
+  }
+
+  .code-block .code-lang-plain {
+    background-color: var(--bg);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+
+  .code-block .code-file {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text);
+  }
+
+  .code-block .code-actions {
+    margin-left: auto;
+    flex-shrink: 0;
+    display: inline-flex;
+    gap: 0.3rem;
+  }
+
+  .code-block .code-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     font-family: var(--font-sans);
     font-size: 0.75rem;
     font-weight: 600;
@@ -573,32 +712,57 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
     background-color: var(--bg);
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 0.25em 0.8em;
+    padding: 0.28em 0.7em;
     cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    transition: color 0.15s ease, border-color 0.15s ease;
   }
 
-  .code-block:hover .copy-button,
-  .code-block .copy-button:focus-visible {
-    opacity: 1;
-  }
-
-  .code-block .copy-button:hover {
+  .code-block .code-btn:hover {
     color: var(--accent);
     border-color: var(--accent);
   }
 
-  /* 터치 환경에서는 항상 노출 */
-  @media (hover: none) {
-    .code-block .copy-button {
-      opacity: 1;
-    }
+  .code-block .collapse-button {
+    padding: 0.28em 0.45em;
+  }
+
+  .code-block .collapse-button svg {
+    width: 0.85rem;
+    height: 0.85rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.2s ease;
+  }
+
+  .code-block[data-collapsed='true'] .collapse-button svg {
+    transform: rotate(180deg);
+  }
+
+  /* 높이 제한 + 세로 내부 스크롤(가로 스크롤은 안쪽 pre가 그대로 담당) */
+  .code-block .code-scroll {
+    max-height: 34rem;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .code-block[data-collapsed='true'] .code-scroll {
+    display: none;
+  }
+
+  /* 래퍼가 테두리·배경·둥근모서리를 가지므로 안쪽 pre는 군더더기 제거 */
+  .code-block pre.astro-code {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .code-block .copy-button {
-      opacity: 1;
+    .code-block .collapse-button svg {
+      transition: none;
     }
   }
 </style>

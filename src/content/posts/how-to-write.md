@@ -4,7 +4,7 @@ description: "관리자 페이지도 데이터베이스도 없이, 마크다운 
 pubDate: 2026-06-09
 updatedDate: 2026-06-21
 category: "글쓰기"
-tags: ["astro", "markdown", "blog"]
+tags: ["astro", "markdown", "블로그"]
 draft: false
 ---
 
@@ -45,7 +45,7 @@ title: "글 제목"
 description: "목록·검색·공유 미리보기에 쓰이는 한 줄 요약"
 pubDate: 2026-06-10
 category: "블로그"
-tags: ["astro", "blog"]
+tags: ["astro", "블로그"]
 draft: false
 ---
 ```

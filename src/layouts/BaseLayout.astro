@@ -225,8 +225,11 @@ const categories = await getCategories();
 
 <script>
   import { enhanceSmoothDetails } from '../scripts/smooth-details';
+  import { watchPendingDeploy } from '../scripts/deploy-toast';
   // 접이식 요소(시리즈 폴더·시리즈 내비·만듦새 패널)를 데스크톱·모바일 어디서나 부드럽게 펼친다
   enhanceSmoothDetails();
+  // 발행 후 페이지를 떠나도 배포가 끝나면 완료 토스트를 띄운다(작성자 브라우저 한정).
+  watchPendingDeploy();
 
   // 전체 방문 수 — 세션당 1회만 카운트하고(Abacus), 실패하면 조용히 숨긴다
   const visits = document.getElementById('site-visits');

@@ -364,6 +364,15 @@ a:hover {
   font-weight: 600;
 }
 
+/* 표 행 호버 — 훑어볼 때 보고 있는 행을 은은히 강조(헤더 th 제외). SeriesNav 현재항목과 같은 accent-mix. */
+.prose table tbody tr {
+  transition: background-color 0.12s ease;
+}
+
+.prose table tbody tr:hover {
+  background-color: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
 /* 인라인 코드 */
 .prose :not(pre) > code {
   font-family: var(--font-mono);
@@ -612,6 +621,47 @@ a:hover {
   font-size: 0.9em;
 }
 
+/* 다이어그램 래퍼 + 우상단 '확대' 버튼(모달 열기). JS 생성 DOM이라 전역. 상시 노출(은은) */
+.prose .diagram-wrap {
+  position: relative;
+}
+
+.prose .diagram-wrap .diagram-expand {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background-color: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.prose .diagram-wrap .diagram-expand:hover,
+.prose .diagram-wrap .diagram-expand:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.prose .diagram-wrap .diagram-expand svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* 체크박스(task list) */
 .prose input[type='checkbox'] {
   accent-color: var(--accent);
@@ -650,3 +700,112 @@ a:hover {
 
 /* 펼침·접힘(<details>) 부드러운 애니메이션은 src/scripts/smooth-details.ts(Web Animations API)가
    맡는다 — CSS ::details-content는 모바일(iOS) 지원이 들쭉날쭉해 전 브라우저 동작을 위해 JS로 옮겼다. */
+
+/* --------------------------------------------------------------------------
+   배포 완료 토스트 — '글 보러 가기'로 /write를 떠나도 배포가 끝나면 하단 가운데에 잠깐 뜬다.
+   body 직속으로 JS가 만드는 요소라(deploy-toast.ts) 전역에 둔다.
+   -------------------------------------------------------------------------- */
+.injoy-toast {
+  position: fixed;
+  left: 50%;
+  /* 노치·제스처바 기기에서 하단 시스템 UI와 겹치지 않게 safe-area 반영 */
+  bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  z-index: 100;
+  max-width: min(92vw, 27rem);
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.8rem 0.85rem 0.8rem 1.1rem;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
+  transition:
+    opacity 0.28s ease,
+    transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.injoy-toast.in {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.injoy-toast.out {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
+}
+
+.injoy-toast-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.injoy-toast-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.injoy-toast-link {
+  display: flex;
+  align-items: baseline;
+  max-width: 100%;
+  font-size: 0.84rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.injoy-toast-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.injoy-toast-go {
+  flex: none;
+  white-space: nowrap;
+}
+
+.injoy-toast-link:hover {
+  text-decoration: underline;
+}
+
+.injoy-toast-x {
+  flex-shrink: 0;
+  margin-left: auto;
+  width: 1.7rem;
+  height: 1.7rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.injoy-toast-x:hover {
+  color: var(--text);
+  background-color: var(--accent-weak);
+}
+
+/* 움직임 줄이기: 슬라이드 없이 페이드만 */
+@media (prefers-reduced-motion: reduce) {
+  .injoy-toast {
+    transform: translateX(-50%);
+    transition: opacity 0.2s ease;
+  }
+  .injoy-toast.in,
+  .injoy-toast.out {
+    transform: translateX(-50%);
+  }
+}

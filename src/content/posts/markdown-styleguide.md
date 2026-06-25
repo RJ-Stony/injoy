@@ -4,7 +4,7 @@ description: "제목·코드·표·수식·다이어그램·콜아웃까지, Inj
 pubDate: 2026-06-10
 updatedDate: 2026-06-24
 category: "글쓰기"
-tags: ["markdown", "design"]
+tags: ["markdown", "글쓰기"]
 draft: false
 cover: "../../assets/markdown-demo.svg"
 ---

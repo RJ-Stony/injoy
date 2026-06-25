@@ -18,7 +18,7 @@ import {
   editorViewOptionsCtx,
   remarkStringifyOptionsCtx,
 } from '@milkdown/kit/core';
-import { commonmark } from '@milkdown/kit/preset/commonmark';
+import { commonmark, codeBlockSchema } from '@milkdown/kit/preset/commonmark';
 import { gfm } from '@milkdown/kit/preset/gfm';
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { history } from '@milkdown/kit/plugin/history';
@@ -31,6 +31,42 @@ import { alertOptions } from '../utils/callout-config.mjs';
 import { WIKI_LINK_RE } from '../plugins/wiki-link-pattern.mjs';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
+
+/**
+ * Milkdown 기본 code_block 스키마는 펜스 언어 뒤 메타(`​```ts src/foo.ts`의 파일명)를 버려서,
+ * 파일명을 단 코드블록을 /write에서 한 번 열었다 저장하면 파일명이 조용히 증발한다.
+ * meta attr를 더해 파싱·직렬화 양쪽에서 보존한다(코드블록 헤더의 파일명 = 이 메타).
+ */
+const codeBlockWithMeta = codeBlockSchema.extendSchema((prev) => (ctx) => {
+  const base = prev(ctx);
+  return {
+    ...base,
+    attrs: {
+      ...base.attrs,
+      meta: { default: '', validate: 'string' },
+    },
+    parseMarkdown: {
+      match: base.parseMarkdown.match,
+      runner: (state: any, node: any, type: any) => {
+        state.openNode(type, { language: node.lang ?? '', meta: node.meta ?? '' });
+        if (node.value) state.addText(node.value);
+        state.closeNode();
+      },
+    },
+    toMarkdown: {
+      match: base.toMarkdown.match,
+      runner: (state: any, node: any) => {
+        // mdast는 lang이 빈 문자열이면 meta를 통째로 버린다(code.js: if (node.lang && node.meta)).
+        // 파일명(meta)만 있고 언어가 없으면 'text'로 채워, 파일명이 조용히 증발하지 않게 한다.
+        const meta = node.attrs.meta || undefined;
+        state.addNode('code', undefined, node.content.firstChild?.text || '', {
+          lang: node.attrs.language || (meta ? 'text' : undefined),
+          meta,
+        });
+      },
+    },
+  };
+});
 
 /**
  * remark-stringify는 줄머리 `[`를 `\[`로 이스케이프한다. 그래서 위키링크
@@ -864,6 +900,65 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
               ignoreMutation: () => true,
             };
           },
+          // 코드블록: 위에 파일명 입력칸 + 언어 배지를 얹는다(머리는 contentEditable=false, 코드 본문이 contentDOM).
+          // 파일명은 code_block의 meta attr에 기록돼 백틱3+언어+공백+파일명으로 왕복된다(codeBlockWithMeta).
+          code_block: (node: any, editorView: any, getPos: any) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'injoy-cb';
+
+            const head = document.createElement('div');
+            head.className = 'injoy-cb-head';
+            head.contentEditable = 'false';
+            const langBadge = document.createElement('span');
+            langBadge.className = 'injoy-cb-lang';
+            const fileInput = document.createElement('input');
+            fileInput.type = 'text';
+            fileInput.className = 'injoy-cb-file';
+            fileInput.placeholder = '파일명 (선택)';
+            head.append(langBadge, fileInput);
+
+            const pre = document.createElement('pre');
+            const code = document.createElement('code');
+            pre.appendChild(code);
+            wrap.append(head, pre);
+
+            const apply = (n: any) => {
+              langBadge.textContent = n.attrs.language || 'text';
+              if (document.activeElement !== fileInput) fileInput.value = n.attrs.meta ?? '';
+            };
+            apply(node);
+
+            const commit = () => {
+              const pos = typeof getPos === 'function' ? getPos() : null;
+              if (pos == null) return;
+              const n = editorView.state.doc.nodeAt(pos);
+              if (!n || n.type.name !== 'code_block' || n.attrs.meta === fileInput.value) return;
+              editorView.dispatch(
+                editorView.state.tr.setNodeMarkup(pos, undefined, { ...n.attrs, meta: fileInput.value }),
+              );
+            };
+            fileInput.addEventListener('input', commit);
+            fileInput.addEventListener('keydown', (ev: KeyboardEvent) => {
+              ev.stopPropagation(); // ProseMirror 단축키가 파일명 입력을 가로채지 않게
+              if (ev.key === 'Enter' || ev.key === 'Escape') {
+                ev.preventDefault();
+                editorView.focus();
+              }
+            });
+
+            return {
+              dom: wrap,
+              contentDOM: code, // 코드 본문은 여기로 — 타이핑·줄바꿈은 기본 code_block 그대로
+              update: (updated: any) => {
+                if (updated.type.name !== 'code_block') return false;
+                apply(updated);
+                return true;
+              },
+              // 파일명 입력 이벤트는 PM이 안 가로채게; 코드 본문(contentDOM) 변형만 PM이 처리.
+              stopEvent: (e: any) => e.target === fileInput,
+              ignoreMutation: (m: any) => !code.contains(m.target),
+            };
+          },
         },
       }));
       // 잘못된 LaTeX가 에디터를 죽이지 않게 (붉은 에러 표시로 대체)
@@ -874,6 +969,7 @@ export async function mountEditor(root: HTMLElement, opts: MountOptions): Promis
     })
     .use(commonmark)
     .use(gfm)
+    .use(codeBlockWithMeta) // 기본 code_block을 meta(파일명) 보존 버전으로 덮어쓴다(commonmark 뒤)
     .use(underline)
     .use(math)
     .use(history)

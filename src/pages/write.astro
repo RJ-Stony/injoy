@@ -1144,6 +1144,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       .then((ok) => {
         if (gen !== deployRun) return; // 더 최신 발행이 있으면 이 결과는 버린다
         stop();
+        // 인라인으로 완료를 봤으니 전역 토스트(watchPendingDeploy)는 안 뜨게 대기 기록을 지운다.
+        try { localStorage.removeItem('injoy-pending-deploy'); } catch {}
         if (ok === true) {
           status.innerHTML = `<span class="pub-ok pub-done"><span aria-hidden="true">✓</span> 사이트에 반영됐어요</span><span class="pub-sep" aria-hidden="true">·</span>${link} <span class="tossface pub-sprout">🌱</span>`;
         } else if (ok === 'superseded') {
@@ -1157,6 +1159,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       .catch(() => {
         if (gen !== deployRun) return;
         stop();
+        try { localStorage.removeItem('injoy-pending-deploy'); } catch {}
         status.innerHTML = `<span class="pub-ok">✓ ${verbPast}</span> · ${link}`;
       });
   }
@@ -1209,6 +1212,13 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       btn.disabled = false;
       // 배포 확인은 백그라운드 + 즐거운 진행 표시(논블로킹) — 끝나면 '반영됐어요'로 바뀐다.
       trackDeploy(sha, url, verb === '수정' ? '수정됐어요' : '발행됐어요');
+      // '글 보러 가기'로 이 페이지를 떠나도 배포 완료를 알 수 있게 대기 기록을 남긴다(watchPendingDeploy가 잡는다).
+      try {
+        localStorage.setItem(
+          'injoy-pending-deploy',
+          JSON.stringify({ sha, url, title: ($('fm-title') as HTMLInputElement).value.trim(), verb, ts: Date.now() }),
+        );
+      } catch {}
       // 목록·인덱스 갱신은 발행과 별개라 따로 감싼다(여기서 실패해도 '발행 실패'로 오인하지 않게).
       try {
         await loadIndex();
@@ -2564,6 +2574,68 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     white-space: pre;
   }
 
+  /* 코드블록 NodeView — 파일명 입력 + 언어 배지 머리 + 코드 본문(에디터에서 파일명 CRUD) */
+  .write-root .injoy-md.ProseMirror .injoy-cb {
+    margin-block: 0.9em;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background-color: var(--code-bg);
+  }
+
+  .write-root .injoy-md.ProseMirror .injoy-cb-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .write-root .injoy-md.ProseMirror .injoy-cb-lang {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.16em 0.5em;
+  }
+
+  /* 파일명 입력은 머리 안에서 테두리 없는 평문처럼 (글로벌 input 규칙을 특이도로 덮음) */
+  .write-root .injoy-md.ProseMirror input.injoy-cb-file {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0.2em 0.1em;
+  }
+
+  .write-root .injoy-md.ProseMirror input.injoy-cb-file:hover,
+  .write-root .injoy-md.ProseMirror input.injoy-cb-file:focus-visible {
+    border: 0;
+    outline: none;
+  }
+
+  .write-root .injoy-md.ProseMirror input.injoy-cb-file::placeholder {
+    color: var(--text-muted);
+  }
+
+  /* 머리를 얹었으니 안쪽 pre의 자체 테두리·둥근모서리·마진 제거(래퍼가 담당) */
+  .write-root .injoy-md.ProseMirror .injoy-cb pre {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
   .write-root .injoy-md.ProseMirror img {
     max-width: 100%;
     height: auto;
@@ -3071,6 +3143,17 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     /* 상단 액션 버튼 터치 타깃 확대 (select은 커스텀 화살표 여백 유지를 위해 제외) */
     .write-root .top-actions button {
       padding: 0.5em 0.9em;
+    }
+
+    /* 발행 상태문구: 버튼 위가 아니라 '왼쪽'에. 상태가 좌측 칸을 채우고 버튼은 우측 같은 줄에 남는다. */
+    .write-root .publish-bar {
+      justify-content: space-between;
+    }
+    .write-root #publish-status {
+      flex: 1 1 0;
+      min-width: 0;
+      justify-content: flex-start;
+      text-align: left;
     }
   }
 </style>

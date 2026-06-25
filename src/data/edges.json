@@ -15,14 +15,14 @@
     {
       "from": "markdown-styleguide",
       "to": "welcome",
-      "type": "instantiates",
-      "note": "'정갈한 디자인'이 본문 요소 하나하나에 어떻게 구현됐는지 보여 주는 사례"
+      "type": "related",
+      "note": "첫 글에서 그린 블로그의 모습이 본문 요소 하나하나로 어떻게 보이는지 함께 짚어 보면 좋은 글"
     },
     {
       "from": "wysiwyg-editor",
       "to": "markdown-styleguide",
-      "type": "requires",
-      "note": "에디터로 다루는 마크다운 요소들을 먼저 훑어보면 이 글이 무엇을 다루는지 분명해진다"
+      "type": "related",
+      "note": "에디터로 다루는 마크다운 요소들이 발행되면 실제로 어떻게 보이는지 이 가이드에 모아 두었다"
     },
     {
       "from": "slash-menu",
@@ -143,6 +143,24 @@
       "to": "markdown-styleguide",
       "type": "related",
       "note": "LLM Wiki를 만들지 않기로 하며 보니, 위키링크로 글을 잇고 타입 연결로 그래프를 짜는 이 체계가 이미 그 뼈대였음을 확인한 글"
+    },
+    {
+      "from": "polish-round-3",
+      "to": "polish-round-2",
+      "type": "triggered-by",
+      "note": "코드 설명이 번역투라는 지적에서 가독성 손질이 시작됐다. polish-round-2 즈음의 그 지적이 이 글을 쓰게 된 출발점"
+    },
+    {
+      "from": "polish-round-5",
+      "to": "polish-round-4",
+      "type": "related",
+      "note": "공유 카드·읽는 순간을 손본 지난 글에 이어, 그때 남아 있던 자잘하게 어긋난 곳들을 마저 맞춘 회차"
+    },
+    {
+      "from": "polish-round-10",
+      "to": "polish-round-9",
+      "type": "extends",
+      "note": "글을 폴더로 모으고 발행 순간을 다듬은 데 이어, 글 속 블록(코드·다이어그램·표)을 키우고 접고 글쓰기 화면에서 다룰 수 있게 한 다듬기"
     }
   ]
 }

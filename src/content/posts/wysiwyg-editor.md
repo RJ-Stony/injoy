@@ -6,6 +6,7 @@ updatedDate: 2026-06-21
 category: "블로그"
 tags: ["에디터", "milkdown", "markdown", "notion"]
 draft: false
+series: "블로그 다듬기 기록"
 ---
 
 이 블로그는 마크다운 파일 하나만 추가하면 곧 발행된다는 단순한 구조로 되어있다. 그런데 정작 글을 쓰는 화면은 그 단순함과 거리가 멀었다. 왼쪽 칸에 `##`와 `>`와 백틱을 직접 입력하고, 미리보기로 결과를 확인하는 식이었다. 익숙해지면 빠르지만 문법을 머릿속에 담고 있어야 했다. Notion이나 다른 에디터의 매끄러움과는 분명히 달랐다.
@@ -37,7 +38,7 @@ bootEditor(document.querySelector('#editor'));
 
 코드로는 한 줄이다. 에디터 내용이 바뀔 때마다 마크다운으로 직렬화(화면에 보이는 내용을 글자 데이터로 바꾸는 일)해서 흘려보내는 게 전부다.
 
-```ts
+```ts src/scripts/milkdown-editor.ts
 // 에디터가 바뀔 때마다 마크다운으로 직렬화해 textarea로 보낸다
 opts.onChange(normalizeMarkdown(editor.action(getMarkdown())));
 ```
@@ -69,7 +70,7 @@ flowchart LR
 
 그 보정은 코드 단위로 돈다. 코드펜스(코드블록을 여닫는 표시 줄)를 만나면 닫는 펜스까지 한 줄도 손대지 않고 그대로 흘려보내고, 코드 바깥에서만 위키링크와 콜아웃 마커를 되살린다.
 
-```ts
+```ts src/scripts/milkdown-editor.ts
 export function normalizeMarkdown(md: string): string {
   const lines = md.split('\n');
   let fence: string | null = null;

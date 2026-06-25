@@ -192,6 +192,9 @@ const cards = posts.map((p, i) => ({
     margin: 0;
     padding: 0.2rem 1.1rem 1.05rem;
     overflow-x: auto;
+    /* scroll-snap-align:start가 첫 카드를 스크롤포트 시작에 붙여 좌측 패딩(1.1rem)을 먹어 버린다.
+       스냅 기준을 패딩만큼 안으로 밀어 첫 카드도 오른쪽 끝과 같은 여백을 갖게 한다. */
+    scroll-padding-inline: 1.1rem;
     scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;

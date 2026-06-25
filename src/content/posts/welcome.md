@@ -4,7 +4,7 @@ description: "enjoy의 오타가 아니다."
 pubDate: 2026-06-08
 updatedDate: 2026-06-21
 category: "회고"
-tags: ["블로그", "시작"]
+tags: ["블로그"]
 draft: false
 ---
 
