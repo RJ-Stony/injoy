@@ -126,7 +126,7 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
             <h2>연결된 글</h2>
             <a class="to-graph" href={withBase(`/graph/?focus=${post.id}`)}>그래프에서 보기 →</a>
           </div>
-          <ul>
+          <ul id="connections-list">
             {connections.map((c) => (
               <li>
                 <span class:list={['edge-chip', c.type]}>{c.phrase}</span>
@@ -135,6 +135,17 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
               </li>
             ))}
           </ul>
+          {connections.length > 3 && (
+            <button
+              type="button"
+              class="connections-more"
+              aria-expanded="false"
+              aria-controls="connections-list"
+            >
+              <span class="cm-label">{`+${connections.length - 3}개 더 보기`}</span>
+              <svg class="cm-caret" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
+            </button>
+          )}
         </section>
       )
     }
@@ -365,6 +376,64 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
       }
     });
   }
+
+  // 연결된 글 '처음 3개 + 더 보기' — 코드블록·smooth-details와 같은 WAAPI 높이 애니로 스르륵 펼침.
+  (() => {
+    const list = document.getElementById('connections-list');
+    const moreBtn = document.querySelector<HTMLButtonElement>('.connections-more');
+    if (!list || !moreBtn) return;
+    const items = list.children;
+    if (items.length <= 3) {
+      moreBtn.remove();
+      return;
+    }
+    const labelEl = moreBtn.querySelector('.cm-label')!;
+    const hiddenCount = items.length - 3;
+    // 접힌 높이 = 3번째 항목 바닥까지(목록이 펼쳐진 상태에서 재서야 정확)
+    const collapsedHeight = () =>
+      items[2].getBoundingClientRect().bottom - list.getBoundingClientRect().top;
+    const reduce =
+      matchMedia('(prefers-reduced-motion: reduce)').matches || !('animate' in Element.prototype);
+
+    let expanded = false;
+    let anim: Animation | null = null;
+    // 초기 접힘(높이 측정은 펼친 상태에서)
+    list.style.overflow = 'hidden';
+    list.style.height = `${collapsedHeight()}px`;
+
+    const sync = () => {
+      labelEl.textContent = expanded ? '접기' : `+${hiddenCount}개 더 보기`;
+      moreBtn.setAttribute('aria-expanded', String(expanded));
+    };
+    sync();
+
+    moreBtn.addEventListener('click', () => {
+      expanded = !expanded;
+      sync();
+      if (reduce) {
+        list.style.height = expanded ? 'auto' : `${collapsedHeight()}px`;
+        list.style.overflow = expanded ? '' : 'hidden';
+        return;
+      }
+      anim?.cancel();
+      const from = list.offsetHeight;
+      const to = expanded ? list.scrollHeight : collapsedHeight();
+      list.style.overflow = 'hidden';
+      anim = list.animate([{ height: `${from}px` }, { height: `${to}px` }], {
+        duration: SMOOTH_DURATION,
+        easing: SMOOTH_EASING,
+      });
+      anim.onfinish = () => {
+        if (expanded) {
+          list.style.height = 'auto'; // 펼침: 자연 높이로 해제
+          list.style.overflow = '';
+        } else {
+          list.style.height = `${to}px`; // 접힘: 3개 높이 유지
+        }
+        anim = null;
+      };
+    });
+  })();
 </script>
 
 <style>
@@ -623,6 +692,48 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
     font-size: 0.85rem;
     color: var(--text-muted);
     line-height: 1.6;
+  }
+
+  /* 연결 '더 보기/접기' — 작은 텍스트 버튼, accent hover, 셰브론 회전(펼치면 180°) */
+  .connections-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.7rem;
+    padding: 0.3rem 0.2rem;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    transition: color 0.15s ease;
+  }
+
+  .connections-more:hover {
+    color: var(--accent);
+  }
+
+  .connections-more .cm-caret {
+    width: 0.85em;
+    height: 0.85em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.2s ease;
+  }
+
+  .connections-more[aria-expanded='true'] .cm-caret {
+    transform: rotate(180deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .connections-more .cm-caret {
+      transition: none;
+    }
   }
 
   .post-nav {

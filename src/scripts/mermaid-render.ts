@@ -89,6 +89,15 @@ async function doRender(containers: HTMLElement[]): Promise<void> {
     },
   });
 
+  // 웹폰트(Wanted Sans)가 로드되기 전에 그리면 mermaid가 폴백 폰트(system-ui) 글자 폭으로
+  // 노드 박스·SVG 폭을 재서, 실제 폰트가 뒤늦게 로드되면 다이어그램이 어긋나 밀린다(간헐적 FOUT).
+  // 측정 전에 폰트 로드를 기다려 항상 같은 폰트로 잰다.
+  try {
+    if (document.fonts?.ready) await document.fonts.ready;
+  } catch {
+    /* 폰트 API 미지원 등 — 그대로 진행 */
+  }
+
   for (const container of containers) {
     const source = container.dataset.source ?? '';
     try {

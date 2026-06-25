@@ -621,7 +621,8 @@ a:hover {
   font-size: 0.9em;
 }
 
-/* 다이어그램 래퍼 + 우상단 '확대' 버튼(모달 열기). JS 생성 DOM이라 전역. 상시 노출(은은) */
+/* 다이어그램 래퍼 + 우상단 '확대' 버튼(모달 열기). JS 생성 DOM이라 전역.
+   복사 버튼처럼 평소엔 숨고 hover/focus 때만 떠 다이어그램 우상단 노드를 안 가린다. */
 .prose .diagram-wrap {
   position: relative;
 }
@@ -641,15 +642,34 @@ a:hover {
   border-radius: 8px;
   color: var(--text-muted);
   cursor: pointer;
+  opacity: 0;
   transition:
+    opacity 0.15s ease,
     color 0.15s ease,
     border-color 0.15s ease;
 }
 
-.prose .diagram-wrap .diagram-expand:hover,
+.prose .diagram-wrap:hover .diagram-expand,
 .prose .diagram-wrap .diagram-expand:focus-visible {
+  opacity: 1;
+}
+
+.prose .diagram-wrap .diagram-expand:hover {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+/* 터치 환경·모션 줄이기에선 항상 노출(hover가 없으므로) */
+@media (hover: none) {
+  .prose .diagram-wrap .diagram-expand {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prose .diagram-wrap .diagram-expand {
+    opacity: 1;
+  }
 }
 
 .prose .diagram-wrap .diagram-expand svg {
