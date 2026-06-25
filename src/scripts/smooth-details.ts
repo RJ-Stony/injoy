@@ -4,8 +4,11 @@
  * 데스크톱·모바일 어디서나 똑같이 동작하도록 JS로 처리한다.
  * 모션 줄이기 설정이면 손대지 않고 네이티브 즉시 토글로 둔다.
  */
-const DURATION = 260;
-const EASING = 'cubic-bezier(0.33, 1, 0.68, 1)';
+// 펼침·접힘 모션의 단일 출처 — 코드블록 접기([slug].astro)도 같은 결을 쓰도록 export한다.
+export const SMOOTH_DURATION = 260;
+export const SMOOTH_EASING = 'cubic-bezier(0.33, 1, 0.68, 1)';
+const DURATION = SMOOTH_DURATION;
+const EASING = SMOOTH_EASING;
 
 function animateDetails(d: HTMLDetailsElement) {
   if (d.dataset.smooth) return;
