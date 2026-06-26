@@ -2,7 +2,7 @@
 title: "Injoy 글쓰기(마크다운) 문법 총정리"
 description: "제목·코드·표·수식·다이어그램·콜아웃까지, Injoy에서 쓰는 모든 마크다운을 한 글에서 점검"
 pubDate: 2026-06-10
-updatedDate: 2026-06-24
+updatedDate: 2026-06-26
 category: "글쓰기"
 tags: ["markdown", "글쓰기"]
 draft: false
@@ -200,7 +200,7 @@ sequenceDiagram
 글 파일 기준 상대 경로로 넣으면 Astro가 알아서 최적화하고 `loading="lazy"`를 붙인다.
 경로 뒤에 `"따옴표"`로 제목을 적으면 캡션이 된다.
 
-![Injoy의 디자인 토큰을 요약한 다이어그램 - 흰 배경, 블루 포인트, 680px 본문 폭](../../assets/markdown-demo.svg "Injoy 디자인 토큰 한 장 요약 — 캡션은 이렇게 붙는다")
+![Injoy의 디자인을 요약한 이미지 - 흰 배경, 블루 포인트, 680px 본문 폭](../../assets/markdown-demo.svg "Injoy 디자인 한 장 요약 - 캡션은 이렇게 붙는다")
 
 ## 각주
 

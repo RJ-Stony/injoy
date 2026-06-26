@@ -64,7 +64,7 @@
       "from": "polish-round-3",
       "to": "markdown-styleguide",
       "type": "related",
-      "note": "가독성 손질에서 markdown-styleguide는 원래 개발자가 보는 글이라 가볍게만 짚었다. 글마다 풀이 강도를 달리한 판단의 대상"
+      "note": "글마다 풀이 강도를 달리한 판단의 대상"
     },
     {
       "from": "polish-round-3",
@@ -142,7 +142,7 @@
       "from": "polish-round-5",
       "to": "markdown-styleguide",
       "type": "related",
-      "note": "LLM Wiki를 만들지 않기로 하며 보니, 위키링크로 글을 잇고 타입 연결로 그래프를 짜는 이 체계가 이미 그 뼈대였음을 확인한 글"
+      "note": "LLM Wiki 만들기를 보류하며 보니, 위키링크로 글을 잇고 타입 연결로 그래프를 짜는 이 체계가 이미 그 뼈대였음을 확인한 글"
     },
     {
       "from": "polish-round-3",
