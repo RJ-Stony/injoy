@@ -75,11 +75,11 @@ const cards = posts.map((p, i) => ({
   import { SMOOTH_DURATION } from '../scripts/smooth-details';
 
   // 폴더를 펴면 펼침 애니메이션(SMOOTH_DURATION)과 mermaid 모듈 로드·SVG 렌더가
-  // 메인스레드를 다퉈 버벅인다. 렌더를 한가할 때(idle)로 미뤄 애니메이션을 먼저 매끄럽게 끝낸다.
-  const deferIdle = (fn: () => void) =>
-    'requestIdleCallback' in window
-      ? (window as Window & { requestIdleCallback: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback(fn, { timeout: 800 })
-      : setTimeout(fn, SMOOTH_DURATION);
+  // 메인스레드를 다퉈 버벅인다. 렌더를 펼침이 끝난 뒤(SMOOTH_DURATION)로 미루고, 그 뒤 한가할 때
+  // 그린다 — 펼치는 동안엔 스켈레톤만 돌아 화면이 끊기지 않는다(idle이 일찍 와도 펼침 중엔 안 그림).
+  const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
+  const deferAfterExpand = (fn: () => void) =>
+    setTimeout(() => (ric ? ric(fn, { timeout: 500 }) : fn()), SMOOTH_DURATION + 80);
 
   const diagrams = Array.from(
     document.querySelectorAll<HTMLElement>('.series-folder .folder-track .mermaid-diagram'),
@@ -94,7 +94,7 @@ const cards = posts.map((p, i) => ({
             const el = e.target as HTMLElement;
             drawn.push(el);
             obs.unobserve(el);
-            deferIdle(() => renderMermaidDiagrams([el]));
+            deferAfterExpand(() => renderMermaidDiagrams([el]));
           }
         },
         { rootMargin: '200px' },

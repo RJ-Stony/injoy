@@ -1120,7 +1120,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     const gen = ++deployRun;
     if (deployRot) clearInterval(deployRot);
     const status = $('publish-status');
-    const link = `<a href="${url}">글 보러 가기</a>`;
+    // 방금 배포된 sha를 쿼리로 붙여 '글 보러 가기'가 옛 캐시 대신 새 버전을 받게 한다(deploy-toast와 동일).
+    const link = `<a href="${url}${url.includes('?') ? '&' : '?'}v=${sha.slice(0, 8)}">글 보러 가기</a>`;
     const msgs = ['GitHub에 올렸어요', '사이트 짓는 중…', '거의 다 됐어요'];
     let step = 0;
     status.innerHTML =

@@ -60,7 +60,10 @@ export function watchPendingDeploy(): void {
     markToasted(p.sha);
     if (result === true) {
       const lead = p.verb === '수정' ? '수정한 글이' : '새 글이';
-      showToast(`<span class="tossface">🌱</span> ${lead} 사이트에 반영됐어요`, { href: p.url, title: p.title }, 'status');
+      // 방금 배포된 sha를 쿼리로 붙여 '보러 가기'가 옛 HTTP 캐시 대신 새 버전을 받게 한다
+      // (정적 페이지라 쿼리는 서버가 무시하고, giscus는 pathname 매핑이라 댓글 스레드도 안 갈린다).
+      const href = `${p.url}${p.url.includes('?') ? '&' : '?'}v=${p.sha.slice(0, 8)}`;
+      showToast(`<span class="tossface">🌱</span> ${lead} 사이트에 반영됐어요`, { href, title: p.title }, 'status');
     } else {
       // 실패는 드물고 중요 — assertive로 알리고 자동으로 사라지지 않게(닫기 전까지 유지).
       showToast('⚠ 커밋은 됐지만 배포가 실패했어요. Actions 로그를 확인해 주세요.', null, 'alert');
