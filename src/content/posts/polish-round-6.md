@@ -20,7 +20,7 @@ draft: false
 
 정해진 화면을 쓰는 대신, 검색 엔진이 내주는 결과를 받아 *직접* 그리기로 했다. 다행히 엔진은 화면이 가려 두었던 걸 전부 갖고 있었다. 글마다 "어디어디서 맞았는지"를 다 넘겨준다.
 
-```js
+```js src/pages/search.astro
 // 찾은 글을 전부 받아, 글 수와 '찾은 구간' 수를 함께 센다
 const pages = await Promise.all(results.map((r) => r.data()));
 const spots = pages.reduce((n, p) => n + (p.sub_results?.length ?? 0), 0);

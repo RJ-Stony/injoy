@@ -16,7 +16,7 @@ series: "블로그 다듬기 기록"
 
 그런데 생각해 보니 **커밋(GitHub에 글을 올리는 것)이 곧 발행** 과정으로 이어진다. 그 뒤 1분은 배포(올린 글을 사이트 화면으로 바꾸는 빌드)가 도는 시간일 뿐, 내가 붙잡고 있을 이유가 없었다.
 
-```ts
+```ts src/pages/write.astro
 // 예전: 커밋한 뒤, 배포가 끝날 때까지 화면을 붙잡고 기다렸다
 status.textContent = '배포를 기다리는 중…'; // [!code --]
 const ok = await waitForDeploy(sha); // [!code --]

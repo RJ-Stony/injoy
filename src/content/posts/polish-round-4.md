@@ -20,7 +20,7 @@ draft: false
 
 코드로는 한 줄이다. 글에 커버가 있으면 그 썸네일을, 없으면 기본 카드를 공유 이미지로 고른다.
 
-```ts
+```ts src/pages/posts/[slug].astro
 // 커버가 있으면 그걸, 없으면 기본 카드를 공유 이미지로
 const ogImageURL = new URL(ogImage ?? withBase('/og-default.png'), Astro.site);
 ```

@@ -29,7 +29,7 @@ draft: false
 
 원리는 의외로 단순하다. 스크롤을 내리면 제목들이 하나씩 화면 위로 밀려 올라가 사라진다. 그중 마지막으로 화면 맨 위(고정 헤더 바로 아래)를 지나친 제목, 그게 지금 읽고 있는 단락이다.
 
-```ts
+```ts src/components/TableOfContents.astro
 function initToc(nav) {
   const links = [...nav.querySelectorAll('a[href^="#"]')];
   const entries = links.map((a) => ({ a, el: document.getElementById(a.hash.slice(1)) }));
@@ -52,7 +52,7 @@ function initToc(nav) {
 
 이건 본문에서 첫 mermaid 블록을 찾아 펜스를 벗겨 내는 함수 하나로 끝난다.
 
-```ts
+```ts src/utils/post.ts
 export function firstDiagram(post) {
   const { codeBlocks } = splitCode(post.body ?? '');
   const block = codeBlocks.find((b) => /^\s*`{3,}\s*mermaid/.test(b)); // 첫 mermaid 블록
@@ -79,7 +79,7 @@ flowchart LR
 
 해결은 단순했다. 배치가 자리를 잡거나 충분히 오래 돌면 루프를 끝내도록 상한을 뒀다. 프레임 수를 세는 변수 하나와, 끝내는 조건에 `또는` 하나를 더한 게 전부다.
 
-```ts
+```ts src/pages/graph.astro
 let frames = 0;
 const loop = () => {
   frames++; // [!code ++]
@@ -102,7 +102,7 @@ const loop = () => {
 
 휴대폰에서 그리는 픽셀 양도 함께 줄였다. 요즘 고해상도 화면은 **같은 한 칸을 2\~3배 더 촘촘한 픽셀로 그린다.** 그만큼 매 프레임 칠해야 할 픽셀이 불어나 부담이 커진다. 그 배율을 2배까지만 쓰도록 잘랐다.
 
-```ts
+```ts src/pages/graph.astro
 // 고해상도 화면(모바일 2~3배)이라도 캔버스는 2배까지만 그리게 막는다
 const dpr = Math.min(window.devicePixelRatio || 1, 2); // [!code ++]
 ```

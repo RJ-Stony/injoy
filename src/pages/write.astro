@@ -2891,6 +2891,22 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--text-muted);
+    list-style: none;
+  }
+
+  .write-root .edge-guide summary::-webkit-details-marker {
+    display: none;
+  }
+
+  /* 셰브론과 문구 사이 반 em 간격 — 사이트 전반(.makeup) 마커와 통일 */
+  .write-root .edge-guide summary::before {
+    content: '▸';
+    margin-inline-end: 0.5em;
+    font-size: 0.8em;
+  }
+
+  .write-root .edge-guide[open] summary::before {
+    content: '▾';
   }
 
   .write-root .edge-guide summary:hover {
@@ -2994,6 +3010,19 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
 
   .write-root #publish-status .pub-sep {
     color: var(--border);
+  }
+
+  /* '글 보러 가기' 링크 — 또렷한 액션으로 읽히게(accent + 옅은 밑줄) */
+  .write-root #publish-status a {
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+
+  .write-root #publish-status a:hover {
+    border-bottom-color: var(--accent);
   }
 
   /* 완료 순간 축하 칩 — 스피너가 체크로 바뀌며 살짝 튄다 */
@@ -3145,15 +3174,22 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       padding: 0.5em 0.9em;
     }
 
-    /* 발행 상태문구: 버튼 위가 아니라 '왼쪽'에. 상태가 좌측 칸을 채우고 버튼은 우측 같은 줄에 남는다. */
+    /* 발행 상태문구: 좁은 화면에선 한 칸에 끼워 넣지 않고 전체폭 한 블록으로(문장처럼 자연 줄바꿈,
+       '글 보러 가기'가 아래로 고아처럼 떨어지지 않게). 발행 버튼은 그 아래 전체폭 CTA로. */
     .write-root .publish-bar {
-      justify-content: space-between;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.8rem;
     }
     .write-root #publish-status {
-      flex: 1 1 0;
+      flex: none;
+      width: 100%;
       min-width: 0;
       justify-content: flex-start;
       text-align: left;
+    }
+    .write-root .publish-bar .big {
+      width: 100%;
     }
   }
 </style>

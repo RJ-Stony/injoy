@@ -33,7 +33,7 @@ draft: false
 
 그래서 점선만 한 단계 더 옅게 낮췄다(0.7에서 0.45로). 글과 글 간의 선은 그대로 진하게 둔다.
 
-```js
+```js src/pages/graph.astro
 // 태그·언급 점선은 절반쯤 투명하게, 글 사이 선은 그대로
 const alpha = base * (faint ? 0.45 : 0.95);
 ```

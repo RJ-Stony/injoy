@@ -39,7 +39,7 @@ draft: false
 
 원인은 한 줄이었다. 강조 배경의 너비를 "100%"로 줬는데, 이 100%가 코드 전체 너비가 아니라 *화면에 보이는 너비*로 계산되고 있었다.
 
-```css
+```css src/styles/global.css
 .prose pre code {
   display: block;          /* [!code ++] */
   min-width: max-content;  /* [!code ++] */

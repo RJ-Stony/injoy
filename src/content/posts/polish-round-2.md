@@ -23,7 +23,7 @@ draft: false
 
 새 갈래를 더하는 데엔 코드를 건드릴 필요가 없다. 글 frontmatter(글 머리에 적는 정보)의 `category`만 적으면, 메뉴도 페이지도 그 목록을 따라 자동으로 생긴다. 그 목록을 만드는 함수는 이것뿐이다.
 
-```ts
+```ts src/utils/post.ts
 // 발행 글을 훑어 카테고리별 글 수를 센다(글 많은 순, 같으면 가나다순)
 export async function getCategories() {
   const posts = await getPublishedPosts();
@@ -41,7 +41,7 @@ export async function getCategories() {
 
 여기서 작은 문제를 하나 맞딱뜨렸다. 메뉴 안 링크들을 가지런히 놓으려고 `display: flex`(요소를 가지런히 배치하는 CSS 규칙)를 줬는데, 이게 글쓰기 링크의 숨김(`hidden`)을 덮어써 버렸다. 토큰이 없어도 글쓰기 링크가 보이게 된 것이다.
 
-```css
+```css src/layouts/BaseLayout.astro
 .site-header .mobile-menu a {
   display: flex; /* 링크를 가지런히. 그런데 이게 hidden을 덮었다 */
 }
@@ -83,7 +83,7 @@ fetch(`https://abacus.../${mode}/injoy-rjstony/${key}`)
 
 태그선만 따로 거의 흰색에 가까운 토큰을 쓰고 있던 게 원인이었다.
 
-```ts
+```ts src/pages/graph.astro
 const faint = isTag || isMention; // 태그·언급 연결선은 약하게 그린다
 const stroke = isTag ? colors.border : isMention ? colors.muted : colors.edge[e.type]; // [!code --]
 const stroke = faint ? colors.muted : colors.edge[e.type] || colors.accent; // [!code ++]

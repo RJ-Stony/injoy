@@ -105,6 +105,8 @@ export interface GraphNode {
   category?: string;
   /** 연결 수 — 노드 크기에 사용 */
   degree: number;
+  /** 글 노드의 발행 나이(0=가장 옛, 1=최신) — 캔버스가 색 진하기로 쓴다. 태그 노드엔 없음. */
+  age?: number;
 }
 
 export interface Graph {
@@ -178,14 +180,17 @@ export async function getGraph(): Promise<Graph> {
     p.data.tags.map((tag) => ({ from: p.id, to: `tag:${tag}`, type: 'mentions' as const })),
   );
 
+  // posts는 최신순(index 0 = 최신). 나이를 0~1로: 가장 옛 글=0, 최신=1(글이 하나뿐이면 1).
+  const lastIdx = posts.length - 1;
   const nodes: GraphNode[] = [
-    ...posts.map((p) => ({
+    ...posts.map((p, i) => ({
       id: p.id,
       kind: 'post' as const,
       label: p.data.title,
       url: `/posts/${p.id}/`,
       category: p.data.category,
       degree: degree.get(p.id) ?? 0,
+      age: lastIdx > 0 ? (lastIdx - i) / lastIdx : 1,
     })),
     ...tagNodes,
   ];
@@ -218,6 +223,17 @@ export async function getConnections(slug: string): Promise<Connection[]> {
     (EDGE_TYPES as Record<string, { out: string; in: string }>)[type]?.[dir] ??
     AUTO_EDGE_TYPES.mentions[dir];
 
+  // 정렬 기준: 타입 우선순위(EDGE_TYPES 정의 순 → mentions 마지막), 같은 타입이면 최신 글 먼저.
+  // age는 노드에 실린 발행 나이(1=최신). '처음 3개 + 더 보기'가 이 순서를 그대로 따른다.
+  const typeOrder = [...Object.keys(EDGE_TYPES), 'mentions'];
+  const rank = (t: EdgeType) => {
+    const i = typeOrder.indexOf(t);
+    return i < 0 ? typeOrder.length : i;
+  };
+  const ageOf = new Map(
+    graph.nodes.filter((n) => n.kind === 'post').map((n) => [n.id, n.age ?? 0]),
+  );
+
   return graph.edges
     .filter((e) => !e.to.startsWith('tag:'))
     .flatMap((e): Connection[] => {
@@ -246,7 +262,10 @@ export async function getConnections(slug: string): Promise<Connection[]> {
         ];
       }
       return [];
-    });
+    })
+    .sort(
+      (a, b) => rank(a.type) - rank(b.type) || (ageOf.get(b.slug) ?? 0) - (ageOf.get(a.slug) ?? 0),
+    );
 }
 
 /** 엣지 타입의 표시 라벨 */

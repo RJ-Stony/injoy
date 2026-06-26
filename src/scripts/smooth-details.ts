@@ -44,7 +44,19 @@ function animateDetails(d: HTMLDetailsElement) {
       d.open = true; // [open] 스타일(캐럿 회전 등) 즉시 적용 + 전체 높이 측정
       run(d.offsetHeight);
     } else {
-      run((summary as HTMLElement).offsetHeight, () => {
+      // 닫힘 목표 = summary 높이 + details 자신의 세로 패딩·테두리.
+      // summary.offsetHeight만 쓰면 details에 패딩이 있는 경우(.makeup 등) 그만큼
+      // 더 줄였다가 open=false 순간 실제 닫힘 높이로 튕겨 오른다(오버슈트).
+      // offsetHeight는 summary의 패딩·테두리를 이미 포함하므로(=닫힘 시 보이는 박스),
+      // details 자신의 패딩·테두리만 더하면 정확하다. 전역 box-sizing:border-box라
+      // height 애니(=border-box)와 단위가 일치한다(펼침 경로 d.offsetHeight와 동일 가정).
+      const cs = getComputedStyle(d);
+      const extra =
+        (parseFloat(cs.paddingTop) || 0) +
+        (parseFloat(cs.paddingBottom) || 0) +
+        (parseFloat(cs.borderTopWidth) || 0) +
+        (parseFloat(cs.borderBottomWidth) || 0);
+      run((summary as HTMLElement).offsetHeight + extra, () => {
         d.open = false; // 접는 애니메이션이 끝난 뒤 실제로 닫는다
       });
     }

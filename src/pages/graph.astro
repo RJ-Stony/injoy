@@ -126,6 +126,21 @@ const data = {
       'requires', 'triggered-by', 'contradicts', 'related',
     ];
     const colors = { edge: {} };
+    // CSS 색(hex)을 [r,g,b]로. 토큰은 #rrggbb 형식이지만, 혹시 다른 형식이면 canvas로 정규화해 읽는다.
+    const toRGB = (css) => {
+      const hex = css.replace(/^#/, '');
+      if (/^[0-9a-f]{6}$/i.test(hex)) {
+        const n = parseInt(hex, 16);
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+      }
+      if (/^[0-9a-f]{3}$/i.test(hex)) {
+        return [parseInt(hex[0] + hex[0], 16), parseInt(hex[1] + hex[1], 16), parseInt(hex[2] + hex[2], 16)];
+      }
+      ctx.fillStyle = '#000';
+      ctx.fillStyle = css;
+      const m = ctx.fillStyle.match(/[\d.]+/g);
+      return m ? [+m[0], +m[1], +m[2]] : [47, 111, 237];
+    };
     const readColors = () => {
       const s = getComputedStyle(document.documentElement);
       colors.accent = s.getPropertyValue('--accent').trim();
@@ -134,10 +149,23 @@ const data = {
       colors.muted = s.getPropertyValue('--text-muted').trim();
       colors.border = s.getPropertyValue('--border').trim();
       colors.surface = s.getPropertyValue('--surface').trim();
+      // 글 노드 나이 그라데이션 끝점 — 가장 옛 글은 surface 쪽으로 희석(옅게), 최신은 full accent.
+      colors.accentRGB = toRGB(colors.accent);
+      colors.surfaceRGB = toRGB(colors.surface);
       // 엣지 타입별 색 — global.css의 --edge-* 단일 출처를 캔버스가 공유한다
       for (const k of EDGE_KINDS) colors.edge[k] = s.getPropertyValue(`--edge-${k}`).trim();
       // 라벨 폰트도 여기서 한 번만 읽어 캐시한다 — draw()에서 매 프레임 읽지 않게
       colors.fontFamily = getComputedStyle(document.body).fontFamily;
+    };
+
+    // 글 노드 채움색 — 나이(0~1)를 surface↔accent 보간으로. 바닥선 0.5라 가장 옛 글도
+    // 50% accent를 유지해 빈 원(태그 노드)과 헷갈리지 않는다. 최신(age=1)=full accent.
+    const lerp = (a, b, t) => Math.round(a + (b - a) * t);
+    const nodeFill = (age) => {
+      const t = 0.5 + 0.5 * (typeof age === 'number' ? age : 1);
+      const [sr, sg, sb] = colors.surfaceRGB;
+      const [ar, ag, ab] = colors.accentRGB;
+      return `rgb(${lerp(sr, ar, t)}, ${lerp(sg, ag, t)}, ${lerp(sb, ab, t)})`;
     };
 
     // 모바일 등 작은 화면 판정 — 시뮬레이션 부하·정착을 가볍게 조정하는 데 쓴다.
@@ -272,7 +300,7 @@ const data = {
         ctx.beginPath();
         ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
         if (n.kind === 'post') {
-          ctx.fillStyle = colors.accent;
+          ctx.fillStyle = nodeFill(n.age); // 나이별 진하기(옛→옅게, 최신→진하게)
           ctx.fill();
         } else {
           ctx.fillStyle = colors.surface;
@@ -886,6 +914,22 @@ const data = {
     cursor: pointer;
     font-weight: 600;
     color: var(--text-muted);
+    list-style: none;
+  }
+
+  .edge-list summary::-webkit-details-marker {
+    display: none;
+  }
+
+  /* 셰브론과 문구 사이 반 em 간격 — 사이트 전반(.makeup) 마커와 통일 */
+  .edge-list summary::before {
+    content: '▸';
+    margin-inline-end: 0.5em;
+    font-size: 0.8em;
+  }
+
+  .edge-list[open] summary::before {
+    content: '▾';
   }
 
   .edge-list summary:hover {

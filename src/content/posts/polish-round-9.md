@@ -17,7 +17,7 @@ series: "블로그 다듬기 기록"
 
 먼저 글을 '시리즈에 속한 것'과 '낱개 글'로 나눴다. 시리즈 글은 폴더로 가게끔 하고, 나머지만 목록에 남는다. 결국 아래 함수가 하는 일은, 같은 `series`(글 머리에 적는 묶음 이름) 값을 가진 글을 두 편 이상일 때만 한 폴더로 모으는 것이다.
 
-```ts
+```ts src/utils/post.ts
 export async function getSeriesGroups() {
   const posts = await getPublishedPosts();
   const map = new Map();
@@ -38,7 +38,7 @@ export async function getSeriesGroups() {
 
 폴더로 묶어도 글은 계속 늘어난다. 그래서 홈도, 카테고리도, 태그 화면도 **처음 열 개만 보여 주고 나머지는 다음 페이지로** 넘기게 했다. 이 방식을 페이지네이션(긴 목록을 여러 쪽으로 끊어 보여 주는 것)이라고 하는데, Astro에는 이걸 만들어 주는 도구가 있어 글 목록을 넘기면 알아서 페이지를 쪼갠다.
 
-```ts
+```ts src/pages/[...page].astro
 export async function getStaticPaths({ paginate }) {
   const posts = await getStandalonePosts();
   return paginate(posts, { pageSize: 10 }); // [!code highlight]

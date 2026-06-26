@@ -72,6 +72,14 @@ const cards = posts.map((p, i) => ({
   // 캐러셀 카드의 mermaid 썸네일 — 화면(폴더)이 열려 보일 때만 렌더한다.
   // 공용 렌더러는 내부 큐로 직렬화되어 홈의 일반 카드 썸네일과 동시에 그려도 안전하다.
   import { renderMermaidDiagrams } from '../scripts/mermaid-render';
+  import { SMOOTH_DURATION } from '../scripts/smooth-details';
+
+  // 폴더를 펴면 펼침 애니메이션(SMOOTH_DURATION)과 mermaid 모듈 로드·SVG 렌더가
+  // 메인스레드를 다퉈 버벅인다. 렌더를 한가할 때(idle)로 미뤄 애니메이션을 먼저 매끄럽게 끝낸다.
+  const deferIdle = (fn: () => void) =>
+    'requestIdleCallback' in window
+      ? (window as Window & { requestIdleCallback: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback(fn, { timeout: 800 })
+      : setTimeout(fn, SMOOTH_DURATION);
 
   const diagrams = Array.from(
     document.querySelectorAll<HTMLElement>('.series-folder .folder-track .mermaid-diagram'),
@@ -85,8 +93,8 @@ const cards = posts.map((p, i) => ({
             if (!e.isIntersecting) continue;
             const el = e.target as HTMLElement;
             drawn.push(el);
-            renderMermaidDiagrams([el]);
             obs.unobserve(el);
+            deferIdle(() => renderMermaidDiagrams([el]));
           }
         },
         { rootMargin: '200px' },
