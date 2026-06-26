@@ -264,6 +264,29 @@ const cards = posts.map((p, i) => ({
     line-height: normal;
   }
 
+  /* 렌더 전 스켈레톤 — 다이어그램은 idle에 미뤄 그리므로(아래 script), 그 사이 빈 칸 대신
+     잔잔히 반짝이는 자리표시를 보인다. svg가 채워지면 :empty가 풀려 저절로 사라진다(순수 CSS). */
+  .s-thumb .mermaid-diagram:empty {
+    background: linear-gradient(90deg, var(--border), var(--surface), var(--border));
+    background-size: 200% 100%;
+    animation: s-thumb-shimmer 1.2s linear infinite;
+  }
+
+  @keyframes s-thumb-shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .s-thumb .mermaid-diagram:empty {
+      animation: none;
+    }
+  }
+
   .s-thumb .mermaid-diagram svg {
     max-width: 100%;
     max-height: 100%;
