@@ -172,7 +172,7 @@
       "from": "harness-2-self-bypass",
       "to": "harness-1-benchmarking",
       "type": "extends",
-      "note": "벤치마킹으로 깐 파이프라인을 실제로 굴리면서, 본체 AI가 계획 단계를 제 손으로 건너뛰는 문제를 막은 회차"
+      "note": "벤치마킹으로 설계한 파이프라인을 실제로 굴리면서, 모델이 계획 단계를 건너뛰는 문제를 막은 과정"
     },
     {
       "from": "harness-3-serena-proxy",
