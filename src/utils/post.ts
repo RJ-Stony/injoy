@@ -166,9 +166,17 @@ export function hasDiagram(post: Post): boolean {
   return firstDiagram(post) !== null;
 }
 
-/** "2026. 6. 10." 형식의 발행일 표기 */
+/** "2026년 6월 10일" 형식의 발행일 표기(긴 형태) */
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long' }).format(date);
+}
+
+/** "2026.06.10" 짧은 절대표기 — 메타 줄·hover title·상세용(긴 '년 월 일'은 모바일서 줄바꿈) */
+export function formatDateShort(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}.${m}.${d}`;
 }
 
 /** <time datetime> 속성용 ISO 날짜 (YYYY-MM-DD) */

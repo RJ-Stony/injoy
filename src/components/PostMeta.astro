@@ -5,7 +5,7 @@
  * 글 카드에선 통계를 함께 보여 주고(showStats=true), 글 상단에선 통계를 따로
  * 배치하므로 showStats=false로 카테고리·날짜만 그린다.
  */
-import { formatDate, isoDate } from '../utils/post';
+import { formatDate, formatDateShort, isoDate } from '../utils/post';
 import { withBase } from '../utils/url';
 import PostStats from './PostStats.astro';
 import ViewCount from './ViewCount.astro';
@@ -22,6 +22,8 @@ interface Props {
   showStats?: boolean;
   /** 넘기면 읽기 시간 옆에 조회수 칩을 함께 — 홈 목록용(카운트는 올리지 않고 조회만) */
   viewSlug?: string;
+  /** 글 상세용 — 상대시간 대신 정확 날짜+라벨('작성'/'수정')로 또렷하게 보여 준다 */
+  precise?: boolean;
 }
 
 const {
@@ -32,22 +34,45 @@ const {
   updatedDate,
   showStats = true,
   viewSlug,
+  precise = false,
 } = Astro.props;
-// 수정 시각이 발행 시각과 다르면 표시한다. 새 수정은 시각까지 기록되므로 같은 날 수정도 발행(자정)과
-// 달라 뜨고('몇 분 전 수정'을 클라이언트가 채움), 옛 날짜만 있던 글의 발행==수정(같은 자정)은 가려진다.
-// 하루가 넘으면 아래 서버 날짜를 그대로 둔다.
+// 수정 시각이 발행 시각과 다르면 '수정'을 함께 보여 준다(같은 자정의 옛 글은 가려짐).
 const showUpdated = !!updatedDate && updatedDate.getTime() !== pubDate.getTime();
 ---
 
 <div class="post-meta">
   <a class="category" href={withBase(`/categories/${category}/`)}>{category}</a>
-  <time class="m-date" datetime={isoDate(pubDate)}>{formatDate(pubDate)}</time>
   {
-    showUpdated && (
-      <time class="m-date m-upd" datetime={updatedDate!.toISOString()}>
-        수정 {formatDate(updatedDate!)}
+    precise ? (
+      <time class="m-date" datetime={isoDate(pubDate)}>작성 {formatDateShort(pubDate)}</time>
+    ) : (
+      <time
+        class="m-date rel-time"
+        datetime={pubDate.toISOString()}
+        title={formatDate(pubDate)}
+        data-prefix=""
+      >
+        {formatDateShort(pubDate)}
       </time>
     )
+  }
+  {
+    showUpdated &&
+      (precise ? (
+        <time class="m-date m-upd" datetime={updatedDate!.toISOString()}>
+          수정 {formatDateShort(updatedDate!)}
+        </time>
+      ) : (
+        <time
+          class="m-date m-upd rel-time"
+          datetime={updatedDate!.toISOString()}
+          title={formatDate(updatedDate!)}
+          data-prefix="수정 "
+          data-fine="1"
+        >
+          수정 {formatDateShort(updatedDate!)}
+        </time>
+      ))
   }
   {showStats && <PostStats minutes={minutes} connections={connections} />}
   {showStats && viewSlug && <ViewCount slug={viewSlug} increment={false} />}
@@ -91,23 +116,39 @@ const showUpdated = !!updatedDate && updatedDate.getTime() !== pubDate.getTime()
 </style>
 
 <script>
-  // 하루 안의 수정은 '몇 초/분/시간 전 수정'으로, 하루가 넘으면 서버가 그린 '수정 M/D' 날짜 그대로.
-  // 정적 사이트라 '지금'은 뷰 시점에만 알 수 있어 클라이언트에서 계산한다(datetime 속성=수정 시각).
-  function relativeUpdated() {
+  // 카드의 날짜는 상대시간으로 — 정적 사이트라 '지금'은 뷰 시점에만 알 수 있어 클라이언트가 채운다.
+  // datetime=대상 시각, data-prefix='수정 '(작성은 빈 문자열), data-fine='1'이면 24시간 안은 초/분/시 단위.
+  // 정확한 날짜는 hover(title)와 글 상세(precise)에서 본다. (상세는 서버가 절대 날짜로 그려 이 스크립트가 건드리지 않음.)
+  function rel(nowMs: number, tMs: number, fine: boolean): string {
+    const sec = Math.floor((nowMs - tMs) / 1000);
+    // 시각이 박힌 수정(<24h)은 절대 경과초로 — '방금/N분/N시간 전'.
+    if (fine && sec >= 0 && sec < 86400) {
+      if (sec < 5) return '방금';
+      if (sec < 60) return `${sec}초 전`;
+      if (sec < 3600) return `${Math.floor(sec / 60)}분 전`;
+      return `${Math.floor(sec / 3600)}시간 전`;
+    }
+    // 일 단위는 '달력 날짜' 차로 — 로컬 자정 기준. (작성일은 date-only라 UTC 자정에 박혀,
+    // 절대 경과초로 재면 KST에서 오늘/어제 경계가 9시간씩 밀린다. 로컬 자정 정규화로 바로잡는다.)
+    const a = new Date(nowMs); a.setHours(0, 0, 0, 0);
+    const b = new Date(tMs); b.setHours(0, 0, 0, 0);
+    const day = Math.round((a.getTime() - b.getTime()) / 86400000);
+    if (day <= 0) return '오늘'; // 미래(시계 틀어짐·발행 당일 새벽)도 '오늘'로 흡수
+    if (day === 1) return '어제';
+    if (day < 7) return `${day}일 전`;
+    if (day < 30) return `${Math.floor(day / 7)}주 전`;
+    if (day < 365) return `${Math.floor(day / 30)}개월 전`;
+    return `${Math.floor(day / 365)}년 전`;
+  }
+  function paintRelative() {
     const now = Date.now();
-    for (const el of document.querySelectorAll<HTMLTimeElement>('.m-upd[datetime]')) {
+    for (const el of document.querySelectorAll<HTMLTimeElement>('.rel-time[datetime]')) {
       const t = new Date(el.getAttribute('datetime') || '').getTime();
       if (Number.isNaN(t)) continue;
-      const sec = Math.floor((now - t) / 1000);
-      if (sec < 0 || sec >= 86400) continue; // 하루 이상은 서버 날짜를 둔다
-      el.textContent =
-        sec < 5 ? '방금 수정'
-        : sec < 60 ? `${sec}초 전 수정`
-        : sec < 3600 ? `${Math.floor(sec / 60)}분 전 수정`
-        : `${Math.floor(sec / 3600)}시간 전 수정`;
+      el.textContent = (el.dataset.prefix || '') + rel(now, t, el.dataset.fine === '1');
     }
   }
-  relativeUpdated();
+  paintRelative();
   // 보는 동안 '방금'이 '1분 전'으로 자연히 넘어가게 가볍게 갱신한다.
-  setInterval(relativeUpdated, 30000);
+  setInterval(paintRelative, 30000);
 </script>

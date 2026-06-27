@@ -209,6 +209,18 @@
       "to": "harness-7-snowflake",
       "type": "extends",
       "note": "쌓기를 마치고, 직접 만든 통로와 외부 도구를 다시 걷어내며 하네스를 얇게 만든 회차"
+    },
+    {
+      "from": "harness-1-benchmarking",
+      "to": "welcome",
+      "type": "related",
+      "note": "첫 글에서 그린 '무엇을 쓸 것인가'의 AI 갈래로, 이 하네스 엔지니어링 시리즈가 그 한 줄기로 들어왔다"
+    },
+    {
+      "from": "polish-round-12",
+      "to": "polish-round-11",
+      "type": "extends",
+      "note": "그래프 색·접힘을 다듬은 데 이어, 새로고침마다 출렁이던 그래프를 미리 정착시켜 가라앉힌 과정"
     }
   ]
 }

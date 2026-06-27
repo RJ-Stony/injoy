@@ -698,16 +698,18 @@ const data = {
       readColors();
       resize();
       nodes.forEach(seed);
-      homeView(); // 애니메이션 동안 쓸 기본 뷰(고정 박스 맞춤). 정착하면 노드에 꼭 맞춘다.
-      pendingFit = true;
-      if (reduceMotion) {
-        for (let i = 0; i < 400; i++) tick();
-        fitToBbox();
-        pendingFit = false;
-        draw();
-      } else {
-        wake();
+      // ponytail: 로드·리사이즈 땐 시뮬을 화면에서 굴리지 않고, 미리 다 돌려 '정착된 모습'만 한 번 그린다.
+      // (매 진입마다 눈앞에서 출렁이던 원인 = rAF로 settling을 보여 준 것.) d3 정적 포스 레이아웃과 같은 기법
+      // (tick을 미리 N번 돌리고 1회 렌더). 드래그만 wake()로 실시간 반응. 상한 600틱(78노드 O(n²)도 수십 ms).
+      const calmEnergy = Math.max(0.5, nodes.length * 0.05);
+      for (let i = 0; i < 600; i++) {
+        tick();
+        const energy = nodes.reduce((s, n) => s + Math.abs(n.vx) + Math.abs(n.vy), 0);
+        if (energy < calmEnergy) break;
       }
+      fitToBbox();
+      pendingFit = false;
+      draw();
     };
 
     window.addEventListener('injoy:theme-change', () => {
