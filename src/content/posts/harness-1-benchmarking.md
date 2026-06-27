@@ -2,6 +2,7 @@
 title: "잘 쓰고 있는 하네스부터 뜯어보기"
 description: "사내 AI 개발용 하네스를 만들기 전에, 공개된 하네스 플러그인 5개를 벤치마킹한 내용"
 pubDate: 2026-06-27
+updatedDate: 2026-06-27T10:49:50+09:00
 category: "AI"
 tags: ["하네스", "claude-code", "ai", "벤치마킹"]
 draft: false

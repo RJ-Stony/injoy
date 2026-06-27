@@ -2,6 +2,7 @@
 title: "Serena는 처음부터 연결돼 있어야 했다"
 description: "코드 분석용 Serena MCP를 붙이면서, 첫 세션부터 연결 상태를 보장하려 Stub Proxy를 만들었다가 환경의 제약으로 걷어낸 과정"
 pubDate: 2026-06-27
+updatedDate: 2026-06-27T22:28:43+09:00
 category: "AI"
 tags: ["하네스", "claude-code", "mcp", "ai"]
 draft: false

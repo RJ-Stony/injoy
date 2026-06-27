@@ -2,6 +2,7 @@
 title: "AI가 계획 단계를 건너뛰지 못하게"
 description: "AI가 계획 단계를 스스로 우회하는 것을 PreToolUse라는 훅으로 막은 과정"
 pubDate: 2026-06-27
+updatedDate: 2026-06-27T22:18:42+09:00
 category: "AI"
 tags: ["하네스", "claude-code", "ai", "hook"]
 draft: false

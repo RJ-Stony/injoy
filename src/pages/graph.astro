@@ -568,8 +568,9 @@ const data = {
         } else {
           tooltip.hidden = true;
         }
-        if (reduceMotion) draw();
-        else wake();
+        // 배치는 이미 정착했으니 hover는 강조만 다시 그린다 — 물리(wake) 금지.
+        // (hover마다 wake하면 마우스를 올릴 때마다 시뮬이 재시동돼 노드가 계속 출렁였다. 키보드 탐색과 동일하게 draw만.)
+        draw();
       } else if (n && !tooltip.hidden) {
         tooltip.style.left = `${Math.min(x + 14, W - 160)}px`;
         tooltip.style.top = `${y + 14}px`;
@@ -647,7 +648,7 @@ const data = {
       if (dragging || panStart || pinchStart) return;
       hovered = null;
       tooltip.hidden = true;
-      if (reduceMotion) draw();
+      draw(); // 강조 해제만 다시 그린다(물리 재시동 없이)
     });
 
     // 키보드 탐색 — 화살표로 노드 순회, Enter로 그 글로 이동, Esc로 선택 해제.
