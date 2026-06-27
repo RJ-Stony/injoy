@@ -184,7 +184,7 @@
       "from": "harness-4-memory",
       "to": "harness-3-serena-proxy",
       "type": "extends",
-      "note": "도구를 붙인 데 이어, 세션을 넘어 기억이 이어지게 메모리 불러오기를 손본 회차"
+      "note": "세션을 넘어 기억이 이어지게 메모리 불러오기를 추가한 과정"
     },
     {
       "from": "harness-5-nondev-ux",
