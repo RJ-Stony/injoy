@@ -51,7 +51,7 @@ export function watchPendingDeploy(): void {
   }
 
   const p = pending;
-  pollDeploy(p.sha, token).then((result) => {
+  pollDeploy(p.sha, token).then(async (result) => {
     // 내가 폴링한 그 발행 기록일 때만 지운다 — 그 사이 더 최신 발행이 기록을 덮어썼으면 보존(다중 탭 경합).
     clearRecordIfSha(p.sha);
     if (result !== true && result !== false) return; // null(시간 초과)·'superseded'(더 최신 발행)는 조용히
@@ -59,16 +59,45 @@ export function watchPendingDeploy(): void {
     if (alreadyToasted(p.sha)) return;
     markToasted(p.sha);
     if (result === true) {
+      // Actions 성공 후에도 라이브 반영엔 시차가 있어, 새 빌드가 실제로 떴는지 확인한 뒤 알린다.
+      const live = await confirmLive(p.url, p.sha);
       const lead = p.verb === '수정' ? '수정한 글이' : '새 글이';
       // 방금 배포된 sha를 쿼리로 붙여 '보러 가기'가 옛 HTTP 캐시 대신 새 버전을 받게 한다
-      // (정적 페이지라 쿼리는 서버가 무시하고, giscus는 pathname 매핑이라 댓글 스레드도 안 갈린다).
+      // (giscus는 pathname 매핑이라 댓글 스레드도 안 갈린다).
       const href = `${p.url}${p.url.includes('?') ? '&' : '?'}v=${p.sha.slice(0, 8)}`;
-      showToast(`<span class="tossface">🌱</span> ${lead} 사이트에 반영됐어요`, { href, title: p.title }, 'status');
+      const msg = live
+        ? `<span class="tossface">🌱</span> ${lead} 사이트에 반영됐어요`
+        : `<span class="tossface">🌱</span> ${lead} 곧 반영됩니다`;
+      showToast(msg, { href, title: p.title }, 'status');
     } else {
       // 실패는 드물고 중요 — assertive로 알리고 자동으로 사라지지 않게(닫기 전까지 유지).
       showToast('⚠ 커밋은 됐지만 배포가 실패했어요. Actions 로그를 확인해 주세요.', null, 'alert');
     }
   });
+}
+
+/**
+ * Actions 런이 success여도 GitHub Pages CDN이 새 빌드를 내놓기까진 몇 초 시차가 있다.
+ * 라이브 페이지를 캐시 우회로 받아 `<meta name="injoy:build">`가 이 발행 sha가 될 때까지(또는 한도까지)
+ * 기다린다 — '보러 가기'가 옛 빌드로 가지 않게. (쿼리만으론 CDN 캐시가 확실히 안 깨지므로 내용으로 확인.)
+ */
+export async function confirmLive(url: string, sha: string, tries = 12): Promise<boolean> {
+  const want = sha.slice(0, 8);
+  for (let i = 0; i < tries; i++) {
+    try {
+      const bust = `${url}${url.includes('?') ? '&' : '?'}_cb=${want}-${i}`;
+      const res = await fetch(bust, { cache: 'no-store' });
+      if (res.ok) {
+        const html = await res.text();
+        const live = html.match(/<meta\s+name=["']injoy:build["']\s+content=["']([^"']*)["']/i)?.[1] ?? '';
+        if (live && live.slice(0, 8) === want) return true;
+      }
+    } catch {
+      /* 일시 오류 무시 */
+    }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  return false;
 }
 
 /** 저장된 기록의 sha가 내가 폴링한 sha와 같을 때만 지운다(더 최신 발행 기록은 건드리지 않음). */

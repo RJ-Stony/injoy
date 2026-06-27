@@ -25,6 +25,9 @@ const siteName = 'Injoy';
 const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
 // 헤더 카테고리 메뉴 — 데스크톱 드롭다운과 모바일 햄버거가 함께 쓴다(빌드 시 1회).
 const categories = await getCategories();
+// 이 빌드의 커밋 sha — '보러 가기'가 새 빌드가 실제로 떴는지 확인하는 표식(deploy-toast.confirmLive).
+// GitHub Actions 빌드에선 GITHUB_SHA가 곧 발행 커밋이고, 로컬 dev에선 빈 값(확인은 라이브에서만 의미).
+const buildSha = process.env.GITHUB_SHA ?? '';
 ---
 
 <!doctype html>
@@ -33,6 +36,7 @@ const categories = await getCategories();
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
+    <meta name="injoy:build" content={buildSha} />
 
     <!-- FOUC 방지: 저장된 테마 선택을 첫 페인트 전에 적용 -->
     <script is:inline>

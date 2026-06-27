@@ -415,7 +415,11 @@ const data = {
       tick();
       draw();
       const energy = nodes.reduce((s, n) => s + Math.abs(n.vx) + Math.abs(n.vy), 0);
-      calmFrames = energy < 0.5 ? calmFrames + 1 : 0;
+      // 정착 임계값은 노드 수에 비례 — 노드당 속도가 충분히 작아지면 정착으로 본다.
+      // (절대값 0.5 고정이면 글이 늘수록 합 에너지가 커져 정착 판정이 안 돼 매번 maxFrames까지 떨었다.
+      //  분리된 서브그래프가 생겨 노드가 늘면 특히 그랬다.)
+      const calmEnergy = Math.max(0.5, nodes.length * 0.05);
+      calmFrames = energy < calmEnergy ? calmFrames + 1 : 0;
       const calmLimit = isSmall() ? 18 : 30; // 작은 화면은 더 일찍 멈춰 rAF 루프를 끝낸다
       // 중력·척력 균형 탓에 에너지가 0까지 안 떨어질 수 있다 → 프레임 상한을 backstop으로 둬
       // 배치가 자리 잡으면 루프를 끝낸다(무한 rAF·모바일 발열/미세 떨림 방지). 드래그 중엔 유지.

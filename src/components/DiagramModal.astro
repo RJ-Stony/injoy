@@ -41,10 +41,41 @@
 
     // 화면 = 다이어그램좌표 * scale + t (graph.astro view 모델과 동형)
     const view = { scale: 1, tx: 0, ty: 0 };
+    // SVG 자연 크기(scale 1). 줌은 transform scale이 아니라 이 크기에 곱해 SVG를 벡터로 다시 그린다
+    // → GPU가 비트맵을 늘려 흐려지지 않고, 어떤 배율에서도 선명하다. 팬은 translate로(GPU 저렴).
+    let baseW = 0;
+    let baseH = 0;
     let prevBodyOverflow = ''; // 모달 열기 전 body overflow를 저장했다 닫을 때 되돌린다
     const clamp = (s: number) => Math.min(8, Math.max(0.3, s));
+    const captureBase = () => {
+      const svg = diagram.querySelector('svg');
+      if (!svg) return;
+      // mermaid가 박는 width="100%"·인라인 max-width는 풀어 둔다(아래 apply가 건 크기를 자르지 않게).
+      svg.removeAttribute('width');
+      svg.removeAttribute('height');
+      svg.style.maxWidth = 'none';
+      // 자연 크기는 viewBox로 잰다 — 레이아웃에 영향받지 않는 진짜 본디 크기(width="100%"의 부모-수축 함정 회피).
+      const vb = svg.viewBox?.baseVal;
+      if (vb && vb.width && vb.height) {
+        baseW = vb.width;
+        baseH = vb.height;
+      } else {
+        svg.style.width = '';
+        svg.style.height = '';
+        const sb = svg.getBoundingClientRect();
+        baseW = sb.width;
+        baseH = sb.height;
+      }
+    };
     const apply = () => {
-      pan.style.transform = `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`;
+      pan.style.transform = `translate(${view.tx}px, ${view.ty}px)`;
+      const svg = diagram.querySelector('svg');
+      if (svg && baseW) {
+        // mermaid 인라인 max-width가 baked 크기를 자르지 않게 매번 풀어 준다(인라인이 스타일시트를 이김).
+        svg.style.maxWidth = 'none';
+        svg.style.width = `${baseW * view.scale}px`;
+        svg.style.height = `${baseH * view.scale}px`;
+      }
     };
 
     // 한 점(화면 좌표) 아래 지점이 제자리에 남도록 t를 재계산하는 표준 줌 (graph.astro:zoomAtPoint)
@@ -63,19 +94,19 @@
 
     // 다이어그램을 무대에 맞춰 가운데 정렬(처음 열 때·리셋). 자연 크기를 재고 여백 두고 맞춘다.
     const fit = () => {
-      view.scale = 1;
-      view.tx = 0;
-      view.ty = 0;
-      apply();
-      const svg = diagram.querySelector('svg');
+      captureBase();
       const r = stage.getBoundingClientRect();
-      if (!svg) return;
-      const sb = svg.getBoundingClientRect();
-      if (!sb.width || !sb.height) return;
-      const s = Math.min((r.width * 0.92) / sb.width, (r.height * 0.92) / sb.height, 3);
+      if (!baseW || !baseH) {
+        view.scale = 1;
+        view.tx = 0;
+        view.ty = 0;
+        apply();
+        return;
+      }
+      const s = Math.min((r.width * 0.92) / baseW, (r.height * 0.92) / baseH, 3);
       view.scale = s;
-      view.tx = (r.width - sb.width * s) / 2;
-      view.ty = (r.height - sb.height * s) / 2;
+      view.tx = (r.width - baseW * s) / 2;
+      view.ty = (r.height - baseH * s) / 2;
       apply();
     };
 
@@ -163,7 +194,7 @@
     // 다크/라이트 전환 시 다시 그린다 — transform은 dm-pan에 있어 view가 그대로 유지된다.
     let drawn = false;
     const rerender = () => {
-      if (dialog.open && drawn) renderMermaidDiagrams([diagram]);
+      if (dialog.open && drawn) renderMermaidDiagrams([diagram]).then(apply); // 새 svg에 현재 배율 다시 적용
     };
     window.addEventListener('injoy:theme-change', rerender);
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rerender);

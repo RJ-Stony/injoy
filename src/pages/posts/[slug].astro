@@ -234,32 +234,90 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
   const escapeHtml = (s: string) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  // 언어 칩 — 브랜드 색 라벨(자체 배경이라 라이트·다크 모두 또렷). 미정의 언어는 중립 칩으로 폴백.
+  // 언어/확장자 칩 — 브랜드 색 라벨(자체 배경이라 라이트·다크 모두 또렷). 미정의는 중립 칩으로 폴백.
+  // 키는 펜스 언어와 파일 확장자를 함께 받는다(둘이 다르면 파일명 확장자를 우선해 잡는다).
+  const Y = '#1a1a1a'; // 밝은 배경(노랑·주황)에 쓰는 어두운 글자색
   const LANG_CHIP: Record<string, { label: string; bg: string; fg: string }> = {
     ts: { label: 'TS', bg: '#3178c6', fg: '#fff' },
+    mts: { label: 'TS', bg: '#3178c6', fg: '#fff' },
+    cts: { label: 'TS', bg: '#3178c6', fg: '#fff' },
     tsx: { label: 'TSX', bg: '#3178c6', fg: '#fff' },
-    js: { label: 'JS', bg: '#f7df1e', fg: '#1a1a1a' },
-    jsx: { label: 'JSX', bg: '#f7df1e', fg: '#1a1a1a' },
+    js: { label: 'JS', bg: '#f7df1e', fg: Y },
+    mjs: { label: 'JS', bg: '#f7df1e', fg: Y },
+    cjs: { label: 'JS', bg: '#f7df1e', fg: Y },
+    jsx: { label: 'JSX', bg: '#f7df1e', fg: Y },
     json: { label: 'JSON', bg: '#5b6470', fg: '#fff' },
+    jsonc: { label: 'JSONC', bg: '#5b6470', fg: '#fff' },
     css: { label: 'CSS', bg: '#2965f1', fg: '#fff' },
+    scss: { label: 'SCSS', bg: '#cc6699', fg: '#fff' },
+    sass: { label: 'SASS', bg: '#cc6699', fg: '#fff' },
+    less: { label: 'LESS', bg: '#1d365d', fg: '#fff' },
     html: { label: 'HTML', bg: '#e34f26', fg: '#fff' },
+    xml: { label: 'XML', bg: '#0060ac', fg: '#fff' },
+    svg: { label: 'SVG', bg: '#ffb13b', fg: Y },
     astro: { label: 'ASTRO', bg: '#ff5d01', fg: '#fff' },
+    vue: { label: 'VUE', bg: '#42b883', fg: '#fff' },
+    svelte: { label: 'SVELTE', bg: '#ff3e00', fg: '#fff' },
     bash: { label: 'SH', bg: '#4f5b66', fg: '#fff' },
     shell: { label: 'SH', bg: '#4f5b66', fg: '#fff' },
     sh: { label: 'SH', bg: '#4f5b66', fg: '#fff' },
+    zsh: { label: 'SH', bg: '#4f5b66', fg: '#fff' },
+    ps1: { label: 'PS', bg: '#012456', fg: '#fff' },
     yaml: { label: 'YAML', bg: '#cb171e', fg: '#fff' },
     yml: { label: 'YAML', bg: '#cb171e', fg: '#fff' },
     md: { label: 'MD', bg: '#519aba', fg: '#fff' },
     markdown: { label: 'MD', bg: '#519aba', fg: '#fff' },
+    mdx: { label: 'MDX', bg: '#fcb32c', fg: Y },
     py: { label: 'PY', bg: '#3776ab', fg: '#fff' },
     python: { label: 'PY', bg: '#3776ab', fg: '#fff' },
     go: { label: 'GO', bg: '#00add8', fg: '#fff' },
     rust: { label: 'RS', bg: '#b7410e', fg: '#fff' },
     rs: { label: 'RS', bg: '#b7410e', fg: '#fff' },
+    c: { label: 'C', bg: '#283593', fg: '#fff' },
+    cpp: { label: 'CPP', bg: '#00599c', fg: '#fff' },
+    cc: { label: 'CPP', bg: '#00599c', fg: '#fff' },
+    h: { label: 'H', bg: '#00599c', fg: '#fff' },
+    hpp: { label: 'HPP', bg: '#00599c', fg: '#fff' },
+    cs: { label: 'C#', bg: '#239120', fg: '#fff' },
+    java: { label: 'JAVA', bg: '#b07219', fg: '#fff' },
+    kt: { label: 'KT', bg: '#7f52ff', fg: '#fff' },
+    kotlin: { label: 'KT', bg: '#7f52ff', fg: '#fff' },
+    swift: { label: 'SWIFT', bg: '#fa7343', fg: '#fff' },
+    scala: { label: 'SCALA', bg: '#dc322f', fg: '#fff' },
+    php: { label: 'PHP', bg: '#777bb4', fg: '#fff' },
+    rb: { label: 'RB', bg: '#cc342d', fg: '#fff' },
+    ruby: { label: 'RB', bg: '#cc342d', fg: '#fff' },
+    ex: { label: 'EX', bg: '#4b275f', fg: '#fff' },
+    exs: { label: 'EX', bg: '#4b275f', fg: '#fff' },
+    lua: { label: 'LUA', bg: '#2c2d72', fg: '#fff' },
+    dart: { label: 'DART', bg: '#0175c2', fg: '#fff' },
+    r: { label: 'R', bg: '#276dc3', fg: '#fff' },
+    hs: { label: 'HS', bg: '#5e5086', fg: '#fff' },
+    clj: { label: 'CLJ', bg: '#5881d8', fg: '#fff' },
     sql: { label: 'SQL', bg: '#336791', fg: '#fff' },
+    graphql: { label: 'GQL', bg: '#e10098', fg: '#fff' },
+    gql: { label: 'GQL', bg: '#e10098', fg: '#fff' },
+    proto: { label: 'PROTO', bg: '#5b6470', fg: '#fff' },
+    prisma: { label: 'PRISMA', bg: '#0c344b', fg: '#fff' },
+    toml: { label: 'TOML', bg: '#9c4221', fg: '#fff' },
+    ini: { label: 'INI', bg: '#6d6d6d', fg: '#fff' },
+    env: { label: 'ENV', bg: '#ecd53f', fg: Y },
+    dockerfile: { label: 'DOCKER', bg: '#2496ed', fg: '#fff' },
+    docker: { label: 'DOCKER', bg: '#2496ed', fg: '#fff' },
+    makefile: { label: 'MAKE', bg: '#6d8086', fg: '#fff' },
+    make: { label: 'MAKE', bg: '#6d8086', fg: '#fff' },
+    nginx: { label: 'NGINX', bg: '#009639', fg: '#fff' },
+    zig: { label: 'ZIG', bg: '#f7a41d', fg: Y },
+    nim: { label: 'NIM', bg: '#ffe953', fg: Y },
+    sol: { label: 'SOL', bg: '#363636', fg: '#fff' },
+    tf: { label: 'HCL', bg: '#7b42bc', fg: '#fff' },
+    hcl: { label: 'HCL', bg: '#7b42bc', fg: '#fff' },
+    vim: { label: 'VIM', bg: '#019733', fg: '#fff' },
+    gitignore: { label: 'GIT', bg: '#f05032', fg: '#fff' },
     diff: { label: 'DIFF', bg: '#4f5b66', fg: '#fff' },
     text: { label: 'TXT', bg: '#8a8f98', fg: '#fff' },
     plaintext: { label: 'TXT', bg: '#8a8f98', fg: '#fff' },
+    txt: { label: 'TXT', bg: '#8a8f98', fg: '#fff' },
   };
 
   for (const pre of document.querySelectorAll<HTMLPreElement>('.prose pre')) {
@@ -269,7 +327,11 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
 
     const lang = (pre.dataset.language || 'text').toLowerCase();
     const title = pre.dataset.title || '';
-    const chip = LANG_CHIP[lang] ?? { label: lang.toUpperCase().slice(0, 6), bg: '', fg: '' };
+    // 칩은 파일 확장자를 우선한다 — 파일명이 `agents/x.md`면 하이라이트 언어가 yaml이어도 MD로.
+    // 확장자가 테이블에 없으면(또는 파일명이 없으면) 하이라이트 언어로 폴백한다.
+    const ext = (title.match(/\.([a-z0-9]+)$/i)?.[1] || '').toLowerCase();
+    const key = ext && LANG_CHIP[ext] ? ext : lang;
+    const chip = LANG_CHIP[key] ?? { label: (key || 'text').toUpperCase().slice(0, 6), bg: '', fg: '' };
 
     const block = document.createElement('div');
     block.className = 'code-block';
