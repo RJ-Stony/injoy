@@ -167,6 +167,48 @@
       "to": "polish-round-10",
       "type": "extends",
       "note": "코드 블록 수정에 이어서, 그래프 색과 그 주변 화면들을 다듬은 과정"
+    },
+    {
+      "from": "harness-2-self-bypass",
+      "to": "harness-1-benchmarking",
+      "type": "extends",
+      "note": "벤치마킹으로 깐 파이프라인을 실제로 굴리면서, 본체 AI가 계획 단계를 제 손으로 건너뛰는 문제를 막은 회차"
+    },
+    {
+      "from": "harness-3-serena-proxy",
+      "to": "harness-2-self-bypass",
+      "type": "extends",
+      "note": "규칙과 안전장치를 깐 데 이어, 처음으로 외부 도구(코드 분석 MCP)를 붙인 회차"
+    },
+    {
+      "from": "harness-4-memory",
+      "to": "harness-3-serena-proxy",
+      "type": "extends",
+      "note": "도구를 붙인 데 이어, 세션을 넘어 기억이 이어지게 메모리 불러오기를 손본 회차"
+    },
+    {
+      "from": "harness-5-nondev-ux",
+      "to": "harness-4-memory",
+      "type": "extends",
+      "note": "안에서 도는 장치를 다진 데 이어, 비개발자에게 보이는 말과 첫 줄 가시화를 다듬은 회차"
+    },
+    {
+      "from": "harness-6-codex",
+      "to": "harness-5-nondev-ux",
+      "type": "extends",
+      "note": "한 런타임에서 다진 흐름을, 슬래시 커맨드 의존을 끊어 다른 런타임으로 이식한 회차"
+    },
+    {
+      "from": "harness-7-snowflake",
+      "to": "harness-6-codex",
+      "type": "extends",
+      "note": "저장 위치를 한 곳으로 모아 둔 디딤돌 위에서, 기록을 팀이 같이 쓰게 공용 저장소로 올린 회차"
+    },
+    {
+      "from": "harness-8-trimming",
+      "to": "harness-7-snowflake",
+      "type": "extends",
+      "note": "쌓기를 마치고, 직접 만든 통로와 외부 도구를 다시 걷어내며 하네스를 얇게 만든 회차"
     }
   ]
 }
