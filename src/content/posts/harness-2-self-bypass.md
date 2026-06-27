@@ -1,6 +1,6 @@
 ---
-title: "AI가 제 손으로 규칙을 건너뛰지 못하게"
-description: "본체 AI가 계획 단계를 스스로 우회하는 패턴을 PreToolUse 훅으로 막고, 다시 강제 차단을 소프트 경고로 누그러뜨린 과정"
+title: "AI가 계획 단계를 건너뛰지 못하게"
+description: "AI가 계획 단계를 스스로 우회하는 패턴을 PreToolUse 훅으로 막은 과정"
 pubDate: 2026-06-27
 category: "AI"
 tags: ["하네스", "claude-code", "ai", "hook"]
@@ -18,7 +18,7 @@ series: "하네스 엔지니어링"
 
 핵심 아이디어는 단순하다. *한 번의 사용자 턴 안에서 계획 없이 고친 고유 파일 수*를 센다. 세 번째 파일을 만지려는 순간이 곧 "이건 단순 수정이 아니다"라는 신호다.
 
-이걸 [`PreToolUse` 훅](https://docs.claude.com/en/docs/claude-code/hooks)(파일을 고치는 도구가 실행되기 *직전*에 끼어드는 장치)으로 잡았다. `Edit`·`Write`·`MultiEdit`·`NotebookEdit` 호출 직전마다 카운터를 올린다.
+이걸 [`PreToolUse`](https://docs.claude.com/en/docs/claude-code/hooks) [훅](https://docs.claude.com/en/docs/claude-code/hooks)(파일을 고치는 도구가 실행되기 *직전*에 끼어드는 장치)으로 잡았다. `Edit`·`Write`·`MultiEdit`·`NotebookEdit` 호출 직전마다 카운터를 올린다.
 
 ```js scripts/edit-counter.mjs
 // Edit / Write / MultiEdit / NotebookEdit 직전에 이 턴의 고유 파일 수를 센다
