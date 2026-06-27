@@ -178,7 +178,7 @@
       "from": "harness-3-serena-proxy",
       "to": "harness-2-self-bypass",
       "type": "extends",
-      "note": "규칙과 안전장치를 깐 데 이어, 처음으로 외부 도구(코드 분석 MCP)를 붙인 회차"
+      "note": "규칙과 안전 장치를 깐 데 이어, 처음으로 외부 도구(Serena MCP)를 붙인 과정"
     },
     {
       "from": "harness-4-memory",
