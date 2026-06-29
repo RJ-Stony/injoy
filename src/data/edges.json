@@ -217,6 +217,18 @@
       "note": "AI라는 카테고리로, 이 하네스 엔지니어링 시리즈가 그 한 줄기로 들어오게 되었다"
     },
     {
+      "from": "harness-9-orchestration",
+      "to": "harness-8-trimming",
+      "type": "extends",
+      "note": "얇게 깎고 나서, 개발 너머 비개발 영역까지 받치려 멀티 에이전트 오케스트레이션을 다시 벤치마킹한 회차"
+    },
+    {
+      "from": "harness-9-orchestration",
+      "to": "harness-1-benchmarking",
+      "type": "contradicts",
+      "note": "1편이 OMC의 '강제 위임'을 플러그인 내부 일로 본 것을, 실제로는 사용자 작업 폴더를 변조하는 방식이라고 정정한다"
+    },
+    {
       "from": "polish-round-12",
       "to": "polish-round-11",
       "type": "extends",
