@@ -21,5 +21,3 @@ description: Injoy를 만들고 운영하는 사람, 그리고 이 블로그가 
 ## 연락
 
 블로그에 대한 의견이나 글에 대한 피드백은 언제든 환영합니다. RSS 구독은 [여기](/rss.xml)에서 할 수 있습니다.
-
-<p style="margin-top:4rem;text-align:center;"><a href="/voice/" aria-label="말투 노트" style="opacity:0.28;text-decoration:none;font-size:1.15rem;"><span class="tossface">🌱</span></a></p>

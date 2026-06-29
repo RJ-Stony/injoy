@@ -46,10 +46,6 @@ const edited =
   <div class="mk-body">
     <dl class="mk-facts">
       <div class="mk-row">
-        <dt>작성</dt>
-        <dd>{formatDate(post.data.pubDate)}</dd>
-      </div>
-      <div class="mk-row">
         <dt>길이</dt>
         <dd>{volume.join(' · ')}</dd>
       </div>
@@ -74,6 +70,10 @@ const edited =
             )
           }
         </dd>
+      </div>
+      <div class="mk-row">
+        <dt>작성</dt>
+        <dd>{formatDate(post.data.pubDate)}에 발행했어요.</dd>
       </div>
       {
         edited && (
