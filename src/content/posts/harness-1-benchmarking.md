@@ -2,7 +2,7 @@
 title: "잘 쓰고 있는 하네스부터 뜯어보기"
 description: "사내 AI 개발용 하네스를 만들기 전에, 공개된 하네스 플러그인 5개를 벤치마킹한 내용"
 pubDate: 2026-06-27
-updatedDate: 2026-06-27T10:49:50+09:00
+updatedDate: 2026-06-29T11:00:23.981Z
 category: "AI"
 tags: ["하네스", "claude-code", "ai", "벤치마킹"]
 draft: false
@@ -17,14 +17,14 @@ series: "하네스 엔지니어링"
 
 ## 살펴본 5개의 하네스 플러그인
 
-| 항목    | gstack        | everything-claude-code | oh-my-claudecode    | superpowers          |
-| ----- | ------------- | ---------------------- | ------------------- | -------------------- |
-| 저자    | Garry Tan     | Affaan M               | Yeachan Heo         | Jesse Vincent (obra) |
-| 에이전트  | \~33 역할 skill | **47개**                | 19개                 | 1개(+14 skill)        |
-| 스킬    | \~33          | **181개**               | 37개                 | 14개                  |
-| 커맨드   | `/qa`·`/ship` | **79개 slash**          | 매직 키워드              | slash+skill          |
-| 멀티 AI | Claude+Codex  | Claude 중심              | Claude+Codex+Gemini | Claude 중심            |
-| 주요 기능 | 헤드리스 브라우저 QA  | 생산 환경 플러그인             | 멀티 에이전트 오케스트레이션     | 문서를 TDD로             |
+| 항목    | gstack          | everything-claude-code | oh-my-claudecode    | superpowers          |
+| ----- | --------------- | ---------------------- | ------------------- | -------------------- |
+| 저자    | Garry Tan       | Affaan M               | Yeachan Heo         | Jesse Vincent (obra) |
+| 에이전트  | \~33개의 역할 skill | **47개**                | 19개                 | 1개(+14개 skill)       |
+| 스킬    | \~33개           | **181개**               | 37개                 | 14개                  |
+| 커맨드   | `/qa`·`/ship`   | **79개 slash**          | 매직 키워드              | slash+skill          |
+| 멀티 AI | Claude+Codex    | Claude 중심              | Claude+Codex+Gemini | Claude 중심            |
+| 주요 기능 | 헤드리스 브라우저 QA    | 생산 환경 플러그인             | 멀티 에이전트 오케스트레이션     | 문서를 TDD로             |
 
 다섯 번째로 본 `hermes-agent`는 컨테이너 단위로 환경을 격리하고 **스스로 스킬을 만들어 내는 자율 에이전트**라, 우리가 지금 당장 쓸 규모는 아니었다. 나머지 넷이 실질적인 참고 대상이었다.
 
