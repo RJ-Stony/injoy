@@ -110,6 +110,13 @@ const data = {
     const view = { scale: 1, tx: 0, ty: 0 };
     const baseView = { scale: 1, tx: 0, ty: 0 }; // 마지막으로 맞춘 기준(리셋·줌 한계의 기준)
     let pendingFit = true; // 다음 '정착' 때 딱 한 번 노드에 꼭 맞춘다(매 프레임이 아니라)
+    // 냉각 계수 — 힘을 alpha로 스케일하고 매 틱 줄여, 에너지가 점점 잦아들며 부드럽게 멈춘다(d3-force식).
+    // 상수 감쇠만으론 매 wake가 풀 에너지로 진동(오버슈트)했다. 냉각으로 진입·드래그 모두 출렁임 없이 가라앉는다.
+    let alpha = 1;
+    const ALPHA_DECAY = 0.0228; // ≈300틱에 수렴(d3 기본 alphaDecay)
+    const ALPHA_MIN = 0.0015; // 이보다 식으면 정착으로 보고 루프 종료
+    const ALPHA_DRAG = 0.2; // 드래그 중 유지할 온기(이웃이 따라오되 과하지 않게 — 낮을수록 잔잔)
+    const MAX_V = 26; // 노드 한 틱 최대 이동(속도 상한) — 가까운 점의 척력 스파이크에 튕겨 나가는 것 방지
     // 레이아웃을 담는 고정 박스(원점 중심 반너비·반높이). 글이 많이 늘면 살짝 키워 덜 겹치게.
     const spread = Math.min(2.2, Math.max(1, Math.sqrt(nodes.length / 28)));
     let BX = 0, BY = 0;
@@ -208,7 +215,7 @@ const data = {
           let dy = a.y - b.y;
           let d2 = dx * dx + dy * dy;
           if (d2 < 1) d2 = 1;
-          const f = REPULSION / d2;
+          const f = (REPULSION / d2) * alpha; // 냉각 스케일 — alpha가 줄면 힘도 잦아든다
           const d = Math.sqrt(d2);
           dx /= d;
           dy /= d;
@@ -223,7 +230,7 @@ const data = {
         const dy = e.b.y - e.a.y;
         const d = Math.sqrt(dx * dx + dy * dy) || 1;
         const rest = e.to.startsWith('tag:') ? REST * 0.6 : REST;
-        const f = (d - rest) * SPRING;
+        const f = (d - rest) * SPRING * alpha;
         e.a.vx += (dx / d) * f;
         e.a.vy += (dy / d) * f;
         e.b.vx -= (dx / d) * f;
@@ -232,8 +239,8 @@ const data = {
       const damp = isSmall() ? 0.78 : 0.82; // 작은 화면은 감쇠를 키워 더 빨리 정착(데스크톱 0.82 유지)
       for (const n of nodes) {
         // 중력은 좌표 원점(레이아웃 중심)으로 — 화면 중심이 아니다
-        n.vx += (0 - n.x) * GRAVITY;
-        n.vy += (0 - n.y) * GRAVITY;
+        n.vx += (0 - n.x) * GRAVITY * alpha;
+        n.vy += (0 - n.y) * GRAVITY * alpha;
         if (n === dragging) {
           n.vx = 0;
           n.vy = 0;
@@ -241,13 +248,23 @@ const data = {
         }
         n.vx *= damp;
         n.vy *= damp;
+        // 속도 상한 — 두 점이 가까워져 척력이 순간 치솟아도 노드가 튕겨 나가지 않게 막는다(가끔 튐 방지).
+        const sp = Math.hypot(n.vx, n.vy);
+        if (sp > MAX_V) {
+          n.vx *= MAX_V / sp;
+          n.vy *= MAX_V / sp;
+        }
         n.x += n.vx;
         n.y += n.vy;
-        // 노드를 고정 박스(원점 중심) 안에 가둔다 — 화면엔 박스를 한 번 맞춰 두니
-        // 박스 안 노드는 시뮬레이션이 움직여도 항상 화면 안(가장자리 잘림 0).
+        // 벽에 닿으면 그 방향 속도를 죽인다 — 안 그러면 벽으로 미는 힘에 눌려 가장자리에서 영영 떤다(에너지 누수).
+        if (n.x <= -BX || n.x >= BX) n.vx = 0;
+        if (n.y <= -BY || n.y >= BY) n.vy = 0;
+        // 노드를 고정 박스(원점 중심) 안에 가둔다 — 박스 안 노드는 항상 화면 안(가장자리 잘림 0).
         n.x = Math.max(-BX, Math.min(BX, n.x));
         n.y = Math.max(-BY, Math.min(BY, n.y));
       }
+      // 냉각: alpha를 목표로 끌어내린다. 드래그 중엔 ALPHA_DRAG로 데워 이웃이 계속 따라오고, 놓으면 0으로 식는다.
+      alpha += ((dragging ? ALPHA_DRAG : 0) - alpha) * ALPHA_DECAY;
     };
 
     let hovered = null;
@@ -408,23 +425,15 @@ const data = {
     };
 
     let running = false;
-    let calmFrames = 0;
     let frames = 0;
     const loop = () => {
       frames++;
       tick();
       draw();
-      const energy = nodes.reduce((s, n) => s + Math.abs(n.vx) + Math.abs(n.vy), 0);
-      // 정착 임계값은 노드 수에 비례 — 노드당 속도가 충분히 작아지면 정착으로 본다.
-      // (절대값 0.5 고정이면 글이 늘수록 합 에너지가 커져 정착 판정이 안 돼 매번 maxFrames까지 떨었다.
-      //  분리된 서브그래프가 생겨 노드가 늘면 특히 그랬다.)
-      const calmEnergy = Math.max(0.5, nodes.length * 0.05);
-      calmFrames = energy < calmEnergy ? calmFrames + 1 : 0;
-      const calmLimit = isSmall() ? 18 : 30; // 작은 화면은 더 일찍 멈춰 rAF 루프를 끝낸다
-      // 중력·척력 균형 탓에 에너지가 0까지 안 떨어질 수 있다 → 프레임 상한을 backstop으로 둬
-      // 배치가 자리 잡으면 루프를 끝낸다(무한 rAF·모바일 발열/미세 떨림 방지). 드래그 중엔 유지.
-      const maxFrames = isSmall() ? 180 : 300;
-      if ((calmFrames > calmLimit || frames > maxFrames) && !dragging) {
+      // alpha가 충분히 식으면(또는 안전 상한까지) 정착으로 보고 루프를 끝낸다(무한 rAF·발열 방지). 드래그 중엔 유지.
+      // 냉각이 정상 작동하면 alpha<ALPHA_MIN이 먼저 와서 maxFrames 전에 멈춘다(maxFrames는 backstop).
+      const maxFrames = isSmall() ? 400 : 500;
+      if ((alpha < ALPHA_MIN || frames > maxFrames) && !dragging) {
         running = false;
         if (pendingFit) { // 정착했을 때 딱 한 번 노드에 꼭 맞춘다(이후 hover로 wake돼도 다시 안 함)
           fitToBbox();
@@ -435,12 +444,13 @@ const data = {
       requestAnimationFrame(loop);
     };
     const wake = () => {
+      alpha = Math.max(alpha, 0.3); // 깨우면 살짝 데워 부드럽게 재정착(드래그 후 등 — 너무 높으면 튄다)
       if (reduceMotion) {
-        for (let i = 0; i < 60; i++) tick();
+        for (let i = 0; i < 320; i++) tick(); // 냉각이 그 안에서 작동해 정착(애니 없이)
+        if (pendingFit) { fitToBbox(); pendingFit = false; }
         draw();
         return;
       }
-      calmFrames = 0;
       frames = 0;
       if (!running) {
         running = true;
@@ -698,18 +708,11 @@ const data = {
       readColors();
       resize();
       nodes.forEach(seed);
-      // ponytail: 로드·리사이즈 땐 시뮬을 화면에서 굴리지 않고, 미리 다 돌려 '정착된 모습'만 한 번 그린다.
-      // (매 진입마다 눈앞에서 출렁이던 원인 = rAF로 settling을 보여 준 것.) d3 정적 포스 레이아웃과 같은 기법
-      // (tick을 미리 N번 돌리고 1회 렌더). 드래그만 wake()로 실시간 반응. 상한 600틱(78노드 O(n²)도 수십 ms).
-      const calmEnergy = Math.max(0.5, nodes.length * 0.05);
-      for (let i = 0; i < 600; i++) {
-        tick();
-        const energy = nodes.reduce((s, n) => s + Math.abs(n.vx) + Math.abs(n.vy), 0);
-        if (energy < calmEnergy) break;
-      }
-      fitToBbox();
-      pendingFit = false;
-      draw();
+      // 애니로 정착시키되 alpha 냉각으로 *식으며* 멈춘다 — 진입 시 부드럽게 자리잡고 출렁이지 않는다.
+      homeView(); // 애니 동안 쓸 고정 뷰. 정착하면 노드에 꼭 맞춘다(loop의 pendingFit).
+      pendingFit = true;
+      alpha = 1; // 다시 데워 처음부터 냉각 시작
+      wake();
     };
 
     window.addEventListener('injoy:theme-change', () => {
