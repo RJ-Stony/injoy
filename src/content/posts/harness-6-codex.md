@@ -12,7 +12,7 @@ series: "하네스 엔지니어링"
 
 ## 그전엔 무엇에 묶여 있었나
 
-기존 하네스는 Claude Code의 부품에 단단히 묶여 있었다. 역할별 에이전트는 `agents/*.md`(YAML 머리말이 붙은 마크다운)로 정의했고, 워크플로우는 `/276-harness:plan` 같은 **슬래시 커맨드**로 불렀다. 세션 시작·사용자 입력·편집 직전마다 도는 훅도 Claude Code의 훅 규격(`hooks.json`)에 맞춰져 있었다. 흐름 자체는 런타임과 무관했지만, 그 흐름을 *부르는 방법*이 전부 Claude Code 전용이었다.
+기존 하네스는 Claude Code의 부품에 단단히 묶여 있었다. 역할별 에이전트는 `agents/*.md`(YAML 머리말이 붙은 마크다운)로 정의했고, 워크플로우는 `/harness:plan` 같은 **슬래시 커맨드**로 불렀다. 세션 시작·사용자 입력·편집 직전마다 도는 훅도 Claude Code의 훅 규격(`hooks.json`)에 맞춰져 있었다. 흐름 자체는 런타임과 무관했지만, 그 흐름을 *부르는 방법*이 전부 Claude Code 전용이었다.
 
 Codex에는 그 부품이 없거나 모양이 달랐다. 에이전트는 마크다운이 아니라 **TOML**(키=값 형식의 설정 파일)로 적고, 슬래시 커맨드라는 개념 자체가 없다. 그래서 "복사 붙여넣기"로는 안 됐다.
 
@@ -63,14 +63,14 @@ model_reasoning_effort = "low"        # 검증은 무거운 추론이 필요 없
 
 ```json codex/.codex-plugin/plugin.json
 {
-  "name": "276-harness-dev",
+  "name": "harness-dev",
   "skills": "./skills/",
   "hooks": "./hooks/hooks.json",     // [!code highlight]
   "mcpServers": "./mcp.json"
 }
 ```
 
-[[harness-2-self-bypass|2편]]의 편집 범위 점검도, [[harness-4-memory|4편]]의 메모리 로더도, [[harness-5-nondev-ux|5편]]의 첫 줄 가시화도 전부 `codex-` 접두가 붙은 쌍둥이로 다시 났다. 그리고 워크플로우 스킬(`276-plan`·`276-exec`·`276-verify` ...)도 `codex/skills/` 아래 같은 이름으로 옮겨 심었다. 같은 책임, 다른 런타임.
+[[harness-2-self-bypass|2편]]의 편집 범위 점검도, [[harness-4-memory|4편]]의 메모리 로더도, [[harness-5-nondev-ux|5편]]의 첫 줄 가시화도 전부 `codex-` 접두가 붙은 쌍둥이로 다시 났다. 그리고 워크플로우 스킬(`harness-plan`·`harness-exec`·`harness-verify` ...)도 `codex/skills/` 아래 같은 이름으로 옮겨 심었다. 같은 책임, 다른 런타임.
 
 ```mermaid
 flowchart TD
@@ -95,8 +95,8 @@ flowchart TD
 
 ```js codex/scripts/lib/harness-paths.mjs
 export function dataRoot() {
-  const configured = process.env.PLUGIN_DATA || process.env.CODEX_276_HARNESS_DATA;
-  const root = configured?.length ? configured : join(homedir(), ".codex-276-harness-dev");  // [!code highlight]
+  const configured = process.env.PLUGIN_DATA || process.env.CODEX_HARNESS_DATA;
+  const root = configured?.length ? configured : join(homedir(), ".codex-harness-dev");  // [!code highlight]
   mkdirSync(root, { recursive: true });
   return root;
 }

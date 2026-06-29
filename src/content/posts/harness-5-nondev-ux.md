@@ -14,7 +14,7 @@ series: "하네스 엔지니어링"
 
 ## 그전엔 무엇이 문제였나
 
-손보기 전 하네스는 *기능*은 다 갖췄지만 *말투*가 없었다. 계획 → 작업 → 검증을 다 거치면서도, 그 사실이 사용자 화면에는 거의 드러나지 않았다. AI가 답을 내놓으면 그게 안전장치를 거친 답인지, 그냥 즉흥으로 뱉은 답인지 구분할 단서가 없었다. 검증 결과도 `verify.sh`의 원본 출력(PASS/FAIL·exit code)을 거의 그대로 흘렸고, 진행 안내에는 `planner`·`/276-harness:plan` 같은 **내부 부품 이름**(에이전트·슬래시 커맨드; AI를 부리는 내부 호출)이 그대로 노출됐다.
+손보기 전 하네스는 *기능*은 다 갖췄지만 *말투*가 없었다. 계획 → 작업 → 검증을 다 거치면서도, 그 사실이 사용자 화면에는 거의 드러나지 않았다. AI가 답을 내놓으면 그게 안전장치를 거친 답인지, 그냥 즉흥으로 뱉은 답인지 구분할 단서가 없었다. 검증 결과도 `verify.sh`의 원본 출력(PASS/FAIL·exit code)을 거의 그대로 흘렸고, 진행 안내에는 `planner`·`/harness:plan` 같은 **내부 부품 이름**(에이전트·슬래시 커맨드; AI를 부리는 내부 호출)이 그대로 노출됐다.
 
 개발자에게는 그게 오히려 정보였다. 하지만 비개발자에게는 신뢰를 깎는 잡음이었다. 그래서 v1.2.0의 과제는 새 기능이 아니라 *번역*이었다. 같은 일을 하되, 사람 말로 보이게 한다.
 
@@ -29,7 +29,7 @@ series: "하네스 엔지니어링"
 // 회피 시그널(--simple 등)이 있어도 항상 출력.
 baseLines.push(
   "사용자 가시화 규칙: 사용자에게 보내는 첫 응답의 맨 첫 줄에 다음 한 줄을 그대로 출력하세요. 의역·추가 설명·prefix 금지.",
-  "> 🚀 276 하네스가 요청을 분석하고 있어요."  // [!code highlight]
+  "> 🚀 하네스가 요청을 분석하고 있어요."  // [!code highlight]
 );
 ```
 
@@ -39,7 +39,7 @@ baseLines.push(
 
 ```js scripts/memory-loader.mjs
 // 메모리 폴더가 없거나 기록 0건이면, 첫 응답 첫 줄에 띄울 콜드 스타트 인사를 내보낸다
-const emptyHeadline = "✨ 276 하네스로는 처음 하는 프로젝트네요! 이번 세션부터 메모리가 차곡차곡 쌓일 거예요.";
+const emptyHeadline = "✨ 하네스로는 처음 하는 프로젝트네요! 이번 세션부터 메모리가 차곡차곡 쌓일 거예요.";
 const emptyOutput = { hookSpecificOutput: { hookEventName: "SessionStart",
   additionalContext: [emptyHeadline, "", `…맨 첫 줄에 그대로 출력하세요.`, `> ${emptyHeadline}`].join("\n") } };
 process.stdout.write(JSON.stringify(emptyOutput));  // [!code highlight]

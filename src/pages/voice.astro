@@ -16,7 +16,17 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     <header>
       <h1>말투 노트</h1>
     </header>
-    <div class="prose">
+
+    <div id="voice-gate" class="voice-gate" hidden>
+      <p>이 노트는 글을 쓰는 사람만 볼 수 있다. 이 기기에 작성용 토큰이 있어야 열린다.</p>
+      <div class="vg-row">
+        <input id="vg-token" type="password" placeholder="github_pat_..." autocomplete="off" />
+        <button id="vg-save" type="button">열기</button>
+      </div>
+      <p id="vg-msg" class="vg-msg" hidden>토큰을 확인할 수 없다. 다시 확인해 주세요.</p>
+    </div>
+
+    <div class="prose" id="voice-content" hidden>
       <p>
         이 페이지는 어디에도 링크되어 있지 않다. 미래의 나와, 글을 함께 다듬는 도구가
         같은 결을 잃지 않도록 적어 두는 노트다. 새 글을 쓰기 전에 한 번 읽고, 글이
@@ -69,10 +79,104 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   </article>
 </BaseLayout>
 
+<script>
+  // /voice 접근 제한 — /write와 같은 작성용 토큰(injoy-gh-token)을 가진 기기에서만 본문을 연다.
+  // 정적 사이트라 본문은 HTML에 들어 있지만 기본 hidden이라 토큰 없이는 화면에 뜨지 않는다.
+  const TOKEN_KEY = 'injoy-gh-token';
+  const $ = (id: string) => document.getElementById(id);
+  const gate = $('voice-gate');
+  const content = $('voice-content');
+
+  function reveal() {
+    if (content) content.hidden = false;
+    if (gate) gate.hidden = true;
+  }
+  function showGate() {
+    if (gate) gate.hidden = false;
+    if (content) content.hidden = true;
+  }
+
+  // 토큰이 진짜 유효한지 GitHub API로 확인(/write와 같은 기준).
+  async function valid(token: string): Promise<boolean> {
+    try {
+      const res = await fetch('https://api.github.com/user', {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async function init() {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token && (await valid(token))) {
+      reveal();
+    } else {
+      showGate();
+    }
+  }
+
+  $('vg-save')?.addEventListener('click', async () => {
+    const input = $('vg-token') as HTMLInputElement | null;
+    const msg = $('vg-msg');
+    const value = (input?.value || '').trim();
+    if (!value) return;
+    if (await valid(value)) {
+      localStorage.setItem(TOKEN_KEY, value);
+      reveal();
+    } else {
+      if (msg) msg.hidden = false;
+    }
+  });
+
+  init();
+</script>
+
 <style>
   .page {
     max-width: var(--width-content);
     margin-inline: auto;
+  }
+
+  .voice-gate {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--surface);
+    padding: 1.4rem;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+  }
+
+  .voice-gate .vg-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.9rem;
+  }
+
+  .voice-gate input {
+    flex: 1;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono, monospace);
+  }
+
+  .voice-gate button {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--radius);
+    background-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .voice-gate .vg-msg {
+    margin-top: 0.7rem;
+    color: var(--edge-contradicts, crimson);
   }
 
   .page h1 {
