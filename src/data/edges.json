@@ -190,7 +190,7 @@
       "from": "harness-5-nondev-ux",
       "to": "harness-4-memory",
       "type": "extends",
-      "note": "안에서 도는 장치를 다진 데 이어, 비개발자에게 보이는 말과 첫 줄 가시화를 다듬은 회차"
+      "note": "안에서 도는 하네스를 다진 데 이어, 비개발자에게 보이는 말과 첫 줄의 가시화를 다듬은 과정"
     },
     {
       "from": "harness-6-codex",
