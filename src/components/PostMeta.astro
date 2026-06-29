@@ -5,7 +5,7 @@
  * 글 카드에선 통계를 함께 보여 주고(showStats=true), 글 상단에선 통계를 따로
  * 배치하므로 showStats=false로 카테고리·날짜만 그린다.
  */
-import { formatDate, formatDateShort, isoDate } from '../utils/post';
+import { formatDate, formatDateShort } from '../utils/post';
 import { withBase } from '../utils/url';
 import PostStats from './PostStats.astro';
 import ViewCount from './ViewCount.astro';
@@ -22,8 +22,6 @@ interface Props {
   showStats?: boolean;
   /** 넘기면 읽기 시간 옆에 조회수 칩을 함께 — 홈 목록용(카운트는 올리지 않고 조회만) */
   viewSlug?: string;
-  /** 글 상세용 — 상대시간 대신 정확 날짜+라벨('작성'/'수정')로 또렷하게 보여 준다 */
-  precise?: boolean;
 }
 
 const {
@@ -34,7 +32,6 @@ const {
   updatedDate,
   showStats = true,
   viewSlug,
-  precise = false,
 } = Astro.props;
 // 날짜는 하나만, 라벨 없이 보여 준다 — 수정된 글이면 수정 시각을, 아니면 발행일을. ('수정'이라는 말은
 // 만듦새 패널에서만 붙인다. 메타 줄엔 그냥 날짜/상대시간만.)
@@ -44,20 +41,14 @@ const shown = edited ? updatedDate! : pubDate;
 
 <div class="post-meta">
   <a class="category" href={withBase(`/categories/${category}/`)}>{category}</a>
-  {
-    precise ? (
-      <time class="m-date" datetime={isoDate(shown)}>{formatDateShort(shown)}</time>
-    ) : (
-      <time
-        class="m-date rel-time"
-        datetime={shown.toISOString()}
-        title={formatDate(shown)}
-        data-fine={edited ? '1' : undefined}
-      >
-        {formatDateShort(shown)}
-      </time>
-    )
-  }
+  <time
+    class="m-date rel-time"
+    datetime={shown.toISOString()}
+    title={formatDate(shown)}
+    data-fine={edited ? '1' : undefined}
+  >
+    {formatDateShort(shown)}
+  </time>
   {showStats && <PostStats minutes={minutes} connections={connections} />}
   {showStats && viewSlug && <ViewCount slug={viewSlug} increment={false} />}
 </div>
