@@ -36,26 +36,25 @@ const {
   viewSlug,
   precise = false,
 } = Astro.props;
-// 날짜는 하나만 보여 준다 — 수정된 글이면 '수정' 날짜만, 아니면 발행일. (작성·수정을 둘 다 늘어놓지 않는다.)
+// 날짜는 하나만, 라벨 없이 보여 준다 — 수정된 글이면 수정 시각을, 아니면 발행일을. ('수정'이라는 말은
+// 만듦새 패널에서만 붙인다. 메타 줄엔 그냥 날짜/상대시간만.)
 const edited = !!updatedDate && updatedDate.getTime() !== pubDate.getTime();
 const shown = edited ? updatedDate! : pubDate;
-const prefix = edited ? '수정 ' : '';
 ---
 
 <div class="post-meta">
   <a class="category" href={withBase(`/categories/${category}/`)}>{category}</a>
   {
     precise ? (
-      <time class="m-date" datetime={isoDate(shown)}>{prefix}{formatDateShort(shown)}</time>
+      <time class="m-date" datetime={isoDate(shown)}>{formatDateShort(shown)}</time>
     ) : (
       <time
         class="m-date rel-time"
         datetime={shown.toISOString()}
         title={formatDate(shown)}
-        data-prefix={prefix}
         data-fine={edited ? '1' : undefined}
       >
-        {prefix}{formatDateShort(shown)}
+        {formatDateShort(shown)}
       </time>
     )
   }
