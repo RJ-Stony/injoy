@@ -190,13 +190,13 @@
       "from": "harness-5-nondev-ux",
       "to": "harness-4-memory",
       "type": "extends",
-      "note": "안에서 도는 하네스를 다진 데 이어, 비개발자에게 보이는 말과 첫 줄의 가시화를 다듬은 과정"
+      "note": "안에서만 동작하는 하네스를 다진 데 이어, 비개발자에게 보이는 말들을 다듬은 과정"
     },
     {
       "from": "harness-6-codex",
       "to": "harness-5-nondev-ux",
       "type": "extends",
-      "note": "한 런타임에서 다진 흐름을, 슬래시 커맨드 의존을 끊어 다른 런타임으로 이식한 회차"
+      "note": "슬래시 커맨드 의존을 끊어 다른 LLM으로 확장한 과정"
     },
     {
       "from": "harness-7-snowflake",
