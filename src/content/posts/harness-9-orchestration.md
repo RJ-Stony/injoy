@@ -1,8 +1,8 @@
 ---
-title: "에이전트를 여러 개 사용하는 네 가지 방법"
+title: "에이전트를 멀티로 사용하는 네 가지 방법"
 description: "개발을 넘어 다른 영역까지 커버하기 위한 멀티에이전트 오케스트레이션을 다시 벤치마킹"
 pubDate: 2026-06-29
-updatedDate: 2026-06-30T00:36:10.904Z
+updatedDate: 2026-06-30T23:15:08.077Z
 category: "AI"
 tags: ["하네스", "claude-code", "오케스트레이션", "ai"]
 draft: false
