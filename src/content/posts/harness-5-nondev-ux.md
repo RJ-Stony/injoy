@@ -1,8 +1,8 @@
 ---
-title: "비개발자가 알아듣을 수 있는 하네스"
+title: "비개발자가 알아들을 수 있는 하네스"
 description: "기술적인 문구를 다듬어 비개발자도 쓸 수 있도록 만든 하네스 정비 기록"
 pubDate: 2026-06-27
-updatedDate: 2026-06-30T00:14:59.061Z
+updatedDate: 2026-06-30T00:18:06.307Z
 category: "AI"
 tags: ["하네스", "claude-code", "ux", "ai"]
 draft: false
