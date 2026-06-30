@@ -202,7 +202,7 @@
       "from": "harness-7-snowflake",
       "to": "harness-6-codex",
       "type": "extends",
-      "note": "저장 위치를 한 곳으로 모아 둔 디딤돌 위에서, 기록을 팀이 같이 쓰게 공용 저장소로 올린 회차"
+      "note": "저장 위치를 한 곳으로 모아 둔 구조 위에서, 기록을 팀이 같이 공유할 수 있게 공용 저장소로 올린 과정"
     },
     {
       "from": "harness-8-trimming",
