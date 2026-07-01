@@ -202,13 +202,13 @@
       "from": "harness-7-snowflake",
       "to": "harness-6-codex",
       "type": "extends",
-      "note": "저장 위치를 한 곳으로 모아 둔 구조 위에서, 기록을 팀이 같이 공유할 수 있게 공용 저장소로 올린 과정"
+      "note": "메모리를 사내에서 같이 공유할 수 있게 공용 저장소로 올린 과정"
     },
     {
       "from": "harness-8-trimming",
       "to": "harness-7-snowflake",
       "type": "extends",
-      "note": "쌓기를 마치고, 직접 만든 통로와 외부 도구를 다시 걷어내며 하네스를 얇게 만든 회차"
+      "note": "쌓기를 마치고, 직접 만든 부분과 외부 도구를 다시 걷어내며 하네스를 얇게 만드는 과정"
     },
     {
       "from": "harness-1-benchmarking",
