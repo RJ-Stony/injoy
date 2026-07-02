@@ -341,36 +341,113 @@ a:hover {
 }
 
 /* 표 (GFM) — 가로 스크롤은 래퍼가 담당해 표 시맨틱을 보존한다 */
+/* 표 = '비교 카드' 스타일 — 격자선을 걷어내고 헤더 틴트 + 행 구분선 + 둥근 컨테이너로.
+   래퍼가 테두리·둥근모서리를 갖고, 셀은 가로 구분선만. 긴 토큰은 셀 안에서 줄바꿈된다. */
 .prose .table-wrap {
   overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
 .prose table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.92em;
+  font-size: 0.9em;
 }
 
-.prose th,
-.prose td {
-  border: 1px solid var(--border);
-  padding: 0.55em 0.9em;
+.prose thead th {
+  background-color: var(--accent-weak);
+  color: var(--text);
+  font-weight: 700;
   text-align: left;
+  padding: 0.7em 1em;
+  letter-spacing: 0.01em;
+}
+
+.prose tbody td {
+  padding: 0.65em 1em;
+  border-top: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
   line-height: 1.6;
+  /* 긴 붙은 토큰(agent-teams(wshobson)·SuperClaude 등)도 셀 안에서 줄바꿈 */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
-.prose th {
-  background-color: var(--surface);
-  font-weight: 600;
+/* 첫 열(키)은 굵게 — 행마다 'X는 …'로 읽힌다 */
+.prose tbody td:first-child {
+  font-weight: 700;
 }
 
-/* 표 행 호버 — 훑어볼 때 보고 있는 행을 은은히 강조(헤더 th 제외). SeriesNav 현재항목과 같은 accent-mix. */
+/* 표 행 호버 — 훑어볼 때 보고 있는 행을 은은히 강조. SeriesNav 현재항목과 같은 accent-mix. */
 .prose table tbody tr {
   transition: background-color 0.12s ease;
 }
 
 .prose table tbody tr:hover {
   background-color: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* 좁은 화면: 표를 행별 카드로 — 첫 열이 카드 제목, 나머지는 라벨:값(헤더는 data-label로).
+   display:block으로 표 시맨틱이 사라지므로 [slug].astro가 role을 다시 부여한다. */
+@media (max-width: 560px) {
+  .prose .table-wrap {
+    border: 0;
+    border-radius: 0;
+    overflow-x: visible;
+  }
+
+  .prose table {
+    display: block;
+  }
+
+  .prose thead {
+    display: none;
+  }
+
+  .prose tbody,
+  .prose tbody tr,
+  .prose tbody td {
+    display: block;
+  }
+
+  .prose tbody tr {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 0.8rem;
+  }
+
+  .prose tbody tr:hover {
+    background-color: transparent;
+  }
+
+  .prose tbody td {
+    border-top: 1px solid var(--border);
+    padding: 0.5em 0.9em;
+  }
+
+  .prose tbody td:first-child {
+    background-color: var(--accent-weak);
+    border-top: 0;
+    font-size: 1.05em;
+  }
+
+  /* 나머지 셀: '라벨 : 값' 두 칸 그리드 */
+  .prose tbody td:not(:first-child) {
+    display: grid;
+    grid-template-columns: 5.5em 1fr;
+    gap: 0.6em;
+    align-items: start;
+  }
+
+  .prose tbody td:not(:first-child)::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-size: 0.85em;
+    font-weight: 600;
+  }
 }
 
 /* 인라인 코드 */

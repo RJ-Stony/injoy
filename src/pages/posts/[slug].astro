@@ -452,6 +452,27 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
     });
   }
 
+  // 표: 접근성 role 부여(모바일 카드 레이아웃에서 display:block이라 표 시맨틱이 사라지므로 복원) +
+  //     모바일 카드용 data-label(헤더 텍스트를 각 셀에 붙여 '라벨:값'으로 보이게).
+  for (const table of document.querySelectorAll<HTMLTableElement>('.prose table')) {
+    const headers = [...table.querySelectorAll('thead th')].map((th) => th.textContent?.trim() ?? '');
+    table.setAttribute('role', 'table');
+    for (const g of table.querySelectorAll('thead, tbody')) g.setAttribute('role', 'rowgroup');
+    for (const tr of table.querySelectorAll('tr')) {
+      tr.setAttribute('role', 'row');
+      let i = 0;
+      for (const cell of Array.from(tr.children) as HTMLElement[]) {
+        if (cell.tagName === 'TH') {
+          cell.setAttribute('role', 'columnheader');
+        } else {
+          cell.setAttribute('role', 'cell');
+          if (headers[i]) cell.dataset.label = headers[i];
+        }
+        i++;
+      }
+    }
+  }
+
   // 연결된 글 '처음 3개 + 더 보기' — 코드블록·smooth-details와 같은 WAAPI 높이 애니로 스르륵 펼침.
   (() => {
     const list = document.getElementById('connections-list');
