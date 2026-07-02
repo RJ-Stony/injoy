@@ -81,6 +81,15 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         </div>
       </header>
 
+      <!-- 자동저장된 초안 복구 배너 — 새 글 모드에서 이어 쓸 게 있으면 뜬다 -->
+      <div id="draft-restore" class="draft-restore" hidden>
+        <span class="dr-text">쓰던 초안이 있어요<span id="dr-title"></span>. 이어서 쓸까요?</span>
+        <span class="dr-actions">
+          <button type="button" id="draft-restore-yes" class="primary">이어 쓰기</button>
+          <button type="button" id="draft-restore-no">지우기</button>
+        </span>
+      </div>
+
       <section class="card section">
         <h2 class="section-title">글 정보</h2>
         <div class="fm-grid">
@@ -325,6 +334,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     if (ta.value === markdown) return;
     ta.value = markdown;
     ta.dispatchEvent(new Event('input', { bubbles: true }));
+    scheduleAutosave(); // 본문이 바뀔 때마다 초안 자동저장 예약(새 글 모드에서만 실제 저장)
   };
 
   async function mountBodyEditor() {
@@ -373,6 +383,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     await loadIndex();
     await loadPostList();
     resetForm();
+    offerDraftRestore(); // 저장해 둔 새 글 초안이 있으면 이어 쓸지 물어본다
   };
 
   const init = async () => {
@@ -970,6 +981,121 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   );
   $('fm-draft').addEventListener('change', runLint);
 
+  // ---------- 초안 자동저장·복구 (localStorage) ----------
+  // 새 글을 쓰다 탭을 닫거나 사고가 나도 잃지 않도록 폼을 주기적으로 저장한다.
+  // 안전 원칙: 새 글 모드에서만 저장하고, 빈 폼이라고 저장분을 지우지는 않는다
+  // (초기화가 저장된 초안을 덮어 지우는 사고 방지). 삭제는 발행 성공·'지우기'에서만.
+  const DRAFT_KEY = 'injoy-draft';
+  let autosaveTimer: ReturnType<typeof setTimeout>;
+
+  function currentBody(): string {
+    return mdEditor ? mdEditor.getMarkdown() : ($('fm-body') as HTMLTextAreaElement).value;
+  }
+
+  function saveDraft() {
+    if (state.mode !== 'new') return; // 수정 모드는 불러온 글이라 건드리지 않는다
+    const title = ($('fm-title') as HTMLInputElement).value;
+    const body = currentBody();
+    if (!title.trim() && !body.trim()) return; // 빈 폼은 저장도, 삭제도 안 한다
+    const draft = {
+      title,
+      slug: ($('fm-slug') as HTMLInputElement).value,
+      slugTouched: !!($('fm-slug') as HTMLInputElement).dataset.touched,
+      description: ($('fm-description') as HTMLInputElement).value,
+      category: ($('fm-category') as HTMLInputElement).value,
+      tags: ($('fm-tags') as HTMLInputElement).value,
+      series: ($('fm-series') as HTMLInputElement).value,
+      date: ($('fm-date') as HTMLInputElement).value,
+      draft: ($('fm-draft') as HTMLInputElement).checked,
+      body,
+      ts: Date.now(),
+    };
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      /* 용량 초과 등 — 조용히 무시 */
+    }
+  }
+
+  function scheduleAutosave() {
+    if (state.mode !== 'new') return;
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(saveDraft, 1000);
+  }
+
+  function clearDraft() {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      /* 무시 */
+    }
+  }
+
+  function hideRestoreBanner() {
+    $('draft-restore').hidden = true;
+  }
+
+  // 로드 시 저장된 초안이 있으면 배너로 물어본다(자동 덮어쓰기 X).
+  function offerDraftRestore() {
+    let draft: any = null;
+    try {
+      draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+    } catch {
+      draft = null;
+    }
+    if (!draft || (!String(draft.title).trim() && !String(draft.body).trim())) {
+      hideRestoreBanner();
+      return;
+    }
+    const t = String(draft.title).trim();
+    $('dr-title').textContent = t ? `: “${t}”` : '';
+    $('draft-restore').hidden = false;
+  }
+
+  function restoreDraft() {
+    let draft: any = null;
+    try {
+      draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+    } catch {
+      draft = null;
+    }
+    if (!draft) return hideRestoreBanner();
+    ($('fm-title') as HTMLInputElement).value = draft.title || '';
+    const slugEl = $('fm-slug') as HTMLInputElement;
+    slugEl.value = draft.slug || '';
+    if (draft.slugTouched) slugEl.dataset.touched = '1';
+    ($('fm-description') as HTMLInputElement).value = draft.description || '';
+    ($('fm-category') as HTMLInputElement).value = draft.category || '개발';
+    ($('fm-tags') as HTMLInputElement).value = draft.tags || '';
+    ($('fm-series') as HTMLInputElement).value = draft.series || '';
+    if (draft.date) datePicker.set(draft.date);
+    ($('fm-draft') as HTMLInputElement).checked = !!draft.draft;
+    setBody(draft.body || '');
+    hideRestoreBanner();
+    renderPreview();
+    renderSuggestions();
+    runLint();
+  }
+
+  $('draft-restore-yes').addEventListener('click', restoreDraft);
+  $('draft-restore-no').addEventListener('click', () => {
+    clearDraft();
+    hideRestoreBanner();
+  });
+
+  // 저장 트리거: 폼 필드 입력 + 본문 변경(syncMirror 안에서 호출).
+  // 배너 숨김은 '사람이 직접 편집'했을 때만 — 프로그램적 setBody(복구·불러오기)엔 안 숨긴다.
+  ['fm-title', 'fm-description', 'fm-tags', 'fm-date', 'fm-category', 'fm-series', 'fm-slug'].forEach(
+    (id) =>
+      $(id).addEventListener('input', () => {
+        hideRestoreBanner();
+        scheduleAutosave();
+      }),
+  );
+  $('fm-draft').addEventListener('change', scheduleAutosave);
+  // 본문 직접 타이핑(ProseMirror contenteditable의 input) → 배너 숨김
+  $('md-editor').addEventListener('input', hideRestoreBanner);
+
   // ---------- 발행 (Git Data API — 단일 커밋) ----------
   const b64encodeUtf8 = (s: string) => {
     const bytes = new TextEncoder().encode(s);
@@ -1213,6 +1339,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       const url = `${CFG.base}posts/${slug}/`;
       state.pendingFiles.clear();
       state.coverPendingPath = null;
+      clearDraft(); // 발행됐으니 자동저장된 초안은 지운다
       // acceptedEdges는 비우지 않는다 — 방금 쓴 '이 글의 연결' 상태라, 재발행 reconcile가 멱등이게.
       state.mode = 'edit';
       state.editingSlug = slug;
@@ -1853,6 +1980,36 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     gap: 1rem;
     flex-wrap: wrap;
     padding-block: 0.4rem 1.4rem;
+  }
+
+  /* 초안 복구 배너 — accent-weak 바탕으로 은은하게, 데스크톱·모바일 모두 자연스럽게 줄바꿈 */
+  .write-root .draft-restore {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.6rem 1rem;
+    margin-bottom: 1.2rem;
+    padding: 0.7rem 1rem;
+    background-color: var(--accent-weak);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+  }
+
+  .write-root .draft-restore[hidden] {
+    display: none;
+  }
+
+  .write-root .draft-restore .dr-text {
+    color: var(--text);
+    min-width: 0;
+  }
+
+  .write-root .draft-restore .dr-actions {
+    display: inline-flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
   }
 
   .write-root .editor-top h1 {
