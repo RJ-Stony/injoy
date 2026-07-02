@@ -2,7 +2,10 @@
 /**
  * 읽기 보조 — 글 상세에서만 1회 포함(src/pages/posts/[slug].astro).
  *  · 읽기 진행 막대: 화면 맨 위 가는 줄이 스크롤만큼 차오른다.
- *  · 맨 위로: 한참 내리면 우하단에 뜨고, 누르면 맨 위로 부드럽게.
+ *  · 우하단 컨트롤 스택(위→아래): 집중모드 · 공유 · 맨 위로.
+ *     - 집중모드: 헤더·목차·푸터 등 방해 요소를 감추고 본문만. Escape로 해제.
+ *     - 공유: navigator.share(모바일 시트) 또는 링크 클립보드 복사.
+ *     - 맨 위로: 한참 내리면 등장, 누르면 맨 위로 부드럽게.
  *  · 제목 링크: h2/h3에 호버하면 🔗가 떠 그 단락의 URL(#앵커)을 복사한다.
  * 스크립트로 주입하는 제목 버튼은 스코프 CSS가 안 먹어 전역 스타일로 둔다.
  */
@@ -10,9 +13,19 @@
 
 <div class="reading-progress" aria-hidden="true"><span class="bar"></span></div>
 
-<button type="button" class="to-top" aria-label="맨 위로" hidden>
-  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>
-</button>
+<div class="reading-controls">
+  <button type="button" class="rc-btn to-focus" aria-pressed="false" aria-label="집중 읽기 모드">
+    <svg class="ic-enter" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>
+    <svg class="ic-exit" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+  </button>
+  <button type="button" class="rc-btn to-share" aria-label="이 글 공유">
+    <svg class="ic-share" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><path d="M16 6l-4-4-4 4"></path><path d="M12 2v13"></path></svg>
+    <svg class="ic-done" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-11"></path></svg>
+  </button>
+  <button type="button" class="rc-btn to-top" aria-label="맨 위로" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>
+  </button>
+</div>
 
 <script>
   // 1) 읽기 진행 막대 + 맨 위로 노출 — 스크롤을 rAF로 묶어 한 프레임에 한 번만 계산
@@ -41,7 +54,46 @@
     window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
   });
 
-  // 2) 제목 링크 복사 — .prose h2/h3(Astro가 부여한 id)에 링크 버튼을 붙인다
+  // 2) 집중 읽기 모드 — data-focus 토글. 숨김은 전역 CSS가 담당, 여기선 상태·단축키만.
+  const focusBtn = document.querySelector<HTMLButtonElement>('.to-focus');
+  const setFocus = (on: boolean) => {
+    document.documentElement.dataset.focus = on ? 'true' : '';
+    if (!on) delete document.documentElement.dataset.focus;
+    focusBtn?.setAttribute('aria-pressed', String(on));
+    focusBtn?.setAttribute('aria-label', on ? '집중 모드 해제' : '집중 읽기 모드');
+  };
+  focusBtn?.addEventListener('click', () =>
+    setFocus(document.documentElement.dataset.focus !== 'true'),
+  );
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.documentElement.dataset.focus === 'true') setFocus(false);
+  });
+
+  // 3) 공유 — navigator.share(있으면 네이티브 시트) 또는 링크 클립보드 복사 + 완료 표시
+  const shareBtn = document.querySelector<HTMLButtonElement>('.to-share');
+  let shareTimer: ReturnType<typeof setTimeout>;
+  shareBtn?.addEventListener('click', async () => {
+    const url = location.href;
+    const title = document.title;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, url });
+      } catch {
+        /* 사용자가 공유 시트를 취소 — 조용히 무시 */
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      shareBtn.classList.add('copied');
+      clearTimeout(shareTimer);
+      shareTimer = setTimeout(() => shareBtn.classList.remove('copied'), 1500);
+    } catch {
+      /* 클립보드 거부(비보안 컨텍스트 등) — 조용히 무시 */
+    }
+  });
+
+  // 4) 제목 링크 복사 — .prose h2/h3(Astro가 부여한 id)에 링크 버튼을 붙인다
   const linkIcon =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 15l6-6"></path><path d="M11 6l1-1a4 4 0 0 1 6 6l-1 1"></path><path d="M13 18l-1 1a4 4 0 0 1-6-6l1-1"></path></svg>';
   const baseUrl = location.origin + location.pathname;
@@ -89,11 +141,19 @@
     }
   }
 
-  .to-top {
+  /* 우하단 컨트롤 스택 — 위에서부터 집중·공유·맨위로 */
+  .reading-controls {
     position: fixed;
     right: 1.1rem;
     bottom: 1.1rem;
     z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    align-items: center;
+  }
+
+  .rc-btn {
     width: 2.7rem;
     height: 2.7rem;
     border-radius: 50%;
@@ -108,16 +168,16 @@
     transition: color 0.15s ease, border-color 0.15s ease;
   }
 
-  .to-top[hidden] {
+  .rc-btn[hidden] {
     display: none;
   }
 
-  .to-top:hover {
+  .rc-btn:hover {
     color: var(--accent);
     border-color: var(--accent);
   }
 
-  .to-top svg {
+  .rc-btn svg {
     width: 1.2rem;
     height: 1.2rem;
     fill: none;
@@ -126,9 +186,59 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
+
+  /* 아이콘 전환 — 기본은 enter/share, 활성 상태에서 exit/done */
+  .to-focus .ic-exit,
+  .to-share .ic-done {
+    display: none;
+  }
+
+  .to-share.copied {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .to-share.copied .ic-share {
+    display: none;
+  }
+
+  .to-share.copied .ic-done {
+    display: inline-block;
+  }
 </style>
 
 <style is:global>
+  /* 집중 읽기 모드 — 방해 요소를 감추고 본문만 남긴다. 상태는 <html data-focus="true">. */
+  html[data-focus='true'] .site-header,
+  html[data-focus='true'] .site-footer,
+  html[data-focus='true'] .toc-inline,
+  html[data-focus='true'] .toc-aside,
+  html[data-focus='true'] .toc.line,
+  html[data-focus='true'] .reading-controls .to-share,
+  html[data-focus='true'] .reading-controls .to-top {
+    display: none;
+  }
+
+  /* 목차 사이드바가 사라진 만큼 본문을 가운데로 모은다(빈 220px 칸 제거) */
+  html[data-focus='true'] .post-grid {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+
+  /* 집중 모드에선 집중 버튼이 exit(X) 아이콘으로 */
+  html[data-focus='true'] .to-focus .ic-enter {
+    display: none;
+  }
+
+  html[data-focus='true'] .to-focus .ic-exit {
+    display: inline-block;
+  }
+
+  html[data-focus='true'] .to-focus {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
   /* 제목 앵커가 고정 헤더에 가리지 않게 + 링크 버튼 자리 */
   .prose h2,
   .prose h3 {
