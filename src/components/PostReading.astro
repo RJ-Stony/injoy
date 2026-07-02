@@ -2,10 +2,11 @@
 /**
  * 읽기 보조 — 글 상세에서만 1회 포함(src/pages/posts/[slug].astro).
  *  · 읽기 진행 막대: 화면 맨 위 가는 줄이 스크롤만큼 차오른다.
- *  · 우하단 컨트롤 스택(위→아래): 집중모드 · 공유 · 맨 위로.
- *     - 집중모드: 헤더·목차·푸터 등 방해 요소를 감추고 본문만. Escape로 해제.
+ *  · 우하단 스피드다이얼(FAB): 평소엔 버튼 하나(⋮). 누르면 위로 항목이 스르륵 펼쳐진다.
+ *     - 집중 읽기: 헤더·목차·푸터 등 방해 요소를 감추고 본문만. Escape로 해제.
  *     - 공유: navigator.share(모바일 시트) 또는 링크 클립보드 복사.
- *     - 맨 위로: 한참 내리면 등장, 누르면 맨 위로 부드럽게.
+ *     - 맨 위로: 한참 내렸을 때만 항목으로 등장.
+ *     집중모드에선 FAB가 '집중 해제'(축소 아이콘) 하나로 바뀐다(다이얼 비활성).
  *  · 제목 링크: h2/h3에 호버하면 🔗가 떠 그 단락의 URL(#앵커)을 복사한다.
  * 스크립트로 주입하는 제목 버튼은 스코프 CSS가 안 먹어 전역 스타일로 둔다.
  */
@@ -13,31 +14,49 @@
 
 <div class="reading-progress" aria-hidden="true"><span class="bar"></span></div>
 
-<div class="reading-controls">
-  <button type="button" class="rc-btn to-focus" aria-pressed="false" aria-label="집중 읽기 모드">
-    <svg class="ic-enter" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>
-    <svg class="ic-exit" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
-  </button>
-  <button type="button" class="rc-btn to-share" aria-label="이 글 공유">
-    <svg class="ic-share" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><path d="M16 6l-4-4-4 4"></path><path d="M12 2v13"></path></svg>
-    <svg class="ic-done" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-11"></path></svg>
-  </button>
-  <button type="button" class="rc-btn to-top" aria-label="맨 위로" hidden>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>
+<div class="reading-dial" data-open="false">
+  <div class="rd-items">
+    <button type="button" class="rd-item" data-act="focus" aria-label="집중 읽기 모드" tabindex="-1">
+      <span class="rd-label">집중 읽기</span>
+      <span class="rd-ic">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>
+      </span>
+    </button>
+    <button type="button" class="rd-item to-share" data-act="share" aria-label="이 글 공유" tabindex="-1">
+      <span class="rd-label">공유</span>
+      <span class="rd-ic">
+        <svg class="ic-share" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><path d="M16 6l-4-4-4 4"></path><path d="M12 2v13"></path></svg>
+        <svg class="ic-done" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-11"></path></svg>
+      </span>
+    </button>
+    <button type="button" class="rd-item rd-top" data-act="top" aria-label="맨 위로" tabindex="-1" hidden>
+      <span class="rd-label">맨 위로</span>
+      <span class="rd-ic">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>
+      </span>
+    </button>
+  </div>
+
+  <button type="button" class="rd-fab" aria-haspopup="true" aria-expanded="false" aria-label="읽기 도구">
+    <svg class="ic-menu" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="12" cy="19" r="1.6"></circle></svg>
+    <svg class="ic-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    <svg class="ic-compress" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"></path></svg>
   </button>
 </div>
 
 <script>
-  // 1) 읽기 진행 막대 + 맨 위로 노출 — 스크롤을 rAF로 묶어 한 프레임에 한 번만 계산
+  import { SMOOTH_DURATION } from '../scripts/smooth-details';
+
+  // 1) 읽기 진행 막대 + 맨 위로 항목 노출 — 스크롤을 rAF로 묶어 한 프레임에 한 번만 계산
   const bar = document.querySelector<HTMLElement>('.reading-progress .bar');
-  const toTop = document.querySelector<HTMLButtonElement>('.to-top');
+  const topItem = document.querySelector<HTMLButtonElement>('.rd-top');
   let ticking = false;
   const update = () => {
     ticking = false;
     const max = document.documentElement.scrollHeight - window.innerHeight;
     const p = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
     if (bar) bar.style.transform = `scaleX(${p})`;
-    if (toTop) toTop.hidden = window.scrollY < window.innerHeight * 0.6;
+    if (topItem) topItem.hidden = window.scrollY < window.innerHeight * 0.6;
   };
   const onScroll = () => {
     if (!ticking) {
@@ -49,30 +68,51 @@
   window.addEventListener('resize', onScroll, { passive: true });
   update();
 
-  toTop?.addEventListener('click', () => {
-    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
-  });
+  // 2) 스피드다이얼 열고 닫기
+  const dial = document.querySelector<HTMLElement>('.reading-dial');
+  const fab = document.querySelector<HTMLButtonElement>('.rd-fab');
+  const items = [...document.querySelectorAll<HTMLButtonElement>('.rd-item')];
+  const isFocus = () => document.documentElement.dataset.focus === 'true';
 
-  // 2) 집중 읽기 모드 — data-focus 토글. 숨김은 전역 CSS가 담당, 여기선 상태·단축키만.
-  const focusBtn = document.querySelector<HTMLButtonElement>('.to-focus');
-  const setFocus = (on: boolean) => {
-    document.documentElement.dataset.focus = on ? 'true' : '';
-    if (!on) delete document.documentElement.dataset.focus;
-    focusBtn?.setAttribute('aria-pressed', String(on));
-    focusBtn?.setAttribute('aria-label', on ? '집중 모드 해제' : '집중 읽기 모드');
+  const setOpen = (open: boolean) => {
+    if (!dial || !fab) return;
+    dial.dataset.open = String(open);
+    fab.setAttribute('aria-expanded', String(open));
+    // 닫히면 항목은 탭 순서에서 빠지고, 열리면 키보드로 닿게 한다
+    for (const it of items) it.tabIndex = open ? 0 : -1;
   };
-  focusBtn?.addEventListener('click', () =>
-    setFocus(document.documentElement.dataset.focus !== 'true'),
-  );
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && document.documentElement.dataset.focus === 'true') setFocus(false);
+
+  // 3) 집중 읽기 모드 — data-focus 토글. 숨김은 전역 CSS가 담당.
+  const setFocus = (on: boolean) => {
+    if (on) document.documentElement.dataset.focus = 'true';
+    else delete document.documentElement.dataset.focus;
+    if (on) setOpen(false); // 집중 진입 시 다이얼은 닫는다
+  };
+
+  fab?.addEventListener('click', () => {
+    // 집중모드에선 FAB가 '집중 해제' 버튼 — 바로 나간다(다이얼 안 엶)
+    if (isFocus()) {
+      setFocus(false);
+      return;
+    }
+    setOpen(dial?.dataset.open !== 'true');
   });
 
-  // 3) 공유 — navigator.share(있으면 네이티브 시트) 또는 링크 클립보드 복사 + 완료 표시
-  const shareBtn = document.querySelector<HTMLButtonElement>('.to-share');
+  // 바깥 클릭으로 닫기
+  document.addEventListener('click', (e) => {
+    if (dial?.dataset.open === 'true' && !dial.contains(e.target as Node)) setOpen(false);
+  });
+
+  // Escape: 집중모드면 해제, 아니면 다이얼 닫기
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (isFocus()) setFocus(false);
+    else if (dial?.dataset.open === 'true') setOpen(false);
+  });
+
+  // 4) 항목 동작
   let shareTimer: ReturnType<typeof setTimeout>;
-  shareBtn?.addEventListener('click', async () => {
+  const doShare = async (btn: HTMLButtonElement) => {
     const url = location.href;
     const title = document.title;
     if (navigator.share) {
@@ -85,15 +125,32 @@
     }
     try {
       await navigator.clipboard.writeText(url);
-      shareBtn.classList.add('copied');
+      btn.classList.add('copied');
       clearTimeout(shareTimer);
-      shareTimer = setTimeout(() => shareBtn.classList.remove('copied'), 1500);
+      shareTimer = setTimeout(() => btn.classList.remove('copied'), 1600);
     } catch {
       /* 클립보드 거부(비보안 컨텍스트 등) — 조용히 무시 */
     }
-  });
+  };
 
-  // 4) 제목 링크 복사 — .prose h2/h3(Astro가 부여한 id)에 링크 버튼을 붙인다
+  for (const it of items) {
+    it.addEventListener('click', async () => {
+      const act = it.dataset.act;
+      if (act === 'focus') {
+        setFocus(true);
+      } else if (act === 'share') {
+        await doShare(it);
+        // 공유(복사)는 완료 표시를 보여주려 다이얼을 잠깐 열어 둔다
+        return;
+      } else if (act === 'top') {
+        const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+      }
+      setOpen(false);
+    });
+  }
+
+  // 5) 제목 링크 복사 — .prose h2/h3(Astro가 부여한 id)에 링크 버튼을 붙인다
   const linkIcon =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 15l6-6"></path><path d="M11 6l1-1a4 4 0 0 1 6 6l-1 1"></path><path d="M13 18l-1 1a4 4 0 0 1-6-6l1-1"></path></svg>';
   const baseUrl = location.origin + location.pathname;
@@ -116,6 +173,9 @@
     });
     h.appendChild(btn);
   }
+
+  // 모션 상수를 CSS로 넘겨 사이트 공통 결(SMOOTH_DURATION)과 맞춘다
+  document.documentElement.style.setProperty('--rd-dur', `${SMOOTH_DURATION}ms`);
 </script>
 
 <style>
@@ -141,21 +201,77 @@
     }
   }
 
-  /* 우하단 컨트롤 스택 — 위에서부터 집중·공유·맨위로 */
-  .reading-controls {
+  /* 우하단 스피드다이얼 */
+  .reading-dial {
     position: fixed;
     right: 1.1rem;
     bottom: 1.1rem;
     z-index: 60;
     display: flex;
     flex-direction: column;
-    gap: 0.55rem;
-    align-items: center;
+    align-items: flex-end;
+    gap: 0.6rem;
   }
 
-  .rc-btn {
-    width: 2.7rem;
-    height: 2.7rem;
+  /* 펼쳐지는 항목 목록 */
+  .rd-items {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.6rem;
+  }
+
+  .rd-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    /* 닫힘 기본값 — FAB 뒤에서 살짝 아래·작게 숨어 있다 */
+    opacity: 0;
+    transform: translateY(0.6rem) scale(0.9);
+    pointer-events: none;
+    transition:
+      opacity var(--rd-dur, 260ms) cubic-bezier(0.33, 1, 0.68, 1),
+      transform var(--rd-dur, 260ms) cubic-bezier(0.33, 1, 0.68, 1);
+  }
+
+  .rd-item[hidden] {
+    display: none;
+  }
+
+  .reading-dial[data-open='true'] .rd-item {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  /* FAB에 가까운 항목부터 순서대로 뜨게 살짝 스태거 */
+  .reading-dial[data-open='true'] .rd-item:nth-last-child(1) { transition-delay: 0ms; }
+  .reading-dial[data-open='true'] .rd-item:nth-last-child(2) { transition-delay: 45ms; }
+  .reading-dial[data-open='true'] .rd-item:nth-last-child(3) { transition-delay: 90ms; }
+
+  /* 항목 라벨 — 늘 붙어 있어 무슨 버튼인지 바로 읽힌다 */
+  .rd-label {
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text);
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.3em 0.75em;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
+    white-space: nowrap;
+  }
+
+  /* 항목의 원형 아이콘 — 기존 맨위로 버튼과 같은 결(테두리 원) */
+  .rd-ic {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 2.5rem;
     border-radius: 50%;
     display: inline-flex;
     align-items: center;
@@ -164,22 +280,18 @@
     color: var(--text-muted);
     border: 1px solid var(--border);
     box-shadow: 0 4px 14px rgb(0 0 0 / 12%);
-    cursor: pointer;
     transition: color 0.15s ease, border-color 0.15s ease;
   }
 
-  .rc-btn[hidden] {
-    display: none;
-  }
-
-  .rc-btn:hover {
+  .rd-item:hover .rd-ic,
+  .rd-item:focus-visible .rd-ic {
     color: var(--accent);
     border-color: var(--accent);
   }
 
-  .rc-btn svg {
-    width: 1.2rem;
-    height: 1.2rem;
+  .rd-ic svg {
+    width: 1.15rem;
+    height: 1.15rem;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -187,13 +299,12 @@
     stroke-linejoin: round;
   }
 
-  /* 아이콘 전환 — 기본은 enter/share, 활성 상태에서 exit/done */
-  .to-focus .ic-exit,
+  /* 공유 완료(클립보드 복사) 표시 */
   .to-share .ic-done {
     display: none;
   }
 
-  .to-share.copied {
+  .to-share.copied .rd-ic {
     color: var(--accent);
     border-color: var(--accent);
   }
@@ -205,6 +316,84 @@
   .to-share.copied .ic-done {
     display: inline-block;
   }
+
+  /* FAB — solid accent라 어느 배경에서도 또렷하게 보인다 */
+  .rd-fab {
+    width: 3.1rem;
+    height: 3.1rem;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background-color: var(--accent);
+    color: #fff;
+    border: 0;
+    box-shadow: 0 6px 18px rgb(0 0 0 / 22%);
+    cursor: pointer;
+    transition: transform 0.18s cubic-bezier(0.33, 1, 0.68, 1), filter 0.15s ease;
+  }
+
+  .rd-fab:hover {
+    filter: brightness(1.06);
+  }
+
+  .rd-fab:active {
+    transform: scale(0.94);
+  }
+
+  .rd-fab svg {
+    grid-area: 1 / 1; /* 세 아이콘을 같은 칸에 겹쳐 놓고 opacity로 전환 */
+    width: 1.35rem;
+    height: 1.35rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: opacity 0.15s ease, transform var(--rd-dur, 260ms) cubic-bezier(0.33, 1, 0.68, 1);
+  }
+
+  .rd-fab .ic-menu circle {
+    fill: currentColor;
+    stroke: none;
+  }
+
+  /* 아이콘 전환 — 닫힘=메뉴(⋮), 열림=닫기(×), 집중모드=축소 */
+  .rd-fab .ic-close,
+  .rd-fab .ic-compress {
+    opacity: 0;
+    transform: rotate(-90deg);
+  }
+
+  .reading-dial[data-open='true'] .rd-fab .ic-menu {
+    opacity: 0;
+    transform: rotate(90deg);
+  }
+
+  .reading-dial[data-open='true'] .rd-fab .ic-close {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* 집중모드 FAB: 메뉴·닫기 숨기고 '축소'(집중 해제)만.
+     스코프 블록에 둬야 스코프 기본 규칙(.rd-fab .ic-compress)의 specificity를 이긴다.
+     is:global 규칙은 스코프 속성이 안 붙어 여기 기본 규칙에 져서 축소 아이콘이 안 켜졌다. */
+  html[data-focus='true'] .rd-fab .ic-menu,
+  html[data-focus='true'] .rd-fab .ic-close {
+    opacity: 0;
+  }
+
+  html[data-focus='true'] .rd-fab .ic-compress {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rd-item,
+    .rd-fab,
+    .rd-fab svg {
+      transition: none;
+    }
+  }
 </style>
 
 <style is:global>
@@ -214,8 +403,7 @@
   html[data-focus='true'] .toc-inline,
   html[data-focus='true'] .toc-aside,
   html[data-focus='true'] .toc.line,
-  html[data-focus='true'] .reading-controls .to-share,
-  html[data-focus='true'] .reading-controls .to-top {
+  html[data-focus='true'] .reading-dial .rd-items {
     display: none;
   }
 
@@ -223,20 +411,6 @@
   html[data-focus='true'] .post-grid {
     grid-template-columns: minmax(0, 1fr);
     justify-items: center;
-  }
-
-  /* 집중 모드에선 집중 버튼이 exit(X) 아이콘으로 */
-  html[data-focus='true'] .to-focus .ic-enter {
-    display: none;
-  }
-
-  html[data-focus='true'] .to-focus .ic-exit {
-    display: inline-block;
-  }
-
-  html[data-focus='true'] .to-focus {
-    color: var(--accent);
-    border-color: var(--accent);
   }
 
   /* 제목 앵커가 고정 헤더에 가리지 않게 + 링크 버튼 자리 */
