@@ -220,7 +220,7 @@
       "from": "harness-9-orchestration",
       "to": "harness-8-trimming",
       "type": "extends",
-      "note": "얇게 하네스를 유지하고 나서, 개발 너머 비개발 영역까지 받치기 위해 멀티에이전트 오케스트레이션을 다시 벤치마킹한 과정"
+      "note": "개발 너머 비개발 영역까지 받치기 위해 멀티에이전트 오케스트레이션을 다시 벤치마킹한 과정"
     },
     {
       "from": "harness-9-orchestration",
