@@ -329,27 +329,40 @@ const data = {
     let syncChips = () => {};
 
     // 선택된 칩들로 밝게 유지할 노드·엣지를 다시 계산한다.
-    //  · 카테고리: 그 카테고리 '글만'(이웃은 제외) + 같은 선택 안에서 글끼리 잇는 엣지.
-    //  · 연결 타입: 그 타입 엣지 + 양 끝 노드. 여러 개는 합집합.
+    //   같은 그룹 안은 OR(AI 또는 블로그), 그룹을 가로지르면 AND("AI이면서 확장").
+    //  · 카테고리만: 그 카테고리 '글만'(이웃 제외) + 그 글끼리 잇는 엣지.
+    //  · 연결 타입만: 그 타입 엣지 + 양 끝 노드.
+    //  · 둘 다: 선택 카테고리 글이 낀, 선택 타입의 엣지만(+양 끝) = 교집합.
+    const isCatPost = (n) => n.kind === 'post' && activeCats.has(n.category);
     const recomputeFilter = () => {
-      if (activeCats.size === 0 && activeEdges.size === 0) {
+      const catOn = activeCats.size > 0;
+      const edgeOn = activeEdges.size > 0;
+      if (!catOn && !edgeOn) {
         ovSet = null;
         ovEdgeKeys = null;
         return;
       }
       ovSet = new Set();
       ovEdgeKeys = new Set();
-      const catBright = new Set(
-        nodes.filter((n) => n.kind === 'post' && activeCats.has(n.category)).map((n) => n.id),
-      );
-      for (const id of catBright) ovSet.add(id);
-      for (const e of edges) {
-        if (activeEdges.has(e.type)) {
-          ovEdgeKeys.add(ekey(e.a.id, e.b.id));
-          ovSet.add(e.a.id);
-          ovSet.add(e.b.id);
-        } else if (catBright.has(e.a.id) && catBright.has(e.b.id)) {
-          ovEdgeKeys.add(ekey(e.a.id, e.b.id)); // 선택 카테고리 글끼리의 연결
+      if (catOn && !edgeOn) {
+        for (const n of nodes) if (isCatPost(n)) ovSet.add(n.id);
+        for (const e of edges) if (ovSet.has(e.a.id) && ovSet.has(e.b.id)) ovEdgeKeys.add(ekey(e.a.id, e.b.id));
+      } else if (!catOn && edgeOn) {
+        for (const e of edges)
+          if (activeEdges.has(e.type)) {
+            ovEdgeKeys.add(ekey(e.a.id, e.b.id));
+            ovSet.add(e.a.id);
+            ovSet.add(e.b.id);
+          }
+      } else {
+        // 교집합: 선택 타입 엣지 중 한쪽이라도 선택 카테고리 글이면(그 글의 그 타입 연결) 밝게
+        for (const e of edges) {
+          if (!activeEdges.has(e.type)) continue;
+          if (isCatPost(e.a) || isCatPost(e.b)) {
+            ovEdgeKeys.add(ekey(e.a.id, e.b.id));
+            ovSet.add(e.a.id);
+            ovSet.add(e.b.id);
+          }
         }
       }
     };
