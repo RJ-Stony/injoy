@@ -383,7 +383,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     await loadIndex();
     await loadPostList();
     resetForm();
-    offerDraftRestore(); // 저장해 둔 새 글 초안이 있으면 이어 쓸지 물어본다
+    offerNewDraft(); // 저장해 둔 새 글 초안이 있으면 이어 쓸지 물어본다
   };
 
   const init = async () => {
@@ -982,23 +982,36 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   $('fm-draft').addEventListener('change', runLint);
 
   // ---------- 초안 자동저장·복구 (localStorage) ----------
-  // 새 글을 쓰다 탭을 닫거나 사고가 나도 잃지 않도록 폼을 주기적으로 저장한다.
-  // 안전 원칙: 새 글 모드에서만 저장하고, 빈 폼이라고 저장분을 지우지는 않는다
-  // (초기화가 저장된 초안을 덮어 지우는 사고 방지). 삭제는 발행 성공·'지우기'에서만.
-  const DRAFT_KEY = 'injoy-draft';
+  // 새 글이든 기존 글 수정이든, 쓰다 탭을 닫거나 사고가 나도 잃지 않도록 폼을 글별 키로 저장한다.
+  //   키: 새 글 = injoy-draft:__new__, 수정 = injoy-draft:<슬러그>.
+  // 안전 원칙 두 가지:
+  //  (1) 빈 폼은 저장도 삭제도 안 한다 → 초기화(setBody(''))가 저장분을 덮어 지우는 사고 방지.
+  //  (2) 복구는 자동 적용이 아니라 배너로 물어본다 → 그 사이 origin이 더 새로워졌을 때 옛 편집으로 덮는 사고 방지.
+  //      배너가 물어보는 후보는 스냅샷(pendingRestore)으로 잡아 둬, 이후 autosave가 저장소를 덮어써도 복구가 안전하다.
+  const DRAFT_PREFIX = 'injoy-draft';
   let autosaveTimer: ReturnType<typeof setTimeout>;
+  let pendingRestore: any = null;
+
+  const draftKey = () =>
+    state.mode === 'edit' && state.editingSlug
+      ? `${DRAFT_PREFIX}:${state.editingSlug}`
+      : `${DRAFT_PREFIX}:__new__`;
 
   function currentBody(): string {
     return mdEditor ? mdEditor.getMarkdown() : ($('fm-body') as HTMLTextAreaElement).value;
   }
 
-  function saveDraft() {
-    if (state.mode !== 'new') return; // 수정 모드는 불러온 글이라 건드리지 않는다
-    const title = ($('fm-title') as HTMLInputElement).value;
-    const body = currentBody();
-    if (!title.trim() && !body.trim()) return; // 빈 폼은 저장도, 삭제도 안 한다
-    const draft = {
-      title,
+  function readDraft(key: string): any {
+    try {
+      return JSON.parse(localStorage.getItem(key) || 'null');
+    } catch {
+      return null;
+    }
+  }
+
+  function collectForm() {
+    return {
+      title: ($('fm-title') as HTMLInputElement).value,
       slug: ($('fm-slug') as HTMLInputElement).value,
       slugTouched: !!($('fm-slug') as HTMLInputElement).dataset.touched,
       description: ($('fm-description') as HTMLInputElement).value,
@@ -1007,70 +1020,83 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       series: ($('fm-series') as HTMLInputElement).value,
       date: ($('fm-date') as HTMLInputElement).value,
       draft: ($('fm-draft') as HTMLInputElement).checked,
-      body,
+      body: currentBody(),
       ts: Date.now(),
     };
+  }
+
+  function saveDraft() {
+    const f = collectForm();
+    if (!f.title.trim() && !f.body.trim()) return; // 빈 폼은 저장도, 삭제도 안 한다
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      localStorage.setItem(draftKey(), JSON.stringify(f));
     } catch {
       /* 용량 초과 등 — 조용히 무시 */
     }
   }
 
   function scheduleAutosave() {
-    if (state.mode !== 'new') return;
     clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(saveDraft, 1000);
   }
 
   function clearDraft() {
     try {
-      localStorage.removeItem(DRAFT_KEY);
+      localStorage.removeItem(draftKey());
     } catch {
       /* 무시 */
     }
+    pendingRestore = null;
   }
 
   function hideRestoreBanner() {
     $('draft-restore').hidden = true;
   }
 
-  // 로드 시 저장된 초안이 있으면 배너로 물어본다(자동 덮어쓰기 X).
-  function offerDraftRestore() {
-    let draft: any = null;
-    try {
-      draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
-    } catch {
-      draft = null;
-    }
-    if (!draft || (!String(draft.title).trim() && !String(draft.body).trim())) {
-      hideRestoreBanner();
-      return;
-    }
-    const t = String(draft.title).trim();
+  function showRestoreBanner(draft: any) {
+    pendingRestore = draft;
+    const t = String(draft.title || '').trim();
     $('dr-title').textContent = t ? `: “${t}”` : '';
     $('draft-restore').hidden = false;
   }
 
+  const isEmptyDraft = (d: any) =>
+    !d || (!String(d.title || '').trim() && !String(d.body || '').trim());
+
+  // 새 글 로드 시: 저장된 새 글 초안이 있으면 물어본다.
+  function offerNewDraft() {
+    const d = readDraft(`${DRAFT_PREFIX}:__new__`);
+    if (isEmptyDraft(d)) return hideRestoreBanner();
+    showRestoreBanner(d);
+  }
+
+  // 기존 글 로드 시: 그 글의 로컬 편집분이 origin과 다르면 물어본다(같으면 조용히 넘긴다).
+  function offerEditDraft(slug: string, origin: { title: string; body: string }) {
+    const d = readDraft(`${DRAFT_PREFIX}:${slug}`);
+    if (isEmptyDraft(d)) return hideRestoreBanner();
+    const same =
+      String(d.title || '') === origin.title && String(d.body || '').trim() === origin.body.trim();
+    if (same) return hideRestoreBanner();
+    showRestoreBanner(d);
+  }
+
   function restoreDraft() {
-    let draft: any = null;
-    try {
-      draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
-    } catch {
-      draft = null;
+    const d = pendingRestore;
+    if (!d) return hideRestoreBanner();
+    ($('fm-title') as HTMLInputElement).value = d.title || '';
+    // 수정 모드에선 슬러그가 잠겨 있다(불러온 글 그대로) — 새 글일 때만 슬러그도 복구.
+    if (state.mode !== 'edit') {
+      const slugEl = $('fm-slug') as HTMLInputElement;
+      slugEl.value = d.slug || '';
+      if (d.slugTouched) slugEl.dataset.touched = '1';
     }
-    if (!draft) return hideRestoreBanner();
-    ($('fm-title') as HTMLInputElement).value = draft.title || '';
-    const slugEl = $('fm-slug') as HTMLInputElement;
-    slugEl.value = draft.slug || '';
-    if (draft.slugTouched) slugEl.dataset.touched = '1';
-    ($('fm-description') as HTMLInputElement).value = draft.description || '';
-    ($('fm-category') as HTMLInputElement).value = draft.category || '개발';
-    ($('fm-tags') as HTMLInputElement).value = draft.tags || '';
-    ($('fm-series') as HTMLInputElement).value = draft.series || '';
-    if (draft.date) datePicker.set(draft.date);
-    ($('fm-draft') as HTMLInputElement).checked = !!draft.draft;
-    setBody(draft.body || '');
+    ($('fm-description') as HTMLInputElement).value = d.description || '';
+    ($('fm-category') as HTMLInputElement).value = d.category || '개발';
+    ($('fm-tags') as HTMLInputElement).value = d.tags || '';
+    ($('fm-series') as HTMLInputElement).value = d.series || '';
+    if (d.date) datePicker.set(d.date);
+    ($('fm-draft') as HTMLInputElement).checked = !!d.draft;
+    setBody(d.body || '');
     hideRestoreBanner();
     renderPreview();
     renderSuggestions();
@@ -1419,6 +1445,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     renderPreview();
     renderSuggestions();
     runLint();
+    // origin으로 채운 뒤, 이 글의 로컬 편집분이 남아 있고 origin과 다르면 이어 쓸지 물어본다.
+    offerEditDraft(state.editingSlug!, { title: parsed.title, body: parsed.body });
   });
 
   $('delete-post').addEventListener('click', async () => {
@@ -1435,6 +1463,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         [`${CFG.postsDir}/${state.editingSlug}.md`],
         `post: ${state.editingSlug} 삭제 (/write)`,
       );
+      try { localStorage.removeItem(`${DRAFT_PREFIX}:${state.editingSlug}`); } catch {} // 이 글의 로컬 초안도 정리
       resetForm(); // resetForm이 상태 문구를 비우므로 성공 메시지는 그 뒤에
       status.textContent = '✓ 삭제 커밋 완료. 곧 사이트에서 사라져요(관련 연결도 함께 정리했어요).';
       await loadIndex();
