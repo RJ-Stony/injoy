@@ -9,6 +9,8 @@ const graph = await getGraph();
 const data = {
   nodes: graph.nodes.map((n) => ({ ...n, url: withBase(n.url) })),
   edges: graph.edges,
+  // 필터 칩에 쓸 연결 타입 라벨(EDGE_TYPES 단일 출처)
+  edgeLabels: Object.fromEntries(Object.entries(EDGE_TYPES).map(([k, t]) => [k, t.label])),
 };
 ---
 
@@ -40,12 +42,12 @@ const data = {
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l12 7-12 7z"></path></svg>
         <span class="gt-label">재생</span>
       </button>
-      <button type="button" class="gt-btn" id="gt-path" aria-pressed="false" aria-label="두 글 사이 연결 경로 찾기">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="6" cy="18" r="2.4"></circle><circle cx="18" cy="6" r="2.4"></circle><path d="M8 16.4 16 7.6"></path></svg>
-        <span class="gt-label">경로 찾기</span>
+      <button type="button" class="gt-btn" id="gt-filter" aria-pressed="false" aria-expanded="false" aria-label="카테고리·연결 타입으로 거르기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"></path></svg>
+        <span class="gt-label">필터</span>
       </button>
     </div>
-    <div class="graph-banner" id="graph-banner" hidden></div>
+    <div class="graph-filter" id="graph-filter" role="group" aria-label="그래프 필터"></div>
     <div class="graph-zoom">
       <button type="button" class="gz-btn" data-zoom="in" aria-label="확대">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
@@ -320,94 +322,79 @@ const data = {
       return Math.max(0, Math.min(1, p * nodes.length - appearIndex.get(id)));
     };
 
-    // ---- 경로 찾기(A→B): 무방향 최단 경로를 BFS로 찾아 하이라이트 ----
-    let pathPicking = false;
-    let pathA = null;
-    let pathNodeSet = null;
-    let pathEdgeKeys = null;
-    let pathEnds = null;
+    // ---- 필터: 카테고리/연결 타입으로 거르기(그 종류만 밝게, 나머지 흐리게) ----
     const ekey = (x, y) => (x < y ? `${x}|${y}` : `${y}|${x}`);
-    const bannerEl = document.getElementById('graph-banner');
-    const setBanner = (html) => {
-      if (!bannerEl) return;
-      bannerEl.innerHTML = html || '';
-      bannerEl.hidden = !html;
-    };
-    const bfsPath = (aId, bId) => {
-      const prev = new Map([[aId, null]]);
-      const q = [aId];
-      while (q.length) {
-        const cur = q.shift();
-        if (cur === bId) break;
-        for (const nb of neighbors.get(cur) ?? []) {
-          if (!prev.has(nb)) {
-            prev.set(nb, cur);
-            q.push(nb);
-          }
-        }
-      }
-      if (!prev.has(bId)) return null;
-      const path = [];
-      let c = bId;
-      while (c != null) {
-        path.push(c);
-        c = prev.get(c);
-      }
-      return path.reverse();
-    };
-    const setPath = (ids) => {
-      pathNodeSet = new Set(ids);
-      pathEnds = new Set([ids[0], ids[ids.length - 1]]);
-      pathEdgeKeys = new Set();
-      for (let i = 0; i < ids.length - 1; i++) pathEdgeKeys.add(ekey(ids[i], ids[i + 1]));
-    };
-    const clearPath = () => {
-      pathPicking = false;
-      pathA = null;
-      pathNodeSet = null;
-      pathEdgeKeys = null;
-      pathEnds = null;
-      document.getElementById('gt-path')?.setAttribute('aria-pressed', 'false');
-      canvas.style.cursor = 'default';
-      setBanner('');
-    };
-    const startPathPick = () => {
-      playing = false;
-      clearPath();
-      pathPicking = true;
-      document.getElementById('gt-path')?.setAttribute('aria-pressed', 'true');
-      canvas.style.cursor = 'crosshair';
-      setBanner('출발할 글을 누르세요 <button type="button" class="gb-clear">취소</button>');
-      draw();
-    };
-    const handlePathPick = (n) => {
-      if (!pathA) {
-        pathA = n;
-        selected = n;
-        setBanner('도착할 글을 누르세요 <button type="button" class="gb-clear">취소</button>');
+    let filterKind = null; // 'category' | 'edge'
+    let filterVal = null;
+    let ovSet = null; // 밝게 유지할 노드 id 집합. null이면 필터 없음
+    let ovEdgeKeys = null; // 밝게 유지할 엣지 키 집합
+    const filterPanel = document.getElementById('graph-filter');
+    let syncChips = () => {};
+
+    // dim 전환 애니 — 필터를 걸/풀 때 흐림을 툭 끊지 않고 부드럽게 오간다(0=전체 선명, 1=필터 적용).
+    let dimT = 0;
+    let dimTarget = 0;
+    let dimRAF = 0;
+    const animateDim = () => {
+      // 목표는 '필터가 걸려 있나'로 판단 — 해제 후에도 집합은 유지해 fade-out을 보여주고, 끝나면 정리한다.
+      dimTarget = filterKind ? 1 : 0;
+      if (reduceMotion) {
+        dimT = dimTarget;
+        if (!dimTarget) { ovSet = null; ovEdgeKeys = null; }
         draw();
         return;
       }
-      if (n.id === pathA.id) {
-        setBanner('다른 도착 글을 누르세요 <button type="button" class="gb-clear">취소</button>');
+      if (dimRAF) return; // 이미 진행 중이면 목표만 바꿔 이어 달린다
+      const stepD = () => {
+        dimT += (dimTarget - dimT) * 0.22;
+        if (Math.abs(dimTarget - dimT) < 0.008) {
+          dimT = dimTarget;
+          dimRAF = 0;
+          if (dimTarget === 0) { ovSet = null; ovEdgeKeys = null; } // 다 풀린 뒤 정리
+          draw();
+          return;
+        }
+        draw();
+        dimRAF = requestAnimationFrame(stepD);
+      };
+      dimRAF = requestAnimationFrame(stepD);
+    };
+
+    const clearFilter = () => {
+      filterKind = null;
+      filterVal = null;
+      syncChips();
+      // ovSet/ovEdgeKeys는 animateDim이 fade-out 끝에 정리(스냅 방지)
+    };
+    const applyFilter = (kind, val) => {
+      if (kind === 'all' || (filterKind === kind && filterVal === val)) {
+        clearFilter(); // '전체'거나 같은 칩 재클릭 → 해제
+        animateDim();
         return;
       }
-      const p = bfsPath(pathA.id, n.id);
-      if (p && p.length > 1) {
-        setPath(p);
-        pathPicking = false;
-        selected = null;
-        canvas.style.cursor = 'default';
-        setBanner(
-          `<b>${pathA.label}</b> → <b>${n.label}</b> · ${p.length - 1}단계 <button type="button" class="gb-clear">지우기</button>`,
-        );
+      playing = false; // 재생 중이면 멈춘다
+      filterKind = kind;
+      filterVal = val;
+      ovSet = new Set();
+      ovEdgeKeys = new Set();
+      if (kind === 'category') {
+        const bright = nodes.filter((n) => n.kind === 'post' && n.category === val).map((n) => n.id);
+        for (const id of bright) {
+          ovSet.add(id);
+          for (const nb of neighbors.get(id) ?? []) ovSet.add(nb); // 이웃(태그·연결 글)도 함께 보이게
+        }
+        for (const e of edges) if (ovSet.has(e.a.id) && ovSet.has(e.b.id)) ovEdgeKeys.add(ekey(e.a.id, e.b.id));
       } else {
-        setBanner('두 글이 연결돼 있지 않아요 <button type="button" class="gb-clear">닫기</button>');
-        pathPicking = false;
-        pathA = null;
-        canvas.style.cursor = 'default';
+        // 연결 타입
+        for (const e of edges)
+          if (e.type === val) {
+            ovEdgeKeys.add(ekey(e.a.id, e.b.id));
+            ovSet.add(e.a.id);
+            ovSet.add(e.b.id);
+          }
       }
-      draw();
+      syncChips();
+      animateDim();
     };
 
     const draw = () => {
@@ -415,12 +402,15 @@ const data = {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(dpr * view.scale, 0, 0, dpr * view.scale, dpr * view.tx, dpr * view.ty);
-      // 재생 중엔 hover·경로 강조를 끈다(등장 연출만). 경로가 있으면 경로 집합이 강조 기준.
-      const hl = playing ? null : pathNodeSet ? { set: pathNodeSet } : highlightSet();
+      // 우선순위: 재생(등장 연출) > 필터(dimT 전환) > hover 강조.
+      const hoverHl = !playing && dimT <= 0 ? highlightSet() : null;
       const fade = (id) => {
-        let f = hl && !hl.set.has(id) ? 0.14 : 1;
-        if (playing) f *= revealOf(id);
-        return f;
+        if (playing) return revealOf(id);
+        if (dimT > 0) {
+          const member = !ovSet || ovSet.has(id); // 밝게 유지할 집합
+          return 1 + ((member ? 1 : 0.14) - 1) * dimT; // dimT 0→1: 1 → (member?1:0.14)
+        }
+        return hoverHl && !hoverHl.set.has(id) ? 0.14 : 1;
       };
 
       for (const e of edges) {
@@ -431,13 +421,15 @@ const data = {
         const stroke = faint ? colors.muted : colors.edge[e.type] || colors.accent;
         // 형태: 언급·태그는 잔점선, 반박(contradicts)은 긴 점선(색 없이도 '긴장'을 구분), 그 외 실선.
         const dash = faint ? [4, 4] : e.type === 'contradicts' ? [9, 5] : [];
-        // 경로 모드면 경로 위 엣지만 강조, 아니면 강조집합 양끝이 걸린 엣지.
-        const strong = pathEdgeKeys
-          ? pathEdgeKeys.has(ekey(e.a.id, e.b.id))
-          : hl && hl.set.has(e.a.id) && hl.set.has(e.b.id);
+        // 필터 모드면 필터에 든 엣지만 강조, 아니면 강조집합 양끝이 걸린 엣지.
+        const strong = ovEdgeKeys
+          ? ovEdgeKeys.has(ekey(e.a.id, e.b.id))
+          : hoverHl && hoverHl.set.has(e.a.id) && hoverHl.set.has(e.b.id);
         let alpha = Math.min(fade(e.a.id), fade(e.b.id)) * (faint ? 0.45 : 0.95);
-        if (pathEdgeKeys && !strong) alpha = Math.min(alpha, 0.06); // 경로 아닌 엣지는 더 흐리게
-        if (playing) alpha *= Math.min(revealOf(e.a.id), revealOf(e.b.id));
+        // 필터에 안 든 엣지는 더 흐리게 — dimT로 부드럽게 전환(스냅 방지). 재생 중엔 fade가 이미 등장도 반영.
+        if (ovEdgeKeys && !strong && dimT > 0) {
+          alpha = alpha * (1 - dimT) + Math.min(alpha, 0.06) * dimT;
+        }
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.strokeStyle = stroke;
@@ -466,11 +458,10 @@ const data = {
           ctx.lineWidth = 1.2;
           ctx.stroke();
         }
-        // 강조 링 — 호버·키보드 선택·URL 포커스·경로 양끝(글·태그 공통)
+        // 강조 링 — 호버·키보드 선택·URL 포커스된 노드(글·태그 공통)
         if (
           (hovered && hovered.id === n.id) ||
           (selected && selected.id === n.id) ||
-          (pathEnds && pathEnds.has(n.id)) ||
           (!focusTouched && focusId === n.id)
         ) {
           ctx.strokeStyle = colors.accent;
@@ -654,13 +645,13 @@ const data = {
         focusTouched = true;
         // 잡은 노드를 강조로 고정 — 모바일(호버 없음)에서도 데스크톱 호버처럼 노드+연결이 강조된다.
         // 터치에서만: 데스크톱은 호버가 강조를 담당하므로, 드래그 재배치 후 강조가 고착되지 않게 둔다.
-        if (!pathPicking && ev.pointerType === 'touch') selected = n;
+        if (ev.pointerType === 'touch') selected = n;
         try { canvas.setPointerCapture(ev.pointerId); } catch {}
         wake();
         draw();
       } else {
-        // 빈 곳 탭 = 강조 해제(모바일 포함). 경로 지정 중엔 유지.
-        if (selected && !pathPicking) {
+        // 빈 곳 탭 = 강조 해제(모바일 포함).
+        if (selected) {
           selected = null;
           draw();
         }
@@ -749,11 +740,7 @@ const data = {
       const wasPan = panStart && ev.pointerId === panStart.pointerId;
       dropPointer(ev);
       if (wasDrag) {
-        if (dragging && !moved) {
-          // 안 움직였으면 탭 — 경로 지정 중이면 노드 선택, 아니면 그 글로 이동
-          if (pathPicking) handlePathPick(dragging);
-          else location.href = dragging.url;
-        }
+        if (dragging && !moved) location.href = dragging.url; // 안 움직였으면 탭 = 글로 이동
         dragging = null;
         dragStart = null;
         wake();
@@ -909,7 +896,9 @@ const data = {
     const playBtn = document.getElementById('gt-play');
     playBtn?.addEventListener('click', () => {
       if (playing) { playing = false; draw(); return; }
-      clearPath();
+      clearFilter();
+      if (dimRAF) { cancelAnimationFrame(dimRAF); dimRAF = 0; }
+      dimT = 0; ovSet = null; ovEdgeKeys = null; // 필터 흔적 즉시 제거(재생은 전체 등장)
       hovered = null;
       selected = null;
       focusTouched = true; // URL focus 강조도 끄고 순수 등장만
@@ -933,28 +922,58 @@ const data = {
       requestAnimationFrame(step);
     });
 
-    // 경로 찾기 토글
-    document.getElementById('gt-path')?.addEventListener('click', () => {
-      if (pathNodeSet || pathPicking) { clearPath(); draw(); return; }
-      startPathPick();
+    // 필터 패널 만들기(카테고리 + 연결 타입 칩). 색은 readColors 뒤라야 하므로 restart 뒤에 부른다.
+    const filterBtn = document.getElementById('gt-filter');
+    const buildFilterPanel = () => {
+      if (!filterPanel) return;
+      const cats = [...new Set(nodes.filter((n) => n.kind === 'post' && n.category).map((n) => n.category))];
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      let html = '<div class="gf-group"><span class="gf-title">카테고리</span><div class="gf-chips">';
+      html += '<button type="button" class="gf-chip gf-all" data-kind="all" data-val="">전체</button>';
+      for (const c of cats)
+        html += `<button type="button" class="gf-chip" data-kind="category" data-val="${esc(c)}" aria-pressed="false">${esc(c)}</button>`;
+      html += '</div></div><div class="gf-group"><span class="gf-title">연결 타입</span><div class="gf-chips">';
+      for (const k of EDGE_KINDS)
+        html += `<button type="button" class="gf-chip gf-edge" data-kind="edge" data-val="${k}" aria-pressed="false" style="--chip:${colors.edge[k] || colors.accent}"><span class="gf-sw" aria-hidden="true"></span>${esc(data.edgeLabels?.[k] || k)}</button>`;
+      html += '</div></div>';
+      filterPanel.innerHTML = html;
+      syncChips = () => {
+        for (const chip of filterPanel.querySelectorAll('.gf-chip')) {
+          if (chip.dataset.kind === 'all') continue;
+          chip.setAttribute('aria-pressed', String(chip.dataset.kind === filterKind && chip.dataset.val === filterVal));
+        }
+      };
+    };
+    const setPanelOpen = (open) => {
+      filterPanel.dataset.open = String(open);
+      filterBtn?.setAttribute('aria-expanded', String(open));
+      filterBtn?.setAttribute('aria-pressed', String(open));
+    };
+    filterPanel?.addEventListener('click', (ev) => {
+      const chip = ev.target.closest('.gf-chip');
+      if (chip) applyFilter(chip.dataset.kind, chip.dataset.val);
     });
-
-    // 배너의 '지우기/취소/닫기' 버튼(위임)
-    bannerEl?.addEventListener('click', (ev) => {
-      if (ev.target.closest('.gb-clear')) { clearPath(); draw(); }
+    filterBtn?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      setPanelOpen(filterPanel.dataset.open !== 'true');
+    });
+    // 바깥을 누르면 패널을 닫는다(칩·버튼 클릭은 제외)
+    document.addEventListener('pointerdown', (ev) => {
+      if (filterPanel.dataset.open !== 'true') return;
+      if (ev.target.closest('#graph-filter') || ev.target.closest('#gt-filter')) return;
+      setPanelOpen(false);
     });
 
     restart();
+    buildFilterPanel();
 
     // 개발·테스트용 좌표 핸들 (외부 의존 없음)
     window.__injoyGraph = {
       nodes, view, baseView, homeView, fit: () => { fitToBbox(); draw(); },
       // 테스트 훅
-      _bfs: (a, b) => bfsPath(a, b),
-      _pick: (n) => handlePathPick(byId.get(n)),
-      _startPath: startPathPick,
+      _filter: (kind, val) => applyFilter(kind, val),
       _play: () => playBtn?.click(),
-      _state: () => ({ playing, pathPicking, pathA: pathA?.id ?? null, path: pathNodeSet ? [...pathNodeSet] : null }),
+      _state: () => ({ playing, filterKind, filterVal, bright: ovSet ? ovSet.size : null }),
     };
   })();
 </script>
@@ -1138,47 +1157,6 @@ const data = {
     }
   }
 
-  /* 경로/재생 상태 배너 — 좌상단 도구 아래 */
-  .graph-banner {
-    position: absolute;
-    left: 10px;
-    top: 52px;
-    z-index: 2;
-    max-width: calc(100% - 20px);
-    display: inline-flex;
-    align-items: center;
-    gap: 0.6em;
-    padding: 0.4em 0.8em;
-    background-color: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 0.82rem;
-    color: var(--text);
-    box-shadow: 0 2px 10px rgb(0 0 0 / 10%);
-  }
-
-  .graph-banner[hidden] {
-    display: none;
-  }
-
-  .graph-banner .gb-clear {
-    flex-shrink: 0;
-    font: inherit;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 0.1em 0.6em;
-    cursor: pointer;
-  }
-
-  .graph-banner .gb-clear:hover {
-    color: var(--accent);
-    border-color: var(--accent);
-  }
-
   .legend {
     margin: 0.9rem 0 0;
     padding: 0;
@@ -1311,5 +1289,129 @@ const data = {
   .noscript-note {
     margin-top: 1rem;
     color: var(--text-muted);
+  }
+</style>
+
+<style is:global>
+  /* 필터 팝오버 — 칩은 JS(innerHTML)로 만들어 Astro 스코프가 안 붙으므로 전역으로 정의한다.
+     좌상단 도구 아래에서 스르륵 열리고, 칩은 순서대로 살짝 떠오른다. */
+  .graph-filter {
+    position: absolute;
+    left: 10px;
+    top: 52px;
+    z-index: 3;
+    max-width: calc(100% - 20px);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75em;
+    padding: 0.85em 0.95em;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgb(0 0 0 / 20%);
+    transform-origin: top left;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+    pointer-events: none;
+    transition:
+      opacity 0.2s cubic-bezier(0.33, 1, 0.68, 1),
+      transform 0.2s cubic-bezier(0.33, 1, 0.68, 1);
+  }
+
+  .graph-filter[data-open='true'] {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  .graph-filter .gf-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+  }
+
+  .graph-filter .gf-title {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  .graph-filter .gf-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4em;
+    max-width: 300px;
+  }
+
+  .graph-filter .gf-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.28em 0.78em;
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease,
+      background-color 0.15s ease,
+      transform 0.2s cubic-bezier(0.33, 1, 0.68, 1),
+      opacity 0.2s ease;
+  }
+
+  .graph-filter:not([data-open='true']) .gf-chip {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  .graph-filter[data-open='true'] .gf-chip:nth-child(1) { transition-delay: 0.02s; }
+  .graph-filter[data-open='true'] .gf-chip:nth-child(2) { transition-delay: 0.05s; }
+  .graph-filter[data-open='true'] .gf-chip:nth-child(3) { transition-delay: 0.08s; }
+  .graph-filter[data-open='true'] .gf-chip:nth-child(4) { transition-delay: 0.11s; }
+  .graph-filter[data-open='true'] .gf-chip:nth-child(n + 5) { transition-delay: 0.14s; }
+
+  .graph-filter .gf-chip:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .graph-filter .gf-chip[aria-pressed='true'] {
+    color: var(--accent);
+    border-color: var(--accent);
+    background-color: var(--accent-weak);
+  }
+
+  .graph-filter .gf-chip.gf-all {
+    color: var(--text-muted);
+  }
+
+  .graph-filter .gf-chip.gf-all:hover {
+    color: var(--accent);
+  }
+
+  .graph-filter .gf-sw {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background-color: var(--chip, var(--accent));
+    flex-shrink: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .graph-filter,
+    .graph-filter .gf-chip {
+      transition: none;
+    }
+
+    .graph-filter:not([data-open='true']) {
+      transform: none;
+    }
   }
 </style>
