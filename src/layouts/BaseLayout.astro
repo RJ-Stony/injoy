@@ -38,12 +38,16 @@ const buildSha = process.env.GITHUB_SHA ?? '';
     <meta name="generator" content={Astro.generator} />
     <meta name="injoy:build" content={buildSha} />
 
-    <!-- FOUC 방지: 저장된 테마 선택을 첫 페인트 전에 적용 -->
-    <script is:inline>
+    <!-- FOUC 방지: 저장된 테마 + 집중 읽기 모드를 첫 페인트 전에 적용.
+         집중모드는 글 상세(article)에서만 복원한다(목록·그래프에서 헤더가 사라지면 안 됨). -->
+    <script is:inline define:vars={{ isArticle: ogType === 'article' }}>
       (() => {
         const stored = localStorage.getItem('theme');
         if (stored === 'light' || stored === 'dark') {
           document.documentElement.dataset.theme = stored;
+        }
+        if (isArticle && localStorage.getItem('focus-read') === '1') {
+          document.documentElement.dataset.focus = 'true';
         }
       })();
     </script>

@@ -83,10 +83,16 @@
   };
 
   // 3) 집중 읽기 모드 — data-focus 토글. 숨김은 전역 CSS가 담당.
+  //    상태를 localStorage에 남겨 글을 넘겨도 유지된다(BaseLayout이 첫 페인트 전 복원, 글 상세만).
   const setFocus = (on: boolean) => {
-    if (on) document.documentElement.dataset.focus = 'true';
-    else delete document.documentElement.dataset.focus;
-    if (on) setOpen(false); // 집중 진입 시 다이얼은 닫는다
+    if (on) {
+      document.documentElement.dataset.focus = 'true';
+      localStorage.setItem('focus-read', '1');
+      setOpen(false); // 집중 진입 시 다이얼은 닫는다
+    } else {
+      delete document.documentElement.dataset.focus;
+      localStorage.removeItem('focus-read');
+    }
   };
 
   fab?.addEventListener('click', () => {
