@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="한 세션에서 더한 읽기 컨트롤과 그래프 필터">
+  <rect width="640" height="360" rx="16" fill="#F6F7F9"/>
+
+  <!-- 머리: 카테고리 칩 + 메타 -->
+  <rect x="40" y="32" width="560" height="52" rx="12" fill="#FFFFFF" stroke="#E8EAED"/>
+  <rect x="60" y="50" width="52" height="20" rx="10" fill="#EAF1FE"/>
+  <text x="86" y="65" font-family="sans-serif" font-size="12" font-weight="600" fill="#2F6FED" text-anchor="middle">블로그</text>
+  <text x="124" y="65" font-family="sans-serif" font-size="12.5" fill="#6B7178">· 2026. 7. 3. · 다듬기 4회차</text>
+
+  <!-- 제목 바 -->
+  <rect x="40" y="98" width="560" height="42" rx="10" fill="#1A1B1E" opacity="0.92"/>
+  <text x="60" y="124" font-family="sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">읽기 컨트롤부터 그래프 필터까지</text>
+
+  <!-- 왼쪽: 필터가 걸린 미니 그래프 -->
+  <rect x="40" y="156" width="300" height="168" rx="12" fill="#FFFFFF" stroke="#E8EAED"/>
+  <text x="58" y="180" font-family="sans-serif" font-size="11" font-weight="700" fill="#6B7178" letter-spacing="0.5">GRAPH</text>
+  <!-- 흐린(필터 밖) 엣지 -->
+  <g stroke="#E8EAED" stroke-width="1.5">
+    <line x1="120" y1="232" x2="95" y2="290"/>
+    <line x1="250" y1="238" x2="292" y2="285"/>
+    <line x1="188" y1="210" x2="292" y2="285"/>
+  </g>
+  <!-- 강조(필터 안) 엣지 -->
+  <g stroke="#2F6FED" stroke-width="2.4">
+    <line x1="188" y1="210" x2="120" y2="232"/>
+    <line x1="188" y1="210" x2="250" y2="238"/>
+    <line x1="120" y1="232" x2="180" y2="288"/>
+  </g>
+  <!-- 흐린 노드 -->
+  <g fill="#FFFFFF" stroke="#C9CDD2" stroke-width="1.5">
+    <circle cx="95" cy="290" r="7"/>
+    <circle cx="292" cy="285" r="7"/>
+  </g>
+  <!-- 강조 노드 -->
+  <circle cx="188" cy="210" r="11" fill="#2F6FED"/>
+  <circle cx="120" cy="232" r="10" fill="#2F6FED"/>
+  <circle cx="250" cy="238" r="9" fill="#5B8DEF"/>
+  <circle cx="180" cy="288" r="9" fill="#5B8DEF"/>
+
+  <!-- 오른쪽: 필터 칩 + 스피드다이얼 -->
+  <rect x="356" y="156" width="244" height="168" rx="12" fill="#FFFFFF" stroke="#E8EAED"/>
+  <text x="374" y="180" font-family="sans-serif" font-size="11" font-weight="700" fill="#6B7178" letter-spacing="0.5">FILTER</text>
+
+  <!-- 카테고리 칩 -->
+  <rect x="374" y="192" width="52" height="24" rx="12" fill="#EAF1FE" stroke="#2F6FED"/>
+  <text x="400" y="208" font-family="sans-serif" font-size="12" font-weight="600" fill="#2F6FED" text-anchor="middle">블로그</text>
+  <rect x="434" y="192" width="40" height="24" rx="12" fill="#FFFFFF" stroke="#E8EAED"/>
+  <text x="454" y="208" font-family="sans-serif" font-size="12" font-weight="600" fill="#1A1B1E" text-anchor="middle">AI</text>
+
+  <!-- 연결 타입 칩(색 스와치) -->
+  <g font-family="sans-serif" font-size="11.5" font-weight="600">
+    <rect x="374" y="226" width="66" height="22" rx="11" fill="#FFFFFF" stroke="#E8EAED"/>
+    <circle cx="388" cy="237" r="4.5" fill="#2F6FED"/>
+    <text x="398" y="241" fill="#1A1B1E">확장</text>
+    <rect x="448" y="226" width="72" height="22" rx="11" fill="#FFFFFF" stroke="#E8EAED"/>
+    <circle cx="462" cy="237" r="4.5" fill="#1F9D6B"/>
+    <text x="472" y="241" fill="#1A1B1E">뒷받침</text>
+    <rect x="374" y="254" width="66" height="22" rx="11" fill="#FFFFFF" stroke="#E8EAED"/>
+    <circle cx="388" cy="265" r="4.5" fill="#CF222E"/>
+    <text x="398" y="269" fill="#1A1B1E">반박</text>
+  </g>
+
+  <!-- 스피드다이얼(재생·공유·집중) -->
+  <circle cx="560" cy="292" r="20" fill="#2F6FED"/>
+  <circle cx="560" cy="284" r="1.9" fill="#FFFFFF"/>
+  <circle cx="560" cy="292" r="1.9" fill="#FFFFFF"/>
+  <circle cx="560" cy="300" r="1.9" fill="#FFFFFF"/>
+</svg>

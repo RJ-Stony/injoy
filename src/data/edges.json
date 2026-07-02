@@ -233,6 +233,12 @@
       "to": "polish-round-11",
       "type": "extends",
       "note": "새로고침마다 계속 튀던 그래프를 미리 정착시켜 가라앉힌 과정"
+    },
+    {
+      "from": "polish-round-13",
+      "to": "polish-round-12",
+      "type": "extends",
+      "note": "그래프를 가라앉힌 다음, 읽기 컨트롤부터 그래프 재생·필터까지 한 세션에서 네 갈래로 더한 과정"
     }
   ]
 }
