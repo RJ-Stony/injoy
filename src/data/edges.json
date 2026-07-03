@@ -239,6 +239,12 @@
       "to": "polish-round-12",
       "type": "extends",
       "note": "그래프를 가라앉힌 다음, 읽는 화면부터 그래프 재생/필터까지 한 세션에서 진행한 과정"
+    },
+    {
+      "from": "singleton-pattern",
+      "to": "welcome",
+      "type": "related",
+      "note": "첫 글에서 그리던 '개발' 카테고리로, 공부하며 정리하는 개발 공부 시리즈가 그 한 줄기로 들어오게 되었다"
     }
   ]
 }
