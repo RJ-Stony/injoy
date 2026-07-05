@@ -193,8 +193,13 @@
 
     // 다크/라이트 전환 시 다시 그린다 — transform은 dm-pan에 있어 view가 그대로 유지된다.
     let drawn = false;
+    // 확대 화면은 다이어그램 하나에 집중하므로 흐름 애니메이션을 늘 켠다(global.css .dm-diagram.flow-on).
     const rerender = () => {
-      if (dialog.open && drawn) renderMermaidDiagrams([diagram]).then(apply); // 새 svg에 현재 배율 다시 적용
+      if (dialog.open && drawn)
+        renderMermaidDiagrams([diagram]).then(() => {
+          diagram.classList.add('flow-on');
+          apply(); // 새 svg에 현재 배율 다시 적용
+        });
     };
     window.addEventListener('injoy:theme-change', rerender);
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rerender);
@@ -214,6 +219,7 @@
         document.body.style.overflow = 'hidden'; // 배경 스크롤 잠금(showModal 보강)
         dialog.showModal();
         await renderMermaidDiagrams([diagram]);
+        diagram.classList.add('flow-on'); // 엣지 흐름 애니메이션 켜기(global.css)
         drawn = true;
         fit();
       },
