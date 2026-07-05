@@ -52,6 +52,9 @@ async function doRender(containers: HTMLElement[]): Promise<void> {
     suppressErrorRendering: true,
     fontFamily: getComputedStyle(document.body).fontFamily,
     theme: 'base',
+    // 시퀀스 다이어그램의 노트·메시지 텍스트가 박스보다 길면 자동 줄바꿈한다.
+    // (안 켜면 'Note over A,B'가 두 액터 사이 폭으로 잡히고 긴 한글 노트가 박스 밖으로 넘친다)
+    sequence: { wrap: true },
     themeVariables: {
       darkMode: effectiveTheme() === 'dark',
       background: v('--surface'),
