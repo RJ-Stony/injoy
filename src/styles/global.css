@@ -727,6 +727,39 @@ a:hover {
   color: light-dark(#cf222e, #e5695e);
 }
 
+/* ---------- 코드 스텝 재생 (code-step-player.ts) ---------- */
+/* 강조가 줄 전체 너비를 덮도록 .highlighted와 같은 폭 트릭을 쓴다.
+   재생 강조가 [!code highlight] 배경을 이기게 뒤에 선언한다(같은 특이도, 후순위 승). */
+.code-block .line.cs-on,
+.code-block .line.cs-past {
+  display: inline-block;
+  width: calc(100% + 2.8em);
+  margin-inline: -1.4em;
+  padding-inline: 1.4em;
+}
+
+.code-block .line.cs-on {
+  background-color: var(--accent-weak);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.code-block .line.cs-past {
+  background-color: color-mix(in srgb, var(--accent-weak) 40%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .code-block .line {
+    transition: background-color 0.25s ease, box-shadow 0.25s ease;
+  }
+}
+
+/* 코드 블록 하단 재생 바 - 스크롤 영역 밖. 헤더 바와 같은 표면색. */
+.code-block .cs-transport {
+  padding: 0.55rem 0.9rem;
+  margin-top: 0;
+  background-color: var(--surface);
+}
+
 /* 수식 (KaTeX) — 긴 수식은 가로 스크롤 */
 .prose .katex-display {
   overflow-x: auto;

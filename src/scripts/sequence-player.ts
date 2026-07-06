@@ -58,13 +58,55 @@ const btn = (label: string, path: string, cls = '') => {
   return b;
 };
 
-const PATHS = {
+export const PLAYER_PATHS = {
   restart: 'M4 4v6h6M4 10a8 8 0 1 1-1 6',
   prev: 'M15 6l-6 6 6 6',
   play: 'M8 5.5v13l11-6.5z',
   pause: 'M7 5h4v14H7zM13 5h4v14h-4z',
   next: 'M9 6l6 6-6 6',
 };
+
+const PATHS = PLAYER_PATHS;
+
+/** 트랜스포트 바 조각 — 시퀀스 재생과 코드 스텝 재생이 같은 시각·라벨을 쓰도록 공유한다. */
+export interface TransportBar {
+  bar: HTMLDivElement;
+  restartB: HTMLButtonElement;
+  prevB: HTMLButtonElement;
+  playB: HTMLButtonElement;
+  nextB: HTMLButtonElement;
+  dots: HTMLSpanElement;
+  counter: HTMLSpanElement;
+  setPlayIcon(playing: boolean, atEnd: boolean): void;
+}
+
+/**
+ * 트랜스포트 바 DOM 생성(버튼 4개 + 점 + 카운터).
+ * 스타일은 global.css의 .sq-* 를 그대로 쓴다. 상태 기계는 호출부가 붙인다.
+ */
+export function createTransportBar(ariaLabel: string): TransportBar {
+  const bar = document.createElement('div');
+  bar.className = 'sq-transport';
+  bar.setAttribute('role', 'group');
+  bar.setAttribute('aria-label', ariaLabel);
+  const restartB = btn('처음부터 재생', PATHS.restart);
+  const prevB = btn('이전 단계', PATHS.prev);
+  const playB = btn('재생', PATHS.play, 'sq-play');
+  const nextB = btn('다음 단계', PATHS.next);
+  const dots = document.createElement('span');
+  dots.className = 'sq-dots';
+  dots.setAttribute('aria-hidden', 'true');
+  const counter = document.createElement('span');
+  counter.className = 'sq-counter';
+  bar.append(restartB, prevB, playB, nextB, dots, counter);
+
+  const setPlayIcon = (playing: boolean, atEnd: boolean) => {
+    playB.querySelector('path')!.setAttribute('d', playing ? PATHS.pause : PATHS.play);
+    playB.setAttribute('aria-label', playing ? '일시정지' : atEnd ? '다시 재생' : '재생');
+  };
+
+  return { bar, restartB, prevB, playB, nextB, dots, counter, setPlayIcon };
+}
 
 export function attachSequencePlayer(host: HTMLElement, diagram: HTMLElement): SequencePlayer | null {
   let steps: Step[] = [];
@@ -79,21 +121,9 @@ export function attachSequencePlayer(host: HTMLElement, diagram: HTMLElement): S
   if (steps.length < 2) return null;
   cur = steps.length;
 
-  // ---- 트랜스포트 바 (JS DOM -> 스타일은 global.css) ----
-  const bar = document.createElement('div');
-  bar.className = 'sq-transport';
-  bar.setAttribute('role', 'group');
-  bar.setAttribute('aria-label', '시퀀스 재생');
-  const restartB = btn('처음부터 재생', PATHS.restart);
-  const prevB = btn('이전 단계', PATHS.prev);
-  const playB = btn('재생', PATHS.play, 'sq-play');
-  const nextB = btn('다음 단계', PATHS.next);
-  const dots = document.createElement('span');
-  dots.className = 'sq-dots';
-  dots.setAttribute('aria-hidden', 'true');
-  const counter = document.createElement('span');
-  counter.className = 'sq-counter';
-  bar.append(restartB, prevB, playB, nextB, dots, counter);
+  // ---- 트랜스포트 바 (공유 헬퍼로 생성 -> 스타일은 global.css) ----
+  const transport = createTransportBar('시퀀스 재생');
+  const { bar, restartB, prevB, playB, nextB, dots, counter } = transport;
   host.append(bar);
 
   const buildDots = () => {
@@ -108,8 +138,7 @@ export function attachSequencePlayer(host: HTMLElement, diagram: HTMLElement): S
   };
 
   const setPlayIcon = (playing: boolean) => {
-    playB.querySelector('path')!.setAttribute('d', playing ? PATHS.pause : PATHS.play);
-    playB.setAttribute('aria-label', playing ? '일시정지' : cur >= steps.length ? '다시 재생' : '재생');
+    transport.setPlayIcon(playing, cur >= steps.length);
   };
 
   const render = () => {

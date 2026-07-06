@@ -68,6 +68,43 @@ const fenceTitle = {
   },
 };
 
+// [!code step:N] 마커 → 그 줄에 data-step="N"을 달고 마커 텍스트는 지운다.
+// 코드 실행 순서 재생(code-step-player.ts)이 소비한다. 주석 문법은 언어를 따른다
+// (파이썬 #, JS //, CSS/블록 주석 등). 마커만 있던 주석 여는 기호가 덜렁 남으면 함께 지운다.
+const STEP_RE = /(?:\/\/|#|--|;|%|\/\*|<!--|"|')?\s*\[!code step:(\d{1,2})\]\s*(?:\*\/|-->)?\s*$/;
+const transformerCodeSteps = () => ({
+  name: 'injoy:code-steps',
+  code(node) {
+    for (const line of node.children) {
+      if (line.type !== 'element') continue;
+      // 줄 안의 텍스트 노드를 순서대로 모은다(Shiki는 토큰 span 안에 텍스트를 둔다).
+      const texts = [];
+      const collect = (el) => {
+        for (const c of el.children ?? []) {
+          if (c.type === 'text') texts.push(c);
+          else if (c.type === 'element') collect(c);
+        }
+      };
+      collect(line);
+      // 마커는 줄 끝에 온다 — 마지막 텍스트 노드부터 뒤로 훑는다.
+      for (let i = texts.length - 1; i >= 0; i--) {
+        const m = texts[i].value.match(STEP_RE);
+        if (!m) {
+          // 뒤쪽에 공백만 있는 노드는 건너뛰고 더 앞을 본다.
+          if (/^\s*$/.test(texts[i].value)) continue;
+          break;
+        }
+        line.properties['data-step'] = m[1];
+        texts[i].value = texts[i].value.slice(0, m.index);
+        // 마커를 지운 뒤 그 줄 끝에 남은 텍스트 노드들이 공백뿐이면 함께 비워
+        // 주석 여는 기호(예: 파이썬 '#')가 덜렁 남지 않게 한다.
+        for (let j = i + 1; j < texts.length; j++) texts[j].value = '';
+        break;
+      }
+    }
+  },
+});
+
 // https://astro.build/config
 export default defineConfig({
   site: SITE,
@@ -106,7 +143,7 @@ export default defineConfig({
         dark: 'github-dark',
       },
       // 코드블록 주석 표기: [!code highlight], [!code ++], [!code --]
-      transformers: [transformerNotationDiff(), transformerNotationHighlight(), fenceTitle],
+      transformers: [transformerNotationDiff(), transformerNotationHighlight(), fenceTitle, transformerCodeSteps()],
     },
   },
 });
