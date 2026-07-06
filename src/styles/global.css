@@ -777,6 +777,18 @@ a:hover {
   }
 }
 
+/* ---------- 본문 블록 은은한 등장 ([slug].astro 스크립트가 부여) ---------- */
+.prose > .scrolly-block {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.prose > .scrolly-block.in-view {
+  opacity: 1;
+  transform: none;
+}
+
 /* ---------- 시퀀스 스텝 재생 (sequence-player.ts가 만드는 DOM) ---------- */
 .sq-hidden {
   opacity: 0;

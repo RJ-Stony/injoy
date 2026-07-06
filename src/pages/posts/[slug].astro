@@ -549,6 +549,37 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
       };
     });
   })();
+
+  // 본문 블록 은은한 등장 - 스크롤로 새 블록이 들어올 때 살짝 fade-up (1회성).
+  // 처음부터 뷰포트 안에 있는 블록은 숨기지 않는다(로드 플래시 방지).
+  // reduced-motion 또는 IO 미지원이면 통째로 건너뛴다(전부 즉시 표시).
+  if (
+    !matchMedia('(prefers-reduced-motion: reduce)').matches &&
+    'IntersectionObserver' in window
+  ) {
+    const prose = document.querySelector<HTMLElement>('.prose');
+    if (prose) {
+      const blocks = [...prose.children] as HTMLElement[];
+      const fold = innerHeight * 1.15;
+      const below = blocks.filter((b) => b.getBoundingClientRect().top > fold);
+      if (below.length > 0) {
+        const io = new IntersectionObserver(
+          (entries) => {
+            for (const e of entries) {
+              if (!e.isIntersecting) continue;
+              e.target.classList.add('in-view');
+              io.unobserve(e.target);
+            }
+          },
+          { rootMargin: '0px 0px -4% 0px' },
+        );
+        for (const b of below) {
+          b.classList.add('scrolly-block');
+          io.observe(b);
+        }
+      }
+    }
+  }
 </script>
 
 <style>
