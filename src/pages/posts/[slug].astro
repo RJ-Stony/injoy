@@ -192,7 +192,8 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
 <script>
   // ```mermaid 코드블록 → 다이어그램 렌더 (라이트/다크 테마 연동, CDN 지연 로드)
   // 렌더 설정은 /write 미리보기와 공유한다 (src/scripts/mermaid-render.ts)
-  import { renderMermaidDiagrams } from '../../scripts/mermaid-render';
+  import { renderMermaidDiagrams, isSequenceSource } from '../../scripts/mermaid-render';
+  import { attachSequencePlayer, type SequencePlayer } from '../../scripts/sequence-player';
   import { SMOOTH_DURATION, SMOOTH_EASING } from '../../scripts/smooth-details';
 
   const mermaidBlocks = document.querySelectorAll<HTMLPreElement>(
@@ -223,10 +224,23 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
       containers.push(div);
     }
 
-    const renderAll = () => renderMermaidDiagrams(containers);
+    const players = new Map<HTMLElement, SequencePlayer>();
+    const renderAll = () =>
+      renderMermaidDiagrams(containers).then(() => {
+        for (const c of containers) {
+          if (!isSequenceSource(c.dataset.source ?? '')) continue;
+          const existing = players.get(c);
+          if (existing) existing.refresh();
+          else {
+            // 트랜스포트 바는 .mermaid-diagram의 형제(.diagram-wrap 자식)로 - innerHTML 교체에 안 지워진다
+            const p = attachSequencePlayer(c.parentElement as HTMLElement, c);
+            if (p) players.set(c, p);
+          }
+        }
+      });
     renderAll();
-    window.addEventListener('injoy:theme-change', renderAll);
-    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll);
+    window.addEventListener('injoy:theme-change', () => void renderAll());
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => void renderAll());
 
     // 엣지 흐름 애니메이션 — 화면에 보이는 다이어그램만 방향대로 대시가 흐른다(off-screen은 일시정지).
     // 클래스만 토글하고 실제 모션은 CSS가 담당(모션 줄이기면 CSS가 정지). 테마 재렌더로 svg가 갈려도

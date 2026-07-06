@@ -725,6 +725,101 @@ a:hover {
   }
 }
 
+/* ---------- 시퀀스 스텝 재생 (sequence-player.ts가 만드는 DOM) ---------- */
+.sq-hidden {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .diagram-wrap svg :is(text.messageText, .messageLine0, .messageLine1, rect.note, text.noteText, [class*='activation']),
+  .dm-diagram svg :is(text.messageText, .messageLine0, .messageLine1, rect.note, text.noteText, [class*='activation']) {
+    transition: opacity 0.3s ease;
+  }
+}
+
+.sq-transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding-top: 0.6rem;
+  margin-top: 0.4rem;
+  border-top: 1px solid var(--border);
+}
+
+.sq-btn {
+  width: 2.1rem;
+  height: 2.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background-color: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.sq-btn:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.sq-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.sq-btn svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sq-btn.sq-play {
+  width: 2.5rem;
+  height: 2.5rem;
+  background-color: var(--accent-weak);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sq-btn.sq-play svg {
+  fill: currentColor;
+  stroke: none;
+}
+
+.sq-dots {
+  display: inline-flex;
+  gap: 5px;
+  margin-inline: 0.3rem;
+}
+
+.sq-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--border);
+  transition: background-color 0.2s ease;
+}
+
+.sq-dot.on {
+  background-color: var(--accent);
+}
+
+.sq-counter {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2em;
+}
+
 /* 다이어그램 래퍼 + 우상단 '확대' 버튼(모달 열기). JS 생성 DOM이라 전역.
    복사 버튼처럼 평소엔 숨고 hover/focus 때만 떠 다이어그램 우상단 노드를 안 가린다. */
 .prose .diagram-wrap {
