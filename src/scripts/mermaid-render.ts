@@ -15,6 +15,78 @@ export const effectiveTheme = (): 'light' | 'dark' => {
   return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
 
+/**
+ * 시퀀스 다이어그램 소스인지 판별한다 - %% 주석과 앞 공백을 걷어내고 첫 키워드를 본다.
+ * (Task 2가 시퀀스 전용 후처리를 걸 때도 이 판별을 재사용한다.)
+ */
+export function isSequenceSource(source: string): boolean {
+  return /^\s*sequenceDiagram/.test(source.replace(/^\s*%%.*$/gm, '').trimStart());
+}
+
+/**
+ * 시퀀스 노트·액터 텍스트를 박스 실측 중앙으로 보정한다.
+ * mermaid의 wrap 배치와 dominant-baseline 처리가 브라우저(특히 iOS Safari)에 따라
+ * 텍스트를 박스 위/아래로 치우치게 잡는 것을, 렌더 후 bbox 차이만큼 되돌린다.
+ * 브라우저 실측 기준이라 원인(wrap이든 baseline이든)과 무관하게 결정적이고,
+ * 어긋남이 없는 환경(Chromium 등)에서는 1px 미만이라 손대지 않는다(no-op).
+ *
+ * DOM 구조(Step 1 실측): 노트/액터는 각각 자기 <g> 안에 rect + text 형제로 들어간다.
+ * - 노트: <g> > rect.note + text.noteText (긴 노트는 줄마다 text.noteText 가 여러 개)
+ * - 액터: <g> > rect.actor + text.actor
+ * 여러 줄 노트는 줄 간격을 유지해야 하므로, 줄 묶음(block)의 중앙을 기준으로
+ * 모든 줄을 같은 delta로 옮긴다(줄마다 따로 중앙에 맞추면 줄이 겹친다).
+ */
+function recenterSequenceText(
+  container: HTMLElement,
+  scaleOf: (svg: SVGSVGElement) => number,
+  prependTranslate: (el: SVGGraphicsElement, dx: number, dy: number) => void,
+): void {
+  const svg = container.querySelector('svg');
+  if (!svg) return;
+  const scale = scaleOf(svg);
+
+  // 노트: rect.note 마다 같은 <g> 안의 text.noteText 줄들을 묶어 블록 중앙을 맞춘다.
+  for (const rect of svg.querySelectorAll<SVGGraphicsElement>('rect.note')) {
+    const g = rect.parentElement;
+    const lines = g
+      ? [...g.querySelectorAll<SVGTextElement>('text.noteText')]
+      : [];
+    if (!lines.length) continue;
+    const rr = rect.getBoundingClientRect();
+    if (!rr.height) continue;
+    let top = Infinity;
+    let bottom = -Infinity;
+    let left = Infinity;
+    let right = -Infinity;
+    for (const t of lines) {
+      const tr = t.getBoundingClientRect();
+      if (!tr.height) continue;
+      top = Math.min(top, tr.top);
+      bottom = Math.max(bottom, tr.bottom);
+      left = Math.min(left, tr.left);
+      right = Math.max(right, tr.right);
+    }
+    if (!isFinite(top)) continue;
+    const dy = (rr.top + rr.height / 2) - (top + bottom) / 2;
+    const dx = (rr.left + rr.width / 2) - (left + right) / 2;
+    if (Math.abs(dy) < 1 && Math.abs(dx) < 1) continue;
+    for (const t of lines) prependTranslate(t, dx * scale, dy * scale);
+  }
+
+  // 액터: rect.actor 마다 같은 <g> 안의 text.actor 를 박스 중앙에 맞춘다.
+  for (const rect of svg.querySelectorAll<SVGGraphicsElement>('rect.actor')) {
+    const t = rect.parentElement?.querySelector<SVGTextElement>('text.actor');
+    if (!t) continue;
+    const tr = t.getBoundingClientRect();
+    const rr = rect.getBoundingClientRect();
+    if (!tr.height || !rr.height) continue;
+    const dy = (rr.top + rr.height / 2) - (tr.top + tr.height / 2);
+    const dx = (rr.left + rr.width / 2) - (tr.left + tr.width / 2);
+    if (Math.abs(dy) < 1 && Math.abs(dx) < 1) continue;
+    prependTranslate(t, dx * scale, dy * scale);
+  }
+}
+
 // mermaid는 단일 인스턴스라 동시 호출이 겹치면 일부가 실패한다. 여러 컴포넌트(글 카드·시리즈 카드·
 // 미리보기)가 각자 호출해도 안전하도록, 모든 호출을 모듈 단위 큐로 직렬화한다.
 let renderQueue: Promise<void> = Promise.resolve();
@@ -101,6 +173,18 @@ async function doRender(containers: HTMLElement[]): Promise<void> {
     /* 폰트 API 미지원 등 — 그대로 진행 */
   }
 
+  const scaleOf = (svg: SVGSVGElement): number => {
+    // 화면 px 1개가 SVG 좌표계에서 몇 단위인지 (뷰박스 스케일). 보정 delta를 여기 맞춰 변환한다.
+    const vb = svg.viewBox?.baseVal;
+    const w = svg.getBoundingClientRect().width;
+    return vb && vb.width && w ? vb.width / w : 1;
+  };
+  // 이미 transform이 있으면 덮어쓰지 않고 앞에 translate를 이어 붙인다 (mermaid가 박은 값 보존).
+  const prependTranslate = (el: SVGGraphicsElement, dx: number, dy: number) => {
+    const prev = el.getAttribute('transform');
+    el.setAttribute('transform', `translate(${dx}, ${dy})${prev ? ' ' + prev : ''}`);
+  };
+
   for (const container of containers) {
     const source = container.dataset.source ?? '';
     try {
@@ -115,6 +199,7 @@ async function doRender(containers: HTMLElement[]): Promise<void> {
       const { svg } = await mermaid.render(`injoy-mmd-${seq++}`, source);
       container.classList.remove('diagram-error');
       container.innerHTML = svg;
+      if (isSequenceSource(source)) recenterSequenceText(container, scaleOf, prependTranslate);
     } catch {
       container.classList.add('diagram-error');
       container.textContent = '다이어그램을 렌더링하지 못했어요.';
