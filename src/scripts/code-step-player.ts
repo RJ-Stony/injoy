@@ -64,7 +64,7 @@ export function attachCodeStepPlayer(codeBlock: HTMLElement): CodeStepPlayer | n
 
   const render = () => {
     clearHighlight();
-    // cur === 0: 초기/종료 상태 = 강조 없음. counter는 '- / N'.
+    // cur === 0: 초기/종료 상태 = 강조 없음. counter는 '0 / N'(다이어그램 카운터와 같은 결).
     if (cur > 0 && cur <= total) {
       for (let i = 0; i < cur; i++) {
         const isCurrent = i === cur - 1;
@@ -76,7 +76,7 @@ export function attachCodeStepPlayer(codeBlock: HTMLElement): CodeStepPlayer | n
       const onLine = byStep.get(stepNums[cur - 1])![0];
       scrollLineIntoView(onLine, scroll);
     }
-    counter.textContent = `${cur > 0 ? cur : '-'} / ${total}`;
+    counter.textContent = `${cur} / ${total}`;
     [...dots.children].forEach((d, i) => d.classList.toggle('on', i < cur));
     prevB.disabled = cur <= 0;
     nextB.disabled = cur >= total;

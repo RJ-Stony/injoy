@@ -70,7 +70,9 @@ const edgeVar = (type: string) => `var(--edge-${type === 'mentions' ? 'related' 
             opacity="0.75"
           />
         ))}
-        {/* 흐름 오버레이 — 베이스 라인 위에 얹어 .flow-on일 때 중심→바깥으로 대시가 흐른다 */}
+        {/* 흐름 오버레이 - 베이스 라인 위에 얹어 .flow-on일 때 중심→바깥으로 점이 흐른다.
+            dasharray "0 11" + round cap = 지름 stroke-width짜리 점이 11px 간격으로 균일하게.
+            주기 11은 injoy-edge-flow의 dashoffset -11과 정확히 맞아 이음새 없이 순환한다. */}
         {nodes.map((n) => (
           <line
             class="mg-flow"
@@ -79,8 +81,8 @@ const edgeVar = (type: string) => `var(--edge-${type === 'mentions' ? 'related' 
             x2={n.x}
             y2={n.y}
             stroke={edgeVar(n.type)}
-            stroke-width="1.5"
-            stroke-dasharray="2 9"
+            stroke-width="2.4"
+            stroke-dasharray="0 11"
             stroke-linecap="round"
           />
         ))}
