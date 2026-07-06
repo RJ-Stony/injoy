@@ -316,7 +316,7 @@ const data = {
     let playMs = 12000;
     let playPaused = false;
     let playElapsed = 0; // 일시정지 때까지 누적된 경과(ms)
-    // 진행도(0~1+) — 일시정지 중엔 시계가 멈추도록 누적 경과 + (재생 중일 때만) 현재 구간을 더한다.
+    // 진행도(0~1+) - 일시정지 중엔 시계가 멈추도록 누적 경과 + (재생 중일 때만) 현재 구간을 더한다.
     const playProgress = () =>
       (playElapsed + (playPaused ? 0 : performance.now() - playStart)) / playMs;
     // 등장 진행도(0~1) — 노드 i는 progress*N이 i를 지날 때 1칸에 걸쳐 서서히 나타난다.
@@ -877,7 +877,7 @@ const data = {
       draw();
     });
 
-    // 첫 화면부터 그래프가 화면에 꼭 맞게 — 정착을 기다리지 않고 미리 동기로 식힌 뒤 fit.
+    // 첫 화면부터 그래프가 화면에 꼭 맞게 - 정착을 기다리지 않고 미리 동기로 식힌 뒤 fit.
     // (루프 안 매 프레임 fit은 흔들림을 만들었던 전력이 있어, fit은 여기서 한 번만)
     let prewarmed = false;
     const prewarm = () => {
