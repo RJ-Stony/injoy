@@ -17,6 +17,7 @@
   <button type="button" class="dm-close" id="dm-close" aria-label="닫기">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
   </button>
+  <div class="dm-transport" id="dm-transport"></div>
   <div class="dm-zoom">
     <button type="button" class="dm-zbtn" data-zoom="in" aria-label="확대">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
@@ -31,13 +32,16 @@
 </dialog>
 
 <script>
-  import { renderMermaidDiagrams } from '../scripts/mermaid-render';
+  import { renderMermaidDiagrams, isSequenceSource } from '../scripts/mermaid-render';
+  import { attachSequencePlayer, type SequencePlayer } from '../scripts/sequence-player';
 
   const dialog = document.querySelector<HTMLDialogElement>('.diagram-modal');
   if (dialog) {
     const stage = dialog.querySelector<HTMLElement>('#dm-stage')!;
     const pan = dialog.querySelector<HTMLElement>('#dm-pan')!;
     const diagram = dialog.querySelector<HTMLElement>('#dm-diagram')!;
+    const transportHost = dialog.querySelector<HTMLElement>('#dm-transport')!;
+    let player: SequencePlayer | null = null;
 
     // 화면 = 다이어그램좌표 * scale + t (graph.astro view 모델과 동형)
     const view = { scale: 1, tx: 0, ty: 0 };
@@ -189,6 +193,8 @@
     });
     dialog.addEventListener('close', () => {
       document.body.style.overflow = prevBodyOverflow;
+      player?.destroy();
+      player = null;
     });
 
     // 다크/라이트 전환 시 다시 그린다 — transform은 dm-pan에 있어 view가 그대로 유지된다.
@@ -199,6 +205,7 @@
         renderMermaidDiagrams([diagram]).then(() => {
           diagram.classList.add('flow-on');
           apply(); // 새 svg에 현재 배율 다시 적용
+          player?.refresh(); // 새 svg에 스텝 재수집
         });
     };
     window.addEventListener('injoy:theme-change', rerender);
@@ -221,6 +228,13 @@
         await renderMermaidDiagrams([diagram]);
         diagram.classList.add('flow-on'); // 엣지 흐름 애니메이션 켜기(global.css)
         drawn = true;
+        // 스텝 y밴드 수집은 getBoundingClientRect 기준 → 줌 변환(fit) 전, scale 1 상태에서 attach해야 밴드 왜곡 없음.
+        player?.destroy();
+        player = null;
+        transportHost.innerHTML = '';
+        if (isSequenceSource(source)) {
+          player = attachSequencePlayer(transportHost, diagram);
+        }
         fit();
       },
       close,
@@ -354,6 +368,35 @@
   .dm-zoom .dm-reset svg {
     width: 16px;
     height: 16px;
+  }
+
+  /* 시퀀스 재생 트랜스포트 — 하단 중앙(바 자체 스타일은 global.css 공용) */
+  .dm-transport {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    z-index: 2;
+  }
+
+  /* 모달 안에서는 border-top 없이 배경 칩 형태로 */
+  .dm-transport :global(.sq-transport) {
+    border-top: none;
+    margin-top: 0;
+    padding: 0.4rem 0.7rem;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 1px 5px rgb(0 0 0 / 10%);
+  }
+
+  /* 모바일에서 줌 버튼(우하단 세로 스택)과 겹치지 않게 왼쪽으로 치우침 허용 */
+  @media (max-width: 560px) {
+    .dm-transport {
+      left: 12px;
+      transform: none;
+      max-width: calc(100% - 76px);
+    }
   }
 
   /* 열림 트랜지션 — reduced-motion이면 즉시 */
