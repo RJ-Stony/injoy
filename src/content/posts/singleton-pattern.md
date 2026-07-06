@@ -292,16 +292,16 @@ class Database(metaclass=SingletonMeta):
 
 ```python
 def singleton(cls):
-    instances = {}
+    instances = {}  # [!code step:2]
 
     def get_instance(*args, **kwargs):
-        if cls not in instances:  # [!code step:1]
-            instances[cls] = cls(*args, **kwargs)  # [!code step:2]
-        return instances[cls]  # [!code step:3]
+        if cls not in instances:  # [!code step:4]
+            instances[cls] = cls(*args, **kwargs)  # [!code step:5]
+        return instances[cls]  # [!code step:6]
 
-    return get_instance
+    return get_instance  # [!code step:3]
 
-@singleton
+@singleton  # [!code step:1]
 class AppConfig:
     ...
 ```
