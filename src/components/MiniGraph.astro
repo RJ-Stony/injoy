@@ -8,6 +8,7 @@
  * 엣지마다 흐름 오버레이 라인을 얹어 화면에 보일 때(.flow-on) 중심→바깥으로 대시가 흐른다.
  */
 import type { Connection } from '../utils/graph';
+import { edgeLabel } from '../utils/graph';
 import { withBase } from '../utils/url';
 
 interface Props {
@@ -51,6 +52,10 @@ const nodes = shown.map((c, i) => {
 const truncate = (s: string, n = 14) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 // mentions는 EDGE_TYPES 밖(자동 수집)이라 related 색을 쓴다
 const edgeVar = (type: string) => `var(--edge-${type === 'mentions' ? 'related' : type})`;
+
+// 범례 - 지금 이 그래프에 실제로 있는 관계 타입만, 우선순위 순서 그대로
+// (shown이 이미 EDGE_TYPES 순 정렬이라 Set의 첫 등장 순서가 곧 우선순위).
+const legendTypes = [...new Set(shown.map((c) => c.type))];
 ---
 
 {
@@ -115,6 +120,24 @@ const edgeVar = (type: string) => `var(--edge-${type === 'mentions' ? 'related' 
           <text class="mg-extra" x={W - 8} y={H - 8} text-anchor="end">{`+${extra}`}</text>
         )}
       </svg>
+      <figcaption class="mg-legend" aria-label="선 색이 뜻하는 관계">
+        {legendTypes.map((t) => (
+          <span class="mg-key">
+            <svg viewBox="0 0 24 8" aria-hidden="true">
+              <line
+                x1="1"
+                y1="4"
+                x2="23"
+                y2="4"
+                stroke={edgeVar(t)}
+                stroke-width="2"
+                stroke-dasharray={t === 'mentions' ? '4 4' : undefined}
+              />
+            </svg>
+            {edgeLabel(t)}
+          </span>
+        ))}
+      </figcaption>
     </figure>
   )
 }
@@ -166,6 +189,29 @@ const edgeVar = (type: string) => `var(--edge-${type === 'mentions' ? 'related' 
   .mg-extra {
     font-size: 11px;
     fill: var(--text-muted);
+  }
+
+  /* 범례 - 이 그래프에 실제 있는 관계 타입만, 그래프 뷰와 같은 라벨(edgeLabel) */
+  .mg-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem 1rem;
+    margin-top: 0.5rem;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  .mg-key {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .mg-key svg {
+    width: 24px;
+    height: 8px;
+    flex: none;
   }
 
   /* 엣지 흐름 오버레이 — 화면에 보일 때(.flow-on)만 흐르고, 모션 줄이기면 정지.
