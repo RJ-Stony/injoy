@@ -20,18 +20,23 @@ import remarkWikiLinks from './src/plugins/remark-wiki-links.mjs';
 import remarkBoldFix from './src/plugins/remark-bold-fix.mjs';
 import { alertOptions } from './src/utils/callout-config.mjs';
 
-// [[위키링크]]의 표시 텍스트로 쓸 글 제목 맵 (config 로드 시 1회 스캔 —
-// dev 중 글을 추가하면 dev 서버 재시작 후 제목이 반영된다).
-// draft 글은 제외 — 프로덕션에서 404가 되는 링크를 만들지 않기 위해
-// 위키링크는 원문 그대로 남기고 빌드 로그에 경고만 낸다.
-const postTitles = Object.fromEntries(
+// [[위키링크]] 하버카드용 글 메타 맵 (config 로드 시 1회 스캔 —
+// dev 중 글을 추가하면 dev 서버 재시작 후 반영된다).
+// draft 글은 제외 — 위키링크는 원문 그대로 남기고 빌드 로그에 경고만 낸다.
+const fm = (src, key) =>
+  src.match(new RegExp(`^${key}:\\s*["']?(.+?)["']?\\s*$`, 'm'))?.[1];
+const postMeta = Object.fromEntries(
   readdirSync('./src/content/posts')
     .filter((f) => /\.(md|mdx)$/.test(f))
     .flatMap((f) => {
       const src = readFileSync(`./src/content/posts/${f}`, 'utf8');
       if (/^draft:\s*true\s*$/m.test(src)) return [];
-      const title = src.match(/^title:\s*["']?(.+?)["']?\s*$/m)?.[1];
-      return [[f.replace(/\.(md|mdx)$/, ''), title ?? f]];
+      const slug = f.replace(/\.(md|mdx)$/, '');
+      return [[slug, {
+        title: fm(src, 'title') ?? slug,
+        description: fm(src, 'description') ?? '',
+        category: fm(src, 'category') ?? '',
+      }]];
     }),
 );
 
@@ -78,7 +83,7 @@ export default defineConfig({
     remarkPlugins: [
       remarkMath, // $인라인$ / $$블록$$ 수식
       [remarkEmoji, { accessible: true }], // :rocket: 숏코드
-      [remarkWikiLinks, { titles: postTitles, base: BASE }], // [[슬러그]] 글 연결
+      [remarkWikiLinks, { meta: postMeta, base: BASE }], // [[슬러그]] 글 연결
       remarkBoldFix, // 구두점에 막혀 깨진 **…** 굵게를 strong으로 보정
     ],
     rehypePlugins: [

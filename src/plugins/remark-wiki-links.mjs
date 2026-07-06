@@ -7,7 +7,7 @@
 import { WIKI_LINK_RE } from './wiki-link-pattern.mjs';
 
 export default function remarkWikiLinks(options = {}) {
-  const titles = options.titles ?? {};
+  const meta = options.meta ?? {};
   const base = (options.base ?? '/').replace(/\/$/, '');
 
   const transform = (node, file) => {
@@ -32,21 +32,29 @@ export default function remarkWikiLinks(options = {}) {
       for (const match of child.value.matchAll(WIKI_LINK_RE)) {
         const [whole, slugRaw, labelRaw] = match;
         const slug = slugRaw.trim();
-        const title = titles[slug];
+        const m = meta[slug];
 
         if (match.index > last) {
           parts.push({ type: 'text', value: child.value.slice(last, match.index) });
         }
 
-        if (title === undefined) {
+        if (m === undefined) {
           console.warn(`[wiki-links] 존재하지 않는 글을 가리키는 위키링크: [[${slug}]] (${file?.path ?? ''})`);
           parts.push({ type: 'text', value: whole });
         } else {
           parts.push({
             type: 'link',
             url: `${base}/posts/${slug}/`,
-            data: { hProperties: { className: ['wiki-link'] } },
-            children: [{ type: 'text', value: labelRaw?.trim() || title }],
+            data: {
+              hProperties: {
+                className: ['wiki-link'],
+                // 하버카드(데스크톱 hover 미리보기)가 읽는 대상 글 메타
+                'data-title': m.title,
+                'data-description': m.description,
+                'data-category': m.category,
+              },
+            },
+            children: [{ type: 'text', value: labelRaw?.trim() || m.title }],
           });
         }
         last = match.index + whole.length;
