@@ -125,9 +125,9 @@ class Singleton:
 
     @classmethod
     def get_instance(cls):
-        if cls._instance is None:  # [!code highlight]
-            cls._instance = Singleton()
-        return cls._instance
+        if cls._instance is None:  # [!code step:1]
+            cls._instance = Singleton()  # [!code step:2]
+        return cls._instance  # [!code step:3]
 ```
 
 결국 "요청이 오면 그제야 만들고, 이미 있으면 그대로 돌려준다"는 코드다.
@@ -154,10 +154,10 @@ class Singleton:
 
     @classmethod
     def get_instance(cls):
-        with cls._lock:  # [!code highlight]
-            if cls._instance is None:
-                cls._instance = Singleton()
-        return cls._instance
+        with cls._lock:  # [!code step:1]
+            if cls._instance is None:  # [!code step:2]
+                cls._instance = Singleton()  # [!code step:3]
+        return cls._instance  # [!code step:4]
 ```
 
 - 인스턴스는 **처음 요청될 때** 만들어진다. (지연 초기화)
@@ -183,11 +183,11 @@ class Singleton:
 
     @classmethod
     def get_instance(cls):
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:  # [!code highlight]
-                    cls._instance = Singleton()
-        return cls._instance
+        if cls._instance is None:  # [!code step:1]
+            with cls._lock:  # [!code step:2]
+                if cls._instance is None:  # [!code step:3]
+                    cls._instance = Singleton()  # [!code step:4]
+        return cls._instance  # [!code step:5]
 ```
 
 첫 번째 검사를 통과하면 잠금을 걸고, 같은 조건을 한 번 더 확인한다. **여러 스레드가 첫 검사를 함께 통과했을 수 있기 때문**이다. 두 검사를 모두 통과할 때만 인스턴스를 만든다.
@@ -255,9 +255,9 @@ class Singleton:
     _instance = None
 
     def __new__(cls):
-        if cls._instance is None:  # [!code highlight]
-            cls._instance = super().__new__(cls)
-        return cls._instance
+        if cls._instance is None:  # [!code step:1]
+            cls._instance = super().__new__(cls)  # [!code step:2]
+        return cls._instance  # [!code step:3]
 ```
 
 그런데 한 가지 문제가 있다. `__new__`가 같은 객체를 돌려줘도 `__init__`은 `Singleton()`을 부를 때마다 실행된다. `__init__`이 상태를 초기화한다면 기존 데이터를 잃는다. 그래서 플래그로 이런 문제를 막거나, 초기화 과정을 `__new__`로 옮겨 대비한다.
@@ -274,11 +274,11 @@ class SingletonMeta(type):
     _lock = threading.Lock()
 
     def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            with cls._lock:
-                if cls not in cls._instances:  # [!code highlight]
-                    cls._instances[cls] = super().__call__(*args, **kwargs)
-        return cls._instances[cls]
+        if cls not in cls._instances:  # [!code step:1]
+            with cls._lock:  # [!code step:2]
+                if cls not in cls._instances:  # [!code step:3]
+                    cls._instances[cls] = super().__call__(*args, **kwargs)  # [!code step:4]
+        return cls._instances[cls]  # [!code step:5]
 
 class Database(metaclass=SingletonMeta):
     ...
@@ -295,9 +295,9 @@ def singleton(cls):
     instances = {}
 
     def get_instance(*args, **kwargs):
-        if cls not in instances:  # [!code highlight]
-            instances[cls] = cls(*args, **kwargs)
-        return instances[cls]
+        if cls not in instances:  # [!code step:1]
+            instances[cls] = cls(*args, **kwargs)  # [!code step:2]
+        return instances[cls]  # [!code step:3]
 
     return get_instance
 
