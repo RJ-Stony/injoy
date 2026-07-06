@@ -68,7 +68,7 @@ export const PLAYER_PATHS = {
 
 const PATHS = PLAYER_PATHS;
 
-/** 트랜스포트 바 조각 — 시퀀스 재생과 코드 스텝 재생이 같은 시각·라벨을 쓰도록 공유한다. */
+/** 트랜스포트 바 조각 - 시퀀스 재생과 코드 스텝 재생이 같은 시각·라벨을 쓰도록 공유한다. */
 export interface TransportBar {
   bar: HTMLDivElement;
   restartB: HTMLButtonElement;

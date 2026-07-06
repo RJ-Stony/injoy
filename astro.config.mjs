@@ -20,9 +20,9 @@ import remarkWikiLinks from './src/plugins/remark-wiki-links.mjs';
 import remarkBoldFix from './src/plugins/remark-bold-fix.mjs';
 import { alertOptions } from './src/utils/callout-config.mjs';
 
-// [[위키링크]] 하버카드용 글 메타 맵 (config 로드 시 1회 스캔 —
+// [[위키링크]] 하버카드용 글 메타 맵 (config 로드 시 1회 스캔 -
 // dev 중 글을 추가하면 dev 서버 재시작 후 반영된다).
-// draft 글은 제외 — 위키링크는 원문 그대로 남기고 빌드 로그에 경고만 낸다.
+// draft 글은 제외 - 위키링크는 원문 그대로 남기고 빌드 로그에 경고만 낸다.
 const fm = (src, key) =>
   src.match(new RegExp(`^${key}:\\s*["']?(.+?)["']?\\s*$`, 'm'))?.[1];
 const postMeta = Object.fromEntries(
@@ -86,7 +86,7 @@ const transformerCodeSteps = () => ({
         }
       };
       collect(line);
-      // 마커는 줄 끝에 온다 — 마지막 텍스트 노드부터 뒤로 훑는다.
+      // 마커는 줄 끝에 온다 - 마지막 텍스트 노드부터 뒤로 훑는다.
       for (let i = texts.length - 1; i >= 0; i--) {
         const m = texts[i].value.match(STEP_RE);
         if (!m) {
