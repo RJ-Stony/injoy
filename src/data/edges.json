@@ -245,6 +245,12 @@
       "to": "welcome",
       "type": "related",
       "note": "첫 개발 카테고리로, 공부하며 정리하는 개발 공부 시리즈가 한 줄기로 들어오게 되었다"
+    },
+    {
+      "from": "polish-round-14",
+      "to": "polish-round-13",
+      "type": "extends",
+      "note": "다듬은 읽기 화면 위에 시퀀스/코드 재생과 미니 관계도를 얹은 회차"
     }
   ]
 }
