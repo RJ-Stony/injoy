@@ -629,6 +629,58 @@ a:hover {
   }
 }
 
+/* ---------- hover 미리보기 카드 (hover-card.ts가 만드는 DOM) ---------- */
+.hover-card {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  width: max-content;
+  max-width: 320px;
+  padding: 0.75rem 0.9rem;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.hover-card .hc-category {
+  margin: 0 0 0.15rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.hover-card .hc-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.hover-card .hc-desc {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hover-card .hc-footnote {
+  font-size: 0.8rem;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.hover-card .hc-footnote p {
+  margin: 0;
+}
+
 /* 코드블록 줄 표기 — [!code highlight] / [!code ++] / [!code --] */
 .astro-code .line.highlighted,
 .astro-code .line.diff {

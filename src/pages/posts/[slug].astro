@@ -195,6 +195,9 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
   import { renderMermaidDiagrams, isSequenceSource } from '../../scripts/mermaid-render';
   import { attachSequencePlayer, type SequencePlayer } from '../../scripts/sequence-player';
   import { SMOOTH_DURATION, SMOOTH_EASING } from '../../scripts/smooth-details';
+  import { initHoverCards } from '../../scripts/hover-card';
+
+  initHoverCards();
 
   const mermaidBlocks = document.querySelectorAll<HTMLPreElement>(
     '.prose pre.astro-code[data-language="mermaid"]',
