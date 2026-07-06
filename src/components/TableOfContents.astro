@@ -17,6 +17,7 @@ const items = headings.filter(
 {
   items.length > 0 && (
     <nav class:list={['toc', variant]} aria-label={variant === 'line' ? '섹션 바로가기' : '목차'}>
+      {variant === 'rail' && <span class="toc-marker" aria-hidden="true" />}
       {variant !== 'line' && <p class="toc-title">목차</p>}
       <ul>
         {items.map((h) => (
@@ -46,9 +47,28 @@ const items = headings.filter(
   }
 
   .toc.rail {
+    position: relative;
     border-inline-start: 2px solid var(--border);
     padding-inline-start: 1.1rem;
     font-size: 0.85rem;
+  }
+
+  /* 활성 항목 위치를 따라 세로선을 미끄러지는 마커 */
+  .toc-marker {
+    position: absolute;
+    left: -2px;
+    top: 0;
+    width: 2px;
+    height: 0;
+    border-radius: 2px;
+    background-color: var(--accent);
+    transition: transform 0.25s ease, height 0.25s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toc-marker {
+      transition: none;
+    }
   }
 
   .toc-title {
@@ -221,6 +241,14 @@ const items = headings.filter(
         else break;
       }
       for (const { a } of entries) a.classList.toggle('active', a === active.a);
+      // rail 변형: 마커를 활성 항목 위치로 (transform이라 레이아웃 영향 0)
+      const marker = nav.querySelector<HTMLElement>('.toc-marker');
+      if (marker) {
+        const ar = active.a.getBoundingClientRect();
+        const nr = nav.getBoundingClientRect();
+        marker.style.height = `${ar.height}px`;
+        marker.style.transform = `translateY(${ar.top - nr.top}px)`;
+      }
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update);
