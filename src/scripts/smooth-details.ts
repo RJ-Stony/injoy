@@ -65,7 +65,7 @@ function animateDetails(d: HTMLDetailsElement) {
 
 /** 공개 화면의 접이식 요소(시리즈 폴더·시리즈 내비·만듦새 패널)에 부드러운 펼침을 입힌다. */
 export function enhanceSmoothDetails(
-  selector = '.series-folder, details.series, .makeup',
+  selector = '.series-folder, details.series, .makeup, .connections-fold',
 ): void {
   // Web Animations API 미지원(아주 오래된 브라우저)이면 네이티브 토글 그대로 둔다
   if (typeof Element === 'undefined' || !('animate' in Element.prototype)) return;

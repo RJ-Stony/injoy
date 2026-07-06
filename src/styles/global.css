@@ -671,6 +671,14 @@ a:hover {
   overflow: hidden;
 }
 
+/* 미니그래프 노드 카드의 관계 note — 설명보다 옅고 작게, 위에 살짝 띄운다 */
+.hover-card .hc-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--text-muted) 75%, var(--bg));
+  line-height: 1.5;
+}
+
 .hover-card .hc-footnote {
   font-size: 0.8rem;
   color: var(--text);

@@ -1,6 +1,7 @@
 /**
  * 데스크톱 hover 미리보기 카드.
  * - a.wiki-link: 대상 글 카테고리·제목·설명 (remark-wiki-links가 심은 data 속성)
+ * - .connections .mg-node: 미니그래프 노드 — 관계 문구(카테고리 줄)·제목·설명·note
  * - 각주 참조: 대응 각주 본문 (백링크 제거)
  * 모바일(hover 없음)에서는 아무것도 하지 않는다 - 링크 기본 동작 그대로.
  */
@@ -11,7 +12,7 @@ export function initHoverCards(): void {
   if (!matchMedia('(hover: hover) and (pointer: fine)').matches) return;
 
   const targets = document.querySelectorAll<HTMLAnchorElement>(
-    '.prose a.wiki-link[data-title], .prose [data-footnote-ref]',
+    '.prose a.wiki-link[data-title], .connections .mg-node[data-title], .prose [data-footnote-ref]',
   );
   if (targets.length === 0) return;
 
@@ -29,22 +30,31 @@ export function initHoverCards(): void {
   };
 
   const fill = (a: HTMLAnchorElement): boolean => {
-    if (a.classList.contains('wiki-link')) {
-      const t = a.dataset.title ?? '';
-      if (!t) return false;
+    // 위키링크·미니그래프 노드 — data-title이 있으면 글 미리보기 카드.
+    // (각주 참조는 data-title이 없으므로 아래 각주 경로로 빠진다.)
+    const el = a as unknown as HTMLElement;
+    if (el.dataset.title) {
+      const t = el.dataset.title;
       card.innerHTML = '';
       const cat = document.createElement('p');
       cat.className = 'hc-category';
-      cat.textContent = a.dataset.category ?? '';
+      cat.textContent = el.dataset.category ?? '';
       const title = document.createElement('p');
       title.className = 'hc-title';
       title.textContent = t;
       const desc = document.createElement('p');
       desc.className = 'hc-desc';
-      desc.textContent = a.dataset.description ?? '';
+      desc.textContent = el.dataset.description ?? '';
       card.append(cat, title, desc);
       if (!cat.textContent) cat.remove();
       if (!desc.textContent) desc.remove();
+      const note = el.dataset.note;
+      if (note) {
+        const n = document.createElement('p');
+        n.className = 'hc-note';
+        n.textContent = note;
+        card.append(n);
+      }
       return true;
     }
     // 각주: href="#user-content-fn-N" -> li 내용을 복제해 백링크 제거
