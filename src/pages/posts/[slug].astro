@@ -12,6 +12,7 @@ import Comments from '../../components/Comments.astro';
 import TransparencyPanel from '../../components/TransparencyPanel.astro';
 import PostReading from '../../components/PostReading.astro';
 import DiagramModal from '../../components/DiagramModal.astro';
+import MiniGraph from '../../components/MiniGraph.astro';
 import { getPublishedPosts, readingMinutes } from '../../utils/post';
 import { getConnections } from '../../utils/graph';
 import { withBase } from '../../utils/url';
@@ -126,6 +127,7 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
             <h2>연결된 글</h2>
             <a class="to-graph" href={withBase(`/graph/?focus=${post.id}`)}>그래프에서 보기 →</a>
           </div>
+          <MiniGraph title={post.data.title} connections={connections} />
           <ul id="connections-list">
             {connections.map((c) => (
               <li>

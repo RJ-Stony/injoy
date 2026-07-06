@@ -1,0 +1,133 @@
+---
+/**
+ * 글 하단 '연결된 글'의 인라인 미니그래프.
+ * 현재 글을 중심에, 연결 글(최대 8개)을 원형 배치한 빌드 타임 SVG.
+ * 선 색 = 엣지 타입 토큰(--edge-*), mentions는 회색 대시.
+ * 클라이언트 JS 0 - hover 강조는 CSS만.
+ */
+import type { Connection } from '../utils/graph';
+import { withBase } from '../utils/url';
+
+interface Props {
+  title: string;
+  connections: Connection[];
+}
+
+const { title, connections } = Astro.props;
+
+const MAX = 8;
+const shown = connections.slice(0, MAX);
+const extra = connections.length - shown.length;
+
+const W = 560;
+const H = 240;
+const CX = W / 2;
+const CY = H / 2;
+const RX = 210;
+const RY = 78;
+
+// 위쪽부터 시계방향 균등 배치. 이웃이 1~2개면 위쪽 쏠림이라 좌우(180도)로 시작.
+const startDeg = shown.length <= 2 ? 180 : -90;
+const nodes = shown.map((c, i) => {
+  const angle = (startDeg + (360 / shown.length) * i) * (Math.PI / 180);
+  return {
+    ...c,
+    x: CX + RX * Math.cos(angle),
+    y: CY + RY * Math.sin(angle),
+    labelAbove: Math.sin(angle) < 0,
+  };
+});
+
+const truncate = (s: string, n = 14) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+// mentions는 EDGE_TYPES 밖(자동 수집)이라 related 색을 쓴다
+const edgeVar = (type: string) => `var(--edge-${type === 'mentions' ? 'related' : type})`;
+---
+
+{
+  shown.length > 0 && (
+    <figure class="mini-graph" aria-label="이 글의 연결 관계도">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img">
+        <title>{`${title}의 연결 관계도`}</title>
+        {nodes.map((n) => (
+          <line
+            x1={CX}
+            y1={CY}
+            x2={n.x}
+            y2={n.y}
+            stroke={edgeVar(n.type)}
+            stroke-width="1.5"
+            stroke-dasharray={n.type === 'mentions' ? '4 4' : undefined}
+            opacity="0.75"
+          />
+        ))}
+        {nodes.map((n) => (
+          <a href={withBase(`/posts/${n.slug}/`)} class="mg-node">
+            <circle cx={n.x} cy={n.y} r="7" />
+            <text x={n.x} y={n.labelAbove ? n.y - 14 : n.y + 22} text-anchor="middle">
+              {truncate(n.title)}
+            </text>
+          </a>
+        ))}
+        <g class="mg-center">
+          <circle cx={CX} cy={CY} r="10" />
+          <text x={CX} y={CY + 28} text-anchor="middle">
+            {truncate(title, 18)}
+          </text>
+        </g>
+        {extra > 0 && (
+          <text class="mg-extra" x={W - 8} y={H - 8} text-anchor="end">{`+${extra}`}</text>
+        )}
+      </svg>
+    </figure>
+  )
+}
+
+<style>
+  .mini-graph {
+    margin: 0 0 1rem;
+  }
+
+  .mini-graph svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .mg-node circle {
+    fill: var(--accent-weak);
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    transition: stroke-width 0.15s ease;
+  }
+
+  .mg-node text {
+    font-size: 11px;
+    fill: var(--text-muted);
+    transition: fill 0.15s ease;
+  }
+
+  .mg-node:hover circle,
+  .mg-node:focus-visible circle {
+    stroke-width: 3;
+  }
+
+  .mg-node:hover text,
+  .mg-node:focus-visible text {
+    fill: var(--accent);
+  }
+
+  .mg-center circle {
+    fill: var(--accent);
+  }
+
+  .mg-center text {
+    font-size: 12px;
+    font-weight: 600;
+    fill: var(--text);
+  }
+
+  .mg-extra {
+    font-size: 11px;
+    fill: var(--text-muted);
+  }
+</style>
