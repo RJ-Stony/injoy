@@ -828,7 +828,6 @@ a:hover {
 @keyframes injoy-node-pop {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
 }
 
@@ -842,6 +841,13 @@ a:hover {
 .prose > .scrolly-block.in-view {
   opacity: 1;
   transform: none;
+}
+
+@media print {
+  .prose > .scrolly-block {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* ---------- 시퀀스 스텝 재생 (sequence-player.ts가 만드는 DOM) ---------- */

@@ -82,6 +82,8 @@ export function initHoverCards(): void {
     // 기본 링크 아래, 공간이 없으면 위
     let y = r.bottom + 8;
     if (y + ch > innerHeight - margin) y = r.top - ch - 8;
+    y = Math.max(margin, y); // 위로 플립한 긴 카드가 뷰포트 위로 잘리지 않게
+
     card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
   };
 

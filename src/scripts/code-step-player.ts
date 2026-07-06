@@ -45,6 +45,7 @@ export function attachCodeStepPlayer(codeBlock: HTMLElement): CodeStepPlayer | n
 
   let cur = 0; // 0 = 초기(강조 없음), 1..total = 해당 스텝 재생 중, cur는 재생 위치
   let timer = 0;
+  let endTimer = 0; // 자연 종료 후 초기 상태 복귀 예약(조작 시 취소)
 
   // 점은 스텝 수가 적을 때만(바가 넓어지는 것 방지) - 시퀀스 플레이어와 같은 정책.
   if (total <= 10) {
@@ -85,6 +86,8 @@ export function attachCodeStepPlayer(codeBlock: HTMLElement): CodeStepPlayer | n
   const stop = () => {
     if (timer) clearInterval(timer);
     timer = 0;
+    if (endTimer) clearTimeout(endTimer);
+    endTimer = 0;
     transport.setPlayIcon(false, cur >= total);
   };
 
@@ -95,7 +98,7 @@ export function attachCodeStepPlayer(codeBlock: HTMLElement): CodeStepPlayer | n
     if (cur >= total) {
       // 마지막 스텝을 잠깐 보여준 뒤 초기 상태(강조 없음)로 복귀한다.
       stop();
-      window.setTimeout(() => { if (!timer) reset(); }, reduced ? 200 : STEP_INTERVAL);
+      endTimer = window.setTimeout(() => { endTimer = 0; if (!timer) reset(); }, reduced ? 200 : STEP_INTERVAL);
     }
   };
 
@@ -105,8 +108,13 @@ export function attachCodeStepPlayer(codeBlock: HTMLElement): CodeStepPlayer | n
     if (cur >= total) cur = 0; // 종료 상태에서 재생 = 처음부터
     cur++;
     render();
-    if (cur < total) timer = window.setInterval(advance, reduced ? 400 : STEP_INTERVAL);
-    else { stop(); window.setTimeout(() => { if (!timer) reset(); }, reduced ? 200 : STEP_INTERVAL); }
+    if (cur < total) {
+      timer = window.setInterval(advance, reduced ? 400 : STEP_INTERVAL);
+      transport.setPlayIcon(true, cur >= total);
+    } else {
+      stop();
+      endTimer = window.setTimeout(() => { endTimer = 0; if (!timer) reset(); }, reduced ? 200 : STEP_INTERVAL);
+    }
   };
 
   playB.addEventListener('click', () => (timer ? stop() : play()));

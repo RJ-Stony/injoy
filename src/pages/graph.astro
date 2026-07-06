@@ -416,7 +416,7 @@ const data = {
         animateDim();
         return;
       }
-      playing = false; // 재생 중이면 멈춘다
+      endPlay(); // 재생 중이면 멈추고 재생 UI(아이콘·초기화 버튼)도 정리한다
       const set = kind === 'category' ? activeCats : activeEdges;
       if (set.has(val)) set.delete(val);
       else set.add(val);
