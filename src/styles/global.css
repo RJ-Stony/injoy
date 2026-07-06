@@ -777,6 +777,20 @@ a:hover {
   }
 }
 
+/* ---------- 플로차트 노드 스태거 등장 (첫 노출 1회) ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .mermaid-diagram.stagger-in :is(g.node, g.cluster) {
+    animation: injoy-node-pop 0.4s ease backwards;
+  }
+}
+
+@keyframes injoy-node-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
 /* ---------- 본문 블록 은은한 등장 ([slug].astro 스크립트가 부여) ---------- */
 .prose > .scrolly-block {
   opacity: 0;

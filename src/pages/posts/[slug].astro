@@ -230,10 +230,30 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
     }
 
     const players = new Map<HTMLElement, SequencePlayer>();
+
+    // 플로차트류 노드 스태거 등장 - 첫 노출 1회만. 시퀀스는 재생 트랜스포트 담당이라 제외.
+    // 이미 스태거했거나 svg가 아직 없으면(지연 렌더) 아무것도 안 한다.
+    const applyStagger = (el: HTMLElement) => {
+      if (el.dataset.staggered || isSequenceSource(el.dataset.source ?? '')) return;
+      const nodes = el.querySelectorAll<SVGGElement>('svg g.node, svg g.cluster');
+      if (nodes.length === 0) return; // svg가 아직(지연 렌더) - 다음 교차 때 다시 시도
+      el.dataset.staggered = '1';
+      nodes.forEach((n, i) => { n.style.animationDelay = `${i * 60}ms`; });
+      el.classList.add('stagger-in');
+      // 애니가 끝나면 잠근다 - 테마 재렌더로 svg가 갈려도 재생하지 않게
+      setTimeout(() => el.classList.replace('stagger-in', 'stagger-done'),
+        nodes.length * 60 + 500);
+    };
+
     const renderAll = () =>
       renderMermaidDiagrams(containers).then(() => {
         for (const c of containers) {
-          if (!isSequenceSource(c.dataset.source ?? '')) continue;
+          if (!isSequenceSource(c.dataset.source ?? '')) {
+            // 렌더 완료 후 화면 안에 있는 미스태거 컨테이너에 1회 적용(IO 첫 발화 때 svg가 없었을 수 있다)
+            const r = c.getBoundingClientRect();
+            if (r.top < innerHeight && r.bottom > 0) applyStagger(c);
+            continue;
+          }
           const existing = players.get(c);
           if (existing) existing.refresh();
           else {
@@ -253,7 +273,10 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
     if ('IntersectionObserver' in window) {
       const flowObserver = new IntersectionObserver(
         (entries) => {
-          for (const e of entries) e.target.classList.toggle('flow-on', e.isIntersecting);
+          for (const e of entries) {
+            e.target.classList.toggle('flow-on', e.isIntersecting);
+            if (e.isIntersecting) applyStagger(e.target as HTMLElement);
+          }
         },
         { rootMargin: '0px 0px -10% 0px' },
       );
