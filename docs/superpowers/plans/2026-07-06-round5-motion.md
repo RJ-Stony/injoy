@@ -1376,6 +1376,262 @@ git log --format=%B be91b84..HEAD | grep -c "Co-Authored-By" || true
 
 - [ ] **Step 6: 메모리 갱신 + push 1회**
 
+<!-- Task 11·14는 세션 중 사용자 요청으로 편입. Task 10보다 먼저 실행한다. -->
+
+---
+
+### Task 14: 코드 블록 스텝 재생 (작성자 마커 기반)
+
+**Files:**
+- Modify: `astro.config.mjs` (커스텀 Shiki transformer)
+- Create: `src/scripts/code-step-player.ts`
+- Modify: `src/scripts/sequence-player.ts` (트랜스포트 바 생성부를 export 헬퍼로 추출)
+- Modify: `src/pages/posts/[slug].astro` (코드 블록 셋업 루프에서 부착)
+- Modify: `src/styles/global.css` (스텝 강조 스타일)
+- Modify: `src/content/posts/markdown-styleguide.md` (기능 문서화 한 절 - 작성자 글이지만 스타일가이드는 기능 매뉴얼이라 추가가 관례)
+
+**Interfaces:**
+- Consumes: Task 2의 트랜스포트 바 시각(.sq-* 클래스 재사용).
+- Produces: 펜스 코드 주석 마커 `[!code step:N]`(언어별 주석 문법 준수, N=1~99). 빌드가 해당 줄에 `data-step="N"`을 달고 마커 텍스트는 제거. `attachCodeStepPlayer(codeBlock: HTMLElement): CodeStepPlayer | null` - `.code-block` 안 `[data-step]` 줄이 2개 스텝 이상일 때만 바 부착.
+- 자동 순서 추론은 하지 않는다(불가능이 정직한 답). 작성자가 마커로 순서를 지정한 블록에만 등장.
+
+- [ ] **Step 1: Shiki transformer (빌드)**
+
+astro.config.mjs의 기존 shiki transformers 배열에 커스텀 transformer 추가. 기존 `[!code highlight]`류가 어떻게 등록돼 있는지 먼저 확인하고 같은 자리에:
+
+```js
+// [!code step:N] 마커 -> 그 줄에 data-step="N" 부여하고 마커 텍스트는 지운다.
+// 코드 실행 순서 재생(code-step-player.ts)이 소비한다. 주석 문법은 언어를 따른다.
+const transformerCodeSteps = () => ({
+  name: 'injoy:code-steps',
+  code(node) {
+    for (const line of node.children) {
+      if (line.type !== 'element') continue;
+      const texts = [];
+      const collect = (el) => {
+        for (const c of el.children ?? []) {
+          if (c.type === 'text') texts.push(c);
+          else if (c.type === 'element') collect(c);
+        }
+      };
+      collect(line);
+      for (const t of texts) {
+        const m = t.value.match(/\s*(?:\/\/|#|--|\/\*|<!--)?\s*\[!code step:(\d+)\]\s*(?:\*\/|-->)?\s*$/);
+        if (!m) continue;
+        line.properties['data-step'] = m[1];
+        t.value = t.value.slice(0, m.index);
+        // 마커만 있던 주석 여는 기호가 덜렁 남으면 그것도 지운다(예: 파이썬 '#')
+        break;
+      }
+    }
+  },
+});
+```
+
+주의: 실제 hast 구조(Shiki 줄 span 안 토큰 span)는 빌드해서 확인 후 조정. `dist`에 `[!code step` 누출 0이 수용 기준. 마커 뒤 잔여 주석 기호(`#`만 남는 줄 등)는 빌드 산출물을 보고 정리 로직 보강.
+
+- [ ] **Step 2: sequence-player.ts에서 바 생성부 추출**
+
+Task 2가 만든 트랜스포트 바 DOM 생성(버튼 4개+점+카운터)을 `export function createTransportBar()`로 추출하고 sequence-player 내부도 그걸 쓰도록 리팩터(동작 불변). code-step-player가 같은 헬퍼를 소비해 시각·접근성 라벨이 한 결로 유지된다.
+
+- [ ] **Step 3: code-step-player.ts**
+
+```ts
+/**
+ * 코드 블록 스텝 재생 - 작성자가 [!code step:N] 마커로 지정한 실행 순서를
+ * 트랜스포트 바로 재생한다. 재생 중 현재 스텝 줄만 강조(.cs-on),
+ * 지나간 스텝은 옅은 잔상(.cs-past). 초기/종료 상태는 강조 없음(평소 코드 그대로).
+ */
+```
+
+- 스텝 수집: `pre .line[data-step]`을 스텝 번호로 그룹핑(같은 번호 여러 줄 허용), 번호 오름차순.
+- 상태: 초기 = 강조 없음, 카운터 `- / N`. 재생 -> 스텝 1부터 interval 1200ms. 현재 스텝 줄 `.cs-on`, 지나간 줄 `.cs-past`. 일시정지/이전/다음/처음부터 = 시퀀스 플레이어와 동일 상태 기계. 종료 -> 강조 전부 해제(초기 상태 복귀).
+- 현재 스텝 줄이 코드 블록 내부 스크롤 밖이면 `scrollIntoView({ block: 'nearest' })`(pre 내부 스크롤 컨테이너 기준, 페이지 스크롤은 건드리지 않게 확인).
+- 부착 지점: [slug].astro의 기존 코드 블록 셋업 루프(헤더 바 만드는 곳)에서 `.code-block`마다 호출, 스텝 2개 미만이면 null. 바는 코드 블록 하단(내부 스크롤 영역 밖).
+- reduced-motion: transition 없이 즉시 전환.
+
+- [ ] **Step 4: global.css**
+
+```css
+/* ---------- 코드 스텝 재생 (code-step-player.ts) ---------- */
+.code-block .line.cs-on {
+  background-color: var(--accent-weak);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.code-block .line.cs-past {
+  background-color: color-mix(in srgb, var(--accent-weak) 40%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .code-block .line {
+    transition: background-color 0.25s ease;
+  }
+}
+```
+
+기존 Shiki `.highlighted` 스타일과 겹치지 않는지 확인(스텝 강조가 이기게 특이도 조정).
+
+- [ ] **Step 5: 스타일가이드 문서화**
+
+markdown-styleguide.md 코드 블록 절에 짧은 소절 추가: 마커 문법(`# [!code step:1]`), 언어별 주석 문법 주의(CSS는 `/* [!code step:1] */`), 스텝 2개부터 바가 뜬다는 것, 예시 블록 1개(실제 마커 넣어 도그푸딩). 작성자 말투(injoy-voice-guide) 준수, 엠대시 0.
+
+- [ ] **Step 6: 검증**
+
+- `npm run build` 후 `grep -r "\[!code step" dist/` 0건(스타일가이드가 문법을 인라인 코드로 언급하는 것은 `<code>` 안이라 정상 - 기존 `[!code` 언급 예외 규칙과 동일).
+- dev에서 스타일가이드 글: 예시 블록에 바 존재, 재생 상태 기계 계측(transition none 주입, 스텝 n에서 .cs-on 줄 집합), 마커 없는 블록엔 바 없음.
+- /write 왕복: 스타일가이드 원문 setMarkdown/getMarkdown diff 0(마커는 코드 내용이라 보존).
+- 복사 버튼이 마커 없는 깨끗한 코드를 복사하는지(렌더된 텍스트 기준인지 원문 기준인지 확인 - 원문 기준이면 마커가 섞이므로 렌더 텍스트로 교체하거나 마커 strip).
+
+- [ ] **Step 7: 커밋**
+
+```bash
+git add astro.config.mjs src/scripts/code-step-player.ts src/scripts/sequence-player.ts "src/pages/posts/[slug].astro" src/styles/global.css src/content/posts/markdown-styleguide.md
+git commit -m "code: 코드 블록에 실행 순서 스텝 재생 추가 (step 마커)"
+```
+
+---
+
+### Task 15: 기존 글 코드 블록 스텝 마커 선별 주입
+
+**Files:**
+- Modify: `src/content/posts/*.md` (선별된 블록만)
+
+**Interfaces:**
+- Consumes: Task 14의 `[!code step:N]` 마커 문법과 transformer.
+
+원칙(선별 기준, 사용자 확정):
+- **넣는다**: 실행 흐름·순서가 이해를 돕는 블록 - 알고리즘(싱글톤 구현 5종), 이벤트 흐름 로직(ts/js 함수), 단계적 처리 코드. 스텝은 3~6개가 적당(줄마다 아니라 의미 단위).
+- **뺀다**: 설정(json/yaml/toml)·CSS 규칙 나열·1~3줄 블록·`text` 블록·마크다운 예시·**diff 근거 블록(`[!code ++/--]` 포함 - 이미 이야기가 있음)**·`[!code highlight]`가 이미 핵심을 짚는 블록은 신중히(스텝이 더 나은 경우만 교체 말고 공존 없이 스텝만).
+- 언어별 주석 문법 준수: py/sh는 `# [!code step:1]`, ts/js는 `// [!code step:1]`, css는 `/* [!code step:1] */`.
+- 글 본문 텍스트는 한 글자도 건드리지 않는다(코드 블록 내 마커 추가만). 작성자 글(singleton 등)도 대상이나 추가는 보수적으로.
+
+- [ ] **Step 1: 후보 조사**
+
+전 글 코드 블록을 훑어 후보 목록(글/블록/언어/예상 스텝 수)을 만들고 위 기준으로 컷. 예상 35~45개 대상이나 실제 판단 우선(억지 스텝 금지 - 확신 없으면 뺀다).
+
+- [ ] **Step 2: 주입**
+
+글 단위로 마커 추가. 스텝 번호는 실행·이해 순서(등장 순서와 다를 수 있음 - 예: 이중 검사 잠금은 첫 검사 1, 잠금 2, 재검사 3, 생성 4).
+
+- [ ] **Step 3: 검증**
+
+- `npm run build` + `grep -r "\[!code step" dist/` 0건(styleguide 인라인 코드 언급 예외).
+- 주입 글 중 3편(singleton 포함) /write 왕복 diff 0.
+- dev에서 주입 블록 2~3개 바 등장·스텝 수 확인, 제외 블록엔 바 없음.
+- 엠대시 0(마커 주변).
+
+- [ ] **Step 4: 커밋**
+
+```bash
+git add src/content/posts/
+git commit -m "post: 실행 흐름이 있는 코드 블록에 스텝 마커 주입"
+```
+
+---
+
+### Task 11: 그래프 초기 화면맞춤 + 타임랩스 컨트롤
+
+**Files:**
+- Modify: `src/pages/graph.astro`
+
+**Interfaces:**
+- 없음(자기 완결). `window.__injoyGraph` 테스트 훅(`_play`, `_state`)은 유지하되 `_state()`에 `paused` 필드 추가.
+
+배경(코드 실측):
+- 초기 뷰: `restart()`가 시뮬을 돌리고 `loop()`가 정착(alpha < ALPHA_MIN 또는 maxFrames)했을 때에야 `pendingFit`으로 `fitToBbox()`가 한 번 불린다(graph.astro:592). 그래서 정착 전까지 축소된 기본 뷰가 보인다.
+- 타임랩스: `#gt-play` 하나로 토글(graph.astro:919), `revealOf`가 `performance.now() - playStart`로 진행도 계산(graph.astro:316). 일시정지·초기화 없음, 버튼에 "재생" 텍스트 라벨.
+- **주의(메모리 실증 함정): 루프 안 매 프레임 fitToBbox는 과거에 그래프 흔들림을 만들었다. 매 프레임 fit 금지.**
+
+- [ ] **Step 1: 초기 화면맞춤(사전 정착)**
+
+`restart()` 호출 직후(또는 restart 내부 마지막)에, 첫 페인트 전에 시뮬을 동기로 미리 돌려 near-정착 상태로 만들고 fit한다. `wake()`의 reduceMotion 분기(graph.astro:602-606, 320틱 동기 정착)와 같은 수법:
+
+```js
+    // 첫 화면부터 그래프가 화면에 꼭 맞게 - 정착을 기다리지 않고 미리 동기로 식힌 뒤 fit.
+    // (루프 안 매 프레임 fit은 흔들림을 만들었던 전력이 있어, fit은 여기서 한 번만)
+    const prewarm = () => {
+      for (let i = 0; i < 300 && alpha >= ALPHA_MIN; i++) tick();
+      fitToBbox();
+      pendingFit = false;
+      draw();
+    };
+```
+
+`restart()` 뒤 최초 1회만 호출(테마 재시작 등 재호출 경로에서 뷰를 덮지 않게 플래그 가드). 잔여 미세 정착은 기존 loop가 이어 간다(추가 fit 없음).
+
+주의:
+- `?focus=슬러그` 경로: focus 노드 강조·센터링 로직이 있으면 prewarm 후에도 그 동작이 유지되는지 확인하고, focus가 뷰를 잡는 경우 prewarm의 fit이 그걸 덮지 않게 순서를 조정한다(focus 처리가 나중에 오도록).
+- 모바일(isSmall)과 데스크톱 모두 확인. reduceMotion 경로는 이미 동기 정착이므로 이중 정착이 되지 않게(중복 tick 무해하나 확인).
+
+- [ ] **Step 2: 타임랩스 컨트롤 3버튼(아이콘 전용)**
+
+마크업(graph.astro:42-47) 교체:
+
+```html
+    <div class="graph-tools">
+      <button type="button" class="gt-btn" id="gt-play" aria-label="글이 쌓인 순서대로 재생">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l12 7-12 7z"></path></svg>
+      </button>
+      <button type="button" class="gt-btn" id="gt-reset" aria-label="재생 초기화" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M4 10a8 8 0 1 1-1 6"></path></svg>
+      </button>
+    </div>
+```
+
+`.gt-label` 스팬 제거(아이콘 전용). 초기화 버튼은 재생 시작 전엔 `hidden`, 재생·일시정지 중에만 노출(평소 도구 바 미니멀 유지).
+
+스크립트: 일시정지는 경과시간 누적으로.
+
+```js
+    let playPaused = false;
+    let playElapsed = 0; // 일시정지 때까지 누적된 경과(ms)
+```
+
+`revealOf`의 진행도 계산을 교체:
+
+```js
+    const playProgress = () =>
+      (playElapsed + (playPaused ? 0 : performance.now() - playStart)) / playMs;
+    const revealOf = (id) => {
+      if (!playing) return 1;
+      const p = playProgress();
+      return Math.max(0, Math.min(1, p * nodes.length - appearIndex.get(id)));
+    };
+```
+
+`#gt-play` 클릭 핸들러 교체 - 상태 3분기(정지 -> 재생 시작 / 재생 중 -> 일시정지 / 일시정지 -> 재개):
+
+```js
+    const playIcon = (playing활성) => { /* path d를 재생(M7 5l12 7-12 7z) <-> 일시정지(M7 5h4v14H7zM13 5h4v14h-4z)로 교체 + aria-label 갱신 */ };
+```
+
+- 재생 시작: 기존 준비 로직(필터 해제·fitToBbox 등) 그대로 + `playElapsed = 0; playPaused = false;` + reset 버튼 `hidden = false`.
+- 일시정지: `playElapsed += performance.now() - playStart; playPaused = true; draw();` (rAF step은 playPaused면 draw 없이 대기하거나 중단 후 재개 시 재시작).
+- 재개: `playStart = performance.now(); playPaused = false;` step 루프 재시작.
+- 종료(진행도 >= 1 + 1/N): 기존대로 playing=false + 아이콘을 재생으로 + reset 버튼 hidden.
+- `#gt-reset` 클릭: `playing = false; playPaused = false; playElapsed = 0;` 아이콘 재생으로, reset 버튼 hidden, `draw()`(전체 표시 상태로 복귀).
+- step 루프의 종료 판정도 `playProgress() >= 1 + 1 / nodes.length`로 교체(일시정지 반영).
+- reduceMotion 경로(애니 없이 전체 표시)는 기존 유지.
+- `__injoyGraph._state()`에 `paused: playPaused` 추가.
+
+- [ ] **Step 3: 검증**
+
+dev 데스크톱 1280 + 모바일 390:
+- 로드 직후(정착 애니 전) `__injoyGraph.view.scale`이 `baseView.scale`과 일치하고 노드 bbox가 캔버스 안에 들어옴(축소 기본 뷰 아님).
+- `_play()` 후 `_state().playing === true`, 일시정지 클릭 -> `paused: true`이고 `revealOf` 진행도가 두 시점 계측에서 동일(멈춤 확인), 재개 -> 진행 재개, 초기화 -> `playing: false` + 전체 표시.
+- `?focus=` 붙여 로드해도 focus 강조 동작 유지.
+- 캔버스 페이지 스크린샷은 stall 위험(메모리) -> 계측은 전부 `preview_eval`로.
+- 그래프 물리·모션의 최종 체감은 라이브 몫.
+
+- [ ] **Step 4: 빌드 + 커밋**
+
+```bash
+npm run build
+git add src/pages/graph.astro
+git commit -m "graph: 첫 화면부터 화면맞춤, 타임랩스에 일시정지·초기화 추가"
+```
+
 - `injoy-project-state.md`에 회차 항목(커밋 해시·비자명 함정) 추가.
 - push는 세션 전체 커밋을 모아 1회:
 
