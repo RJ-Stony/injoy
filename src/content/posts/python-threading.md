@@ -1,7 +1,7 @@
 ---
 title: "파이썬에서 스레드를 만드는 세 가지 방법"
 description: "threading 모듈로 스레드를 만드는 세 가지 방법과 생명주기, 결과 반환까지 정리해보자"
-pubDate: 2026-07-07
+pubDate: 2026-07-07T15:00:00+09:00
 category: "개발"
 tags: ["threading", "동시성", "python"]
 draft: false
