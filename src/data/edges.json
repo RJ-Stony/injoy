@@ -251,6 +251,12 @@
       "to": "polish-round-13",
       "type": "extends",
       "note": "다듬은 읽기 화면 위에 시퀀스/코드 재생 버튼을 얹은 과정"
+    },
+    {
+      "from": "yagni",
+      "to": "singleton-pattern",
+      "type": "related",
+      "note": "싱글톤은 꼭 필요할 때만 골라 써야 한다던 지난 글의 경고를 이어받아, 필요할 때 만든다는 YAGNI 원칙으로 풀어낸 글"
     }
   ]
 }
