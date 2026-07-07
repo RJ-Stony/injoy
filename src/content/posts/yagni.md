@@ -109,9 +109,9 @@ class NotificationEngine:
         self._log = log
 
     def notify(self, message, channel_type: str) -> None:
-        channel = self._factory.get(channel_type)
-        channel.send(message)
-        self._log.save(message)
+        channel = self._factory.get(channel_type)  # [!code step:1]
+        channel.send(message)  # [!code step:2]
+        self._log.save(message)  # [!code step:3]
 ```
 
 무슨 일이 벌어졌는지 보자. 요구사항은 진짜 일로 치면 세 줄이었다. 받고, 만들고, 보내면 된다. 그런데 그걸 하려고 클래스와 인터페이스를 6개나 만들었다. `KakaoChannel`은 `send()`가 텅 비어 있다. `ChannelFactory`는 채널을 딱 하나 관리한다. `DeliveryLog`의 `load`와 `delete`는 아무도 부르지 않는다. 사용자도 없고 푸는 문제도 없는 인프라 코드를 잔뜩 짠 셈이다.
