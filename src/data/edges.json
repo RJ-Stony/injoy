@@ -262,7 +262,7 @@
       "from": "python-threading",
       "to": "singleton-pattern",
       "type": "supports",
-      "note": "싱글톤을 스레드 안전하게 만들 때 쓴 Lock과 이중 검사 잠금, 그 threading 모듈의 구현을 처음부터 파헤쳐 싱글톤의 스레드 안전성을 뒷받침하는 글"
+      "note": "싱글톤 글에서 스레드를 안전하게 만들 때 쓴 Lock과 이중 검사 잠금, 그 threading 모듈의 구현 과정을 처음부터 파헤쳐 스레드 안전성을 뒷받침하는 글"
     }
   ]
 }
