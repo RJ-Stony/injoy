@@ -21,6 +21,19 @@ export interface SequencePlayer {
 
 interface Step { els: Element[] }
 
+// 메시지 선(직선·자기호출 곡선)에 길이를 재어 심는다 → CSS가 stroke-dashoffset으로
+// 방향대로 '그려지는' 등장 모션을 만든다(단순 페이드 대신). 텍스트·노트는 그대로 페이드.
+const LINE_SEL = 'line.messageLine0, line.messageLine1, path.messageLine0, path.messageLine1';
+function markMessageLines(svg: SVGSVGElement): void {
+  for (const el of svg.querySelectorAll<SVGGeometryElement>(LINE_SEL)) {
+    let len = 0;
+    try { len = el.getTotalLength(); } catch { /* getTotalLength 미지원 브라우저 */ }
+    if (!len) continue;
+    el.setAttribute('data-sq-line', '');
+    el.style.setProperty('--sq-len', String(Math.ceil(len) + 1));
+  }
+}
+
 /**
  * 스텝 그룹핑.
  * Step 1 실측 결과: mermaid 시퀀스는 메시지 '텍스트'를 그 '라인'보다 ~35px 위에 그리고,
@@ -89,7 +102,7 @@ export function createTransportBar(ariaLabel: string): TransportBar {
   bar.className = 'sq-transport';
   bar.setAttribute('role', 'group');
   bar.setAttribute('aria-label', ariaLabel);
-  const restartB = btn('처음부터 재생', PATHS.restart);
+  const restartB = btn('처음으로 되돌리기', PATHS.restart);
   const prevB = btn('이전 단계', PATHS.prev);
   const playB = btn('재생', PATHS.play, 'sq-play');
   const nextB = btn('다음 단계', PATHS.next);
@@ -119,6 +132,7 @@ export function attachSequencePlayer(host: HTMLElement, diagram: HTMLElement): S
   if (!first) return null;
   steps = collectSteps(first);
   if (steps.length < 2) return null;
+  markMessageLines(first);
   cur = steps.length;
 
   // ---- 트랜스포트 바 (공유 헬퍼로 생성 -> 스타일은 global.css) ----
@@ -170,7 +184,7 @@ export function attachSequencePlayer(host: HTMLElement, diagram: HTMLElement): S
   };
 
   playB.addEventListener('click', () => (timer ? stop() : play()));
-  restartB.addEventListener('click', () => { stop(); cur = 0; render(); play(); });
+  restartB.addEventListener('click', () => { stop(); cur = 0; render(); }); // ↺ = 0으로 초기화(자동 재생 안 함)
   prevB.addEventListener('click', () => { stop(); cur = Math.max(0, cur - 1); render(); });
   nextB.addEventListener('click', () => { stop(); cur = Math.min(steps.length, cur + 1); render(); });
 
@@ -184,6 +198,7 @@ export function attachSequencePlayer(host: HTMLElement, diagram: HTMLElement): S
       const s = svg();
       steps = s ? collectSteps(s) : [];
       if (steps.length < 2) { bar.style.display = 'none'; return; }
+      if (s) markMessageLines(s);
       bar.style.display = '';
       cur = steps.length;
       buildDots();

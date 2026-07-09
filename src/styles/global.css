@@ -862,6 +862,26 @@ a:hover {
   }
 }
 
+/* 메시지 선은 페이드 대신 출발점 → 도착점으로 '그려지며' 등장한다(화살표가 방향대로 이어지는 모션).
+   sequence-player가 각 선의 길이를 --sq-len에 심어 두면, sq-hidden일 땐 dashoffset=길이(안 그려짐),
+   드러나면 0으로 흘러 선이 방향대로 그어진다. 자기호출(곡선 path)도 같은 원리로 그려진다. */
+.diagram-wrap svg :is(line, path)[data-sq-line],
+.dm-diagram svg :is(line, path)[data-sq-line] {
+  stroke-dasharray: var(--sq-len);
+  stroke-dashoffset: 0;
+}
+.diagram-wrap svg :is(line, path)[data-sq-line].sq-hidden,
+.dm-diagram svg :is(line, path)[data-sq-line].sq-hidden {
+  stroke-dashoffset: var(--sq-len);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .diagram-wrap svg :is(line, path)[data-sq-line],
+  .dm-diagram svg :is(line, path)[data-sq-line] {
+    /* 선은 페이드가 아니라 그리기. opacity는 거의 즉시(잔상 방지), dashoffset만 시간을 들여 흐른다. */
+    transition: stroke-dashoffset 0.5s ease, opacity 0.05s linear;
+  }
+}
+
 .sq-transport {
   display: flex;
   align-items: center;

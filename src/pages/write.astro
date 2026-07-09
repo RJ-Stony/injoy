@@ -2537,23 +2537,23 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   .injoy-bubble-btn.bb-u { text-decoration: underline; }
   .injoy-bubble-btn.bb-s { text-decoration: line-through; }
 
-  /* 터치: 키보드 바로 위 전체폭 도킹 바(iOS 선택 메뉴와 안 겹치게). JS가 visualViewport로 top을 잡는다. */
+  /* 터치: 키보드 위에 살짝 떠 있는 둥근 알약 바(메모앱처럼). 좌우 여백을 둬 플로팅 느낌을 주고,
+     JS가 visualViewport로 키보드 위 살짝 띄운 지점에 top을 잡아 브라우저 하단 UI(주소창)와 안 겹치게 한다.
+     left/right는 CSS가 잡으므로 JS는 top만 설정한다. */
   .injoy-bubble--dock {
-    left: 0;
-    right: 0;
+    left: 10px;
+    right: 10px;
     width: auto;
-    gap: 6px;
-    padding: 6px 8px;
-    border-radius: 0;
-    border-left: 0;
-    border-right: 0;
-    border-bottom: 0;
-    box-shadow: 0 -4px 12px rgb(0 0 0 / 12%);
+    gap: 4px;
+    padding: 5px;
+    border-radius: 14px;
+    box-shadow: 0 6px 22px rgb(0 0 0 / 24%);
   }
   .injoy-bubble--dock .injoy-bubble-btn {
     flex: 1;
     height: 40px;
     font-size: 1rem;
+    border-radius: 10px;
   }
 
   /* 이미지 + alt 입력칸 (에디터 안 nodeView). 이미지를 누르면 아래 입력칸이 펼쳐진다. */

@@ -74,16 +74,38 @@ function recenterSequenceText(
   }
 
   // 액터: rect.actor 마다 같은 <g> 안의 text.actor 를 박스 중앙에 맞춘다.
+  // ★긴 라벨이 자동 줄바꿈되면 mermaid가 줄들을 너무 좁은 간격으로 겹쳐 놓는다
+  // (예: "안내데스크 (공유기/NAT)" → 두 줄이 7px 간격으로 포개짐). 그래서 여러 줄이면
+  // 겹치지 않는 줄 높이로 다시 쌓고, 줄 묶음 전체를 박스 중앙에 맞춘다.
   for (const rect of svg.querySelectorAll<SVGGraphicsElement>('rect.actor')) {
-    const t = rect.parentElement?.querySelector<SVGTextElement>('text.actor');
-    if (!t) continue;
-    const tr = t.getBoundingClientRect();
+    const g = rect.parentElement;
+    const texts = g ? [...g.querySelectorAll<SVGTextElement>('text.actor')] : [];
+    if (!texts.length) continue;
     const rr = rect.getBoundingClientRect();
-    if (!tr.height || !rr.height) continue;
-    const dy = (rr.top + rr.height / 2) - (tr.top + tr.height / 2);
-    const dx = (rr.left + rr.width / 2) - (tr.left + tr.width / 2);
-    if (Math.abs(dy) < 1 && Math.abs(dx) < 1) continue;
-    prependTranslate(t, dx * scale, dy * scale);
+    if (!rr.height) continue;
+    const cx = rr.left + rr.width / 2;
+    const cy = rr.top + rr.height / 2;
+
+    if (texts.length === 1) {
+      const tr = texts[0].getBoundingClientRect();
+      if (!tr.height) continue;
+      const dy = cy - (tr.top + tr.height / 2);
+      const dx = cx - (tr.left + tr.width / 2);
+      if (Math.abs(dy) >= 1 || Math.abs(dx) >= 1) prependTranslate(texts[0], dx * scale, dy * scale);
+      continue;
+    }
+
+    // 여러 줄: y로 정렬 후, 가장 큰 줄 높이를 줄 간격으로 삼아 겹치지 않게 재배치.
+    const rects = texts.map((t) => t.getBoundingClientRect());
+    texts.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+    const lineH = Math.max(...rects.map((r) => r.height)) * 1.05;
+    const firstCenterY = cy - (lineH * (texts.length - 1)) / 2; // 블록을 박스 중앙에
+    texts.forEach((t, i) => {
+      const tr = t.getBoundingClientRect();
+      const dy = firstCenterY + i * lineH - (tr.top + tr.height / 2);
+      const dx = cx - (tr.left + tr.width / 2);
+      prependTranslate(t, dx * scale, dy * scale);
+    });
   }
 }
 

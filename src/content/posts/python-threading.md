@@ -127,8 +127,8 @@ print(thread.is_alive())  # False (종료됨)
 stateDiagram-v2
     [*] --> Created: 스레드 생성
     Created --> Running: start() 호출
-    Running --> Waiting: join(), acquire(), wait(), sleep()
-    Waiting --> Running: 조건 충족, 잠금 획득, 타임아웃
+    Running --> Waiting: join(), acquire(),<br/>wait(), sleep()
+    Waiting --> Running: 조건 충족, 잠금 획득,<br/>타임아웃
     Running --> Terminated: run() 완료 또는 예외
     Terminated --> [*]
 ```

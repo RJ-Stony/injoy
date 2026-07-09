@@ -607,14 +607,16 @@ function makeFormatBubble() {
     // 터치에선 버블을 키보드 바로 위에 고정 바로 도킹한다. 데스크톱은 기존처럼 선택 위에 띄운다.
     const coarse = window.matchMedia('(pointer: coarse)');
 
-    // 도킹 바를 키보드 상단(= visualViewport 하단)에 붙인다. 키보드가 오르내리면 다시 계산.
+    // 도킹 바를 키보드 위에 살짝 띄워 붙인다(플로팅 알약). 좌우 여백은 CSS(.injoy-bubble--dock)가
+    // 잡으므로 여기선 top만 설정한다. 키보드가 오르내리면 visualViewport 변화에 맞춰 다시 계산.
+    const DOCK_GAP = 10; // 키보드 위 여백. 브라우저 하단 UI(주소창)와 겹치지 않게
     const positionDock = () => {
       const vv = window.visualViewport;
-      const h = bar.offsetHeight;
-      const top = vv ? Math.round(vv.offsetTop + vv.height - h) : window.innerHeight - h;
+      const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+      const top = Math.round(bottom - bar.offsetHeight - DOCK_GAP);
       bar.style.top = `${top}px`;
-      bar.style.left = '0px';
-      bar.style.right = '0px';
+      bar.style.left = '';
+      bar.style.right = '';
     };
 
     // 선택 상태에 따라 버블/도킹 바를 배치한다. 포커스 없음·코드 안에서는 숨긴다.
