@@ -16,27 +16,19 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+# 빌드와 배포를 한 잡으로 합쳤다. 잡을 나누면 deploy가 러너를 한 번 더 기다려
+# (호스티드 러너 배정 대기가 두 번) 배포가 느려진다. 성공이 대부분이라 한 잡이 빠르다.
+# deploy가 드물게 실패하면(대개 Pages 레이트리밋) rerun 대신 커밋 모아 다시 push한다.
 jobs:
-  # 빌드/배포를 두 잡으로 나눈다(공식 권장). 러너 스핀업이 한 번 더 들지만,
-  # deploy가 Pages 인프라 사정으로 실패해도(간헐 'Deployment failed, try again later')
-  # 아티팩트를 다시 올리지 않고 실패한 deploy 잡만 안전하게 재실행할 수 있다
-  # (`gh run rerun <id> --failed`). 단일 잡이면 재실행이 아티팩트를 중복 업로드해
-  # 'Multiple artifacts named github-pages'로 되레 깨진다.
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      # withastro/action이 설치·빌드 후 pages 아티팩트(github-pages)를 업로드한다.
-      - uses: withastro/action@v6
-
   deploy:
-    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+      # withastro/action이 설치·빌드 후 pages 아티팩트(github-pages)를 업로드한다.
+      - uses: withastro/action@v6
       - id: deployment
         uses: actions/deploy-pages@v4
