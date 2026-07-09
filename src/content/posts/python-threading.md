@@ -6,7 +6,7 @@ updatedDate: 2026-07-08T10:34:18.880Z
 category: "개발"
 tags: ["threading", "동시성", "python"]
 draft: false
-series: "개발 공부"
+series: "파이썬"
 ---
 
 [[singleton-pattern]] 글에서 싱글톤 패턴을 구현하고, 실제로 캐시 매니저를 만들 때 `threading.Lock`으로 스레드 안전성을 지키게 되었다. 그때 잠깐 작성된 **threading 모듈**을 이번엔 제대로 파보려고 한다.
