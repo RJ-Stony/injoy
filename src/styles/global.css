@@ -869,34 +869,6 @@ a:hover {
   }
 }
 
-/* 메시지 선은 페이드 대신 출발점 → 도착점으로 '그려지며' 등장한다(사다리타기처럼 선이 뻗는 모션).
-   등장은 transition이 아니라 @keyframes로 한다. transition은 클래스 토글 타이밍에 취약하고
-   헤드리스로 검증이 안 되지만, keyframe 애니는 getAnimations()로 발동을 확인할 수 있다.
-   ★dasharray는 !important: mermaid가 SVG 내부 <style>에서 `#id .messageLine0`(ID 특이도)로 dasharray를
-   박기 때문에 그걸 이겨 선을 한 개의 긴 대시로 만든다. sequence-player가 각 선 길이를 --sq-len에 심는다. */
-.diagram-wrap svg :is(line, path)[data-sq-line],
-.dm-diagram svg :is(line, path)[data-sq-line] {
-  stroke-dasharray: var(--sq-len) !important;
-  stroke-dashoffset: 0; /* 기본 = 완성(그려진 상태) */
-  transition: none !important; /* messageLine0/1의 기본 opacity 0.3s 페이드를 끈다 → 선은 '그리기'로만 등장 */
-}
-/* 아직 등장 안 한 선: 화살촉까지 완전히 숨김(opacity). 그리기 시작 전 잔상을 막는다. */
-.diagram-wrap svg :is(line, path)[data-sq-line].sq-hidden,
-.dm-diagram svg :is(line, path)[data-sq-line].sq-hidden {
-  opacity: 0;
-}
-@keyframes injoy-sq-draw {
-  from { stroke-dashoffset: var(--sq-len); }
-  to { stroke-dashoffset: 0; }
-}
-@media (prefers-reduced-motion: no-preference) {
-  /* 그 스텝에서 막 드러나는 선에만 sq-drawing을 붙여 한 번 그린다(과거·완성 선은 정적). */
-  .diagram-wrap svg :is(line, path)[data-sq-line].sq-drawing,
-  .dm-diagram svg :is(line, path)[data-sq-line].sq-drawing {
-    animation: injoy-sq-draw 0.7s ease;
-  }
-}
-
 .sq-transport {
   display: flex;
   align-items: center;
