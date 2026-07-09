@@ -58,6 +58,15 @@ const buildSha = process.env.GITHUB_SHA ?? '';
     <link rel="icon" type="image/png" sizes="32x32" href={withBase('/favicon-32.png')} />
     <link rel="icon" type="image/png" sizes="64x64" href={withBase('/favicon-64.png')} />
     <link rel="apple-touch-icon" href={withBase('/apple-touch-icon.png')} />
+
+    <!-- 홈 화면 앱(PWA). 오프라인 캐싱(서비스 워커)은 필요 없어 뺐다. iOS는 아래 메타 + apple-touch-icon으로 standalone 실행. -->
+    <link rel="manifest" href={withBase('/manifest.webmanifest')} />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#16181c" media="(prefers-color-scheme: dark)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Injoy" />
     <link
       rel="alternate"
       type="application/rss+xml"
@@ -101,7 +110,7 @@ const buildSha = process.env.GITHUB_SHA ?? '';
       <div class:list={['site-header-inner', { wide }]}>
         <a class="logo" href={withBase('/')}>
           <Image class="logo-avatar" src={profile} alt="" width={64} height={64} loading="eager" />
-          <span>Injoy</span>
+          <span class="logo-word">Injoy</span>
         </a>
         <div class="header-actions">
           <nav class="nav-desktop" aria-label="주 메뉴">
@@ -213,6 +222,41 @@ const buildSha = process.env.GITHUB_SHA ?? '';
         document.querySelector<HTMLElement>('.nav-toggle'),
         document.querySelector<HTMLElement>('#mobile-menu'),
       );
+
+      // 워드마크 롱프레스(약 600ms) → 글쓰기. 웹앱(standalone)엔 URL 창이 없어 /write로 갈 길이
+      // 막히는 걸 푼다. /write는 토큰 게이트라 노출돼도 무해. 짧은 탭은 홈 이동 그대로.
+      const word = document.querySelector<HTMLElement>('.logo .logo-word');
+      if (word) {
+        let holdTimer: number | undefined;
+        let fired = false;
+        const start = () => {
+          fired = false;
+          holdTimer = window.setTimeout(() => {
+            fired = true;
+            const href =
+              document.querySelector<HTMLAnchorElement>('a.write-link')?.getAttribute('href') ||
+              '/write/';
+            location.href = href;
+          }, 600);
+        };
+        const cancel = () => {
+          if (holdTimer) {
+            clearTimeout(holdTimer);
+            holdTimer = undefined;
+          }
+        };
+        word.addEventListener('pointerdown', start);
+        word.addEventListener('pointerup', cancel);
+        word.addEventListener('pointerleave', cancel);
+        word.addEventListener('pointercancel', cancel);
+        // 롱프레스로 이동했으면 이어지는 링크 클릭(홈 이동)을 막는다.
+        word.closest('a')?.addEventListener('click', (e) => {
+          if (fired) {
+            e.preventDefault();
+            fired = false;
+          }
+        });
+      }
     </script>
 
     <main id="main" class:list={[{ wide }]}>
@@ -317,6 +361,12 @@ const buildSha = process.env.GITHUB_SHA ?? '';
     font-weight: 800;
     letter-spacing: -0.02em;
     color: var(--text);
+  }
+
+  /* 워드마크 롱프레스(→ 글쓰기)에서 iOS 텍스트 선택·콜아웃 팝오버가 뜨지 않게 한다. */
+  .logo-word {
+    -webkit-touch-callout: none;
+    user-select: none;
   }
 
   .logo-avatar {

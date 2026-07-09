@@ -2537,6 +2537,25 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   .injoy-bubble-btn.bb-u { text-decoration: underline; }
   .injoy-bubble-btn.bb-s { text-decoration: line-through; }
 
+  /* 터치: 키보드 바로 위 전체폭 도킹 바(iOS 선택 메뉴와 안 겹치게). JS가 visualViewport로 top을 잡는다. */
+  .injoy-bubble--dock {
+    left: 0;
+    right: 0;
+    width: auto;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    box-shadow: 0 -4px 12px rgb(0 0 0 / 12%);
+  }
+  .injoy-bubble--dock .injoy-bubble-btn {
+    flex: 1;
+    height: 40px;
+    font-size: 1rem;
+  }
+
   /* 이미지 + alt 입력칸 (에디터 안 nodeView). 이미지를 누르면 아래 입력칸이 펼쳐진다. */
   .write-root .injoy-img {
     display: block;

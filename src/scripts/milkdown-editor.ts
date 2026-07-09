@@ -585,8 +585,8 @@ function makeFormatBubble() {
       el.textContent = b.label;
       el.title = b.title;
       el.setAttribute('aria-label', b.title);
-      el.addEventListener('mousedown', (ev) => {
-        ev.preventDefault(); // 선택·포커스 유지
+      el.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault(); // 선택·포커스 유지(터치에서도 키보드가 안 내려가게)
         const markType = view.state.schema.marks[b.mark];
         if (markType) toggleMark(markType)(view.state, view.dispatch);
         view.focus();
@@ -595,18 +595,54 @@ function makeFormatBubble() {
       return { ...b, el };
     });
 
-    // 선택 위에 버블을 띄운다. 비선택·포커스 없음·코드블록 안에서는 숨긴다.
+    // 버튼 활성 표시 갱신(현재 선택에 마크가 걸려 있으면 눌린 상태로).
+    const updateActive = () => {
+      buttons.forEach((b) => {
+        const markType = view.state.schema.marks[b.mark];
+        b.el.setAttribute('aria-pressed', String(markType ? markActive(markType) : false));
+      });
+    };
+
+    // 터치 기기 여부. 선택 위에 떠다니면 iOS 네이티브 선택 메뉴(오려두기·복사…)와 겹치므로,
+    // 터치에선 버블을 키보드 바로 위에 고정 바로 도킹한다. 데스크톱은 기존처럼 선택 위에 띄운다.
+    const coarse = window.matchMedia('(pointer: coarse)');
+
+    // 도킹 바를 키보드 상단(= visualViewport 하단)에 붙인다. 키보드가 오르내리면 다시 계산.
+    const positionDock = () => {
+      const vv = window.visualViewport;
+      const h = bar.offsetHeight;
+      const top = vv ? Math.round(vv.offsetTop + vv.height - h) : window.innerHeight - h;
+      bar.style.top = `${top}px`;
+      bar.style.left = '0px';
+      bar.style.right = '0px';
+    };
+
+    // 선택 상태에 따라 버블/도킹 바를 배치한다. 포커스 없음·코드 안에서는 숨긴다.
     const place = () => {
       if (!view || !view.hasFocus()) {
         bar.hidden = true;
         return;
       }
       const sel = view.state.selection;
+      // 코드(인라인/블록) 안에서는 서식이 무의미.
+      if (sel.$from.parent.type.spec.code) {
+        bar.hidden = true;
+        return;
+      }
+      // 터치: 포커스가 있으면 선택이 비어도(커서만) 도킹 바를 보인다("굵게 켜고 타이핑"도 된다).
+      if (coarse.matches) {
+        bar.classList.add('injoy-bubble--dock');
+        bar.hidden = false;
+        updateActive();
+        positionDock();
+        return;
+      }
+      // 데스크톱: 텍스트를 드래그 선택했을 때만 선택 위에 띄운다(노드 선택·빈 선택 제외).
+      bar.classList.remove('injoy-bubble--dock');
+      bar.style.right = '';
       const { from, to, empty } = sel;
-      // 텍스트 선택만 대상(노드 선택·빈 선택 제외). 코드(인라인/블록) 안에서는 서식이 무의미.
       const sameTextblock = sel.$from.sameParent(sel.$to) && sel.$from.parent.isTextblock;
-      const inCode = !!sel.$from.parent.type.spec.code;
-      if (empty || !(sel instanceof TextSelection) || !sameTextblock || inCode) {
+      if (empty || !(sel instanceof TextSelection) || !sameTextblock) {
         bar.hidden = true;
         return;
       }
@@ -615,11 +651,7 @@ function makeFormatBubble() {
         const end = view.coordsAtPos(to);
         const mid = (Math.min(start.left, end.left) + Math.max(start.right ?? start.left, end.right ?? end.left)) / 2;
         bar.hidden = false;
-        // 활성 상태 갱신
-        buttons.forEach((b) => {
-          const markType = view.state.schema.marks[b.mark];
-          b.el.setAttribute('aria-pressed', String(markType ? markActive(markType) : false));
-        });
+        updateActive();
         const rect = bar.getBoundingClientRect();
         const top = Math.min(start.top, end.top) - rect.height - 8;
         const left = Math.max(8, Math.min(mid - rect.width / 2, window.innerWidth - rect.width - 8));
@@ -639,11 +671,26 @@ function makeFormatBubble() {
         };
         window.addEventListener('scroll', reposition, true);
         window.addEventListener('resize', reposition);
+        // 터치: 키보드가 오르내리며 visualViewport가 바뀔 때 도킹 바를 다시 붙인다.
+        const vv = window.visualViewport;
+        vv?.addEventListener('resize', reposition);
+        vv?.addEventListener('scroll', reposition);
+        // 포커스만 바뀌고 선택 변화가 없으면 update가 안 오기도 한다 → 포커스/블러도 직접 듣는다.
+        const onFocus = () => place();
+        const onBlur = () => {
+          bar.hidden = true;
+        };
+        editorView.dom.addEventListener('focus', onFocus);
+        editorView.dom.addEventListener('blur', onBlur);
         return {
           update: () => place(),
           destroy: () => {
             window.removeEventListener('scroll', reposition, true);
             window.removeEventListener('resize', reposition);
+            vv?.removeEventListener('resize', reposition);
+            vv?.removeEventListener('scroll', reposition);
+            editorView.dom.removeEventListener('focus', onFocus);
+            editorView.dom.removeEventListener('blur', onBlur);
             bar.remove();
           },
         };

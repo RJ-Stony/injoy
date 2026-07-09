@@ -1,0 +1,13 @@
+{
+  "name": "Injoy",
+  "short_name": "Injoy",
+  "start_url": "/injoy/",
+  "scope": "/injoy/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "/injoy/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "/injoy/favicon-64.png", "sizes": "64x64", "type": "image/png" }
+  ]
+}
