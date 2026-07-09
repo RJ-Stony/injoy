@@ -178,7 +178,7 @@ const buildSha = process.env.GITHUB_SHA ?? '';
     </header>
 
     <!-- 글쓰기 링크: 이 기기에 발행 토큰이 있을 때만 보인다(운영자 전용). 두 메뉴 모두 적용.
-         토큰이 없는 웹앱(standalone)에서 처음 들어갈 땐 푸터 '안에서'를 길게 눌러 /write로 간다(아래 스크립트). -->
+         토큰이 없는 웹앱(standalone)에서 처음 들어갈 땐 푸터 'Injoy'를 길게 눌러 /write로 간다(아래 스크립트). -->
     <script is:inline>
       try {
         if (localStorage.getItem('injoy-gh-token')) {
@@ -224,9 +224,9 @@ const buildSha = process.env.GITHUB_SHA ?? '';
         document.querySelector<HTMLElement>('#mobile-menu'),
       );
 
-      // 숨은 진입: 푸터 '안에서'를 길게(약 600ms) 누르면 글쓰기로 간다. 웹앱(standalone)엔 주소창이
+      // 숨은 진입: 푸터 'Injoy'를 길게(약 600ms) 누르면 글쓰기로 간다. 웹앱(standalone)엔 주소창이
       // 없어 /write로 갈 길이 막히는데, 링크를 노출하지 않고도 주인만 아는 제스처로 연다.
-      // '안에서'는 일반 텍스트(링크 아님)라 iOS 링크 미리보기가 안 뜬다. /write는 토큰 게이트라 안전.
+      // 'Injoy'는 일반 텍스트(링크 아님)라 iOS 링크 미리보기가 안 뜬다. /write는 토큰 게이트라 안전.
       const key = document.querySelector<HTMLElement>('.write-key');
       if (key) {
         let holdTimer: number | undefined;
@@ -257,7 +257,7 @@ const buildSha = process.env.GITHUB_SHA ?? '';
 
     <footer class="site-footer">
       <div class:list={['site-footer-inner', { wide }]}>
-        <p>© {new Date().getFullYear()} Injoy. 즐거움 <span class="write-key">안에서</span>.</p>
+        <p>© {new Date().getFullYear()} <span class="write-key">Injoy</span>.</p>
         <p class="footer-links">
           <span id="site-visits" hidden></span>
           <a href={withBase('/rss.xml')}>RSS</a>
@@ -355,7 +355,7 @@ const buildSha = process.env.GITHUB_SHA ?? '';
     color: var(--text);
   }
 
-  /* 푸터 '안에서' 롱프레스(→ 글쓰기)에서 iOS 텍스트 선택·콜아웃 팝오버가 뜨지 않게 한다.
+  /* 푸터 'Injoy' 롱프레스(→ 글쓰기)에서 iOS 텍스트 선택·콜아웃 팝오버가 뜨지 않게 한다.
      일반 텍스트라 링크 미리보기(peek)는 애초에 안 뜬다(로고 <a>와 달리). */
   .write-key {
     -webkit-touch-callout: none;
