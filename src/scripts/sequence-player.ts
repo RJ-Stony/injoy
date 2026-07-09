@@ -5,7 +5,7 @@
  * 본문(.diagram-wrap)과 확대 모달이 공유한다. 문서 마크다운은 건드리지 않는다.
  */
 
-const STEP_INTERVAL = 900; // ms, 스텝 간 간격
+const STEP_INTERVAL = 1500; // ms, 스텝 간 간격(선이 그어지는 시간을 넉넉히)
 const SELECTOR = [
   'text.messageText',
   'line.messageLine0', 'line.messageLine1',

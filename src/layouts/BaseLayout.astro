@@ -110,7 +110,7 @@ const buildSha = process.env.GITHUB_SHA ?? '';
       <div class:list={['site-header-inner', { wide }]}>
         <a class="logo" href={withBase('/')}>
           <Image class="logo-avatar" src={profile} alt="" width={64} height={64} loading="eager" />
-          <span class="logo-word">Injoy</span>
+          <span>Injoy</span>
         </a>
         <div class="header-actions">
           <nav class="nav-desktop" aria-label="주 메뉴">
@@ -177,7 +177,8 @@ const buildSha = process.env.GITHUB_SHA ?? '';
       </div>
     </header>
 
-    <!-- 글쓰기 링크: 이 기기에 발행 토큰이 있을 때만 보인다(운영자 전용). 두 메뉴 모두 적용. -->
+    <!-- 글쓰기 링크: 이 기기에 발행 토큰이 있을 때만 보인다(운영자 전용). 두 메뉴 모두 적용.
+         토큰이 없는 웹앱(standalone)에서 처음 들어갈 땐 푸터 '안에서'를 길게 눌러 /write로 간다(아래 스크립트). -->
     <script is:inline>
       try {
         if (localStorage.getItem('injoy-gh-token')) {
@@ -223,39 +224,30 @@ const buildSha = process.env.GITHUB_SHA ?? '';
         document.querySelector<HTMLElement>('#mobile-menu'),
       );
 
-      // 워드마크 롱프레스(약 600ms) → 글쓰기. 웹앱(standalone)엔 URL 창이 없어 /write로 갈 길이
-      // 막히는 걸 푼다. /write는 토큰 게이트라 노출돼도 무해. 짧은 탭은 홈 이동 그대로.
-      const word = document.querySelector<HTMLElement>('.logo .logo-word');
-      if (word) {
+      // 숨은 진입: 푸터 '안에서'를 길게(약 600ms) 누르면 글쓰기로 간다. 웹앱(standalone)엔 주소창이
+      // 없어 /write로 갈 길이 막히는데, 링크를 노출하지 않고도 주인만 아는 제스처로 연다.
+      // '안에서'는 일반 텍스트(링크 아님)라 iOS 링크 미리보기가 안 뜬다. /write는 토큰 게이트라 안전.
+      const key = document.querySelector<HTMLElement>('.write-key');
+      if (key) {
         let holdTimer: number | undefined;
-        let fired = false;
-        const start = () => {
-          fired = false;
-          holdTimer = window.setTimeout(() => {
-            fired = true;
-            const href =
-              document.querySelector<HTMLAnchorElement>('a.write-link')?.getAttribute('href') ||
-              '/write/';
-            location.href = href;
-          }, 600);
-        };
         const cancel = () => {
           if (holdTimer) {
             clearTimeout(holdTimer);
             holdTimer = undefined;
           }
         };
-        word.addEventListener('pointerdown', start);
-        word.addEventListener('pointerup', cancel);
-        word.addEventListener('pointerleave', cancel);
-        word.addEventListener('pointercancel', cancel);
-        // 롱프레스로 이동했으면 이어지는 링크 클릭(홈 이동)을 막는다.
-        word.closest('a')?.addEventListener('click', (e) => {
-          if (fired) {
-            e.preventDefault();
-            fired = false;
-          }
+        key.addEventListener('pointerdown', () => {
+          holdTimer = window.setTimeout(() => {
+            const href =
+              document.querySelector<HTMLAnchorElement>('a.write-link')?.getAttribute('href') ||
+              '/write/';
+            location.href = href;
+          }, 600);
         });
+        key.addEventListener('pointerup', cancel);
+        key.addEventListener('pointerleave', cancel);
+        key.addEventListener('pointercancel', cancel);
+        key.addEventListener('contextmenu', (e) => e.preventDefault());
       }
     </script>
 
@@ -265,7 +257,7 @@ const buildSha = process.env.GITHUB_SHA ?? '';
 
     <footer class="site-footer">
       <div class:list={['site-footer-inner', { wide }]}>
-        <p>© {new Date().getFullYear()} Injoy. 즐거움 안에서.</p>
+        <p>© {new Date().getFullYear()} Injoy. 즐거움 <span class="write-key">안에서</span>.</p>
         <p class="footer-links">
           <span id="site-visits" hidden></span>
           <a href={withBase('/rss.xml')}>RSS</a>
@@ -363,8 +355,9 @@ const buildSha = process.env.GITHUB_SHA ?? '';
     color: var(--text);
   }
 
-  /* 워드마크 롱프레스(→ 글쓰기)에서 iOS 텍스트 선택·콜아웃 팝오버가 뜨지 않게 한다. */
-  .logo-word {
+  /* 푸터 '안에서' 롱프레스(→ 글쓰기)에서 iOS 텍스트 선택·콜아웃 팝오버가 뜨지 않게 한다.
+     일반 텍스트라 링크 미리보기(peek)는 애초에 안 뜬다(로고 <a>와 달리). */
+  .write-key {
     -webkit-touch-callout: none;
     user-select: none;
   }

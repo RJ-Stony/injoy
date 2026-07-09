@@ -8,7 +8,7 @@
  */
 import { createTransportBar } from './sequence-player';
 
-const STEP_INTERVAL = 1200; // ms, 스텝 간 간격
+const STEP_INTERVAL = 1500; // ms, 스텝 간 간격
 
 export interface CodeStepPlayer {
   destroy(): void;

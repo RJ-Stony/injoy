@@ -58,7 +58,7 @@ sequenceDiagram
     participant S as 외부 웹사이트
 
     R->>G: 택배 (보내는 사람: 202호)
-    Note over G: 보내는 사람을 대표 주소로 바꿔 씀<br/>장부에 "이건 202호" 기록
+    Note over G: 보내는 사람을 대표 주소로 바꿔 씀. 장부에 "이건 202호" 기록
     G->>S: 택배 (보내는 사람: 대표 주소)
     S->>G: 답장 (받는 사람: 대표 주소)
     Note over G: 장부를 보고 202호를 찾음
