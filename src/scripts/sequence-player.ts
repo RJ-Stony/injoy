@@ -155,9 +155,16 @@ export function attachSequencePlayer(host: HTMLElement, diagram: HTMLElement): S
     transport.setPlayIcon(playing, cur >= steps.length);
   };
 
-  const render = () => {
+  // drawStep = 이번에 '막 드러나는' 스텝 인덱스(그 스텝의 선에만 그리기 애니를 건다). -1이면 애니 없음.
+  const render = (drawStep = -1) => {
     steps.forEach((s, i) => {
-      for (const el of s.els) el.classList.toggle('sq-hidden', i >= cur);
+      const hidden = i >= cur;
+      for (const el of s.els) {
+        el.classList.toggle('sq-hidden', hidden);
+        if ((el as Element).matches?.('[data-sq-line]')) {
+          (el as Element).classList.toggle('sq-drawing', !hidden && i === drawStep);
+        }
+      }
     });
     counter.textContent = `${cur} / ${steps.length}`;
     [...dots.children].forEach((d, i) => d.classList.toggle('on', i < cur));
@@ -173,7 +180,7 @@ export function attachSequencePlayer(host: HTMLElement, diagram: HTMLElement): S
 
   const advance = () => {
     cur++;
-    render();
+    render(cur - 1); // 방금 드러난 스텝(cur-1)의 선을 그린다
     if (cur >= steps.length) stop();
   };
 
@@ -181,12 +188,16 @@ export function attachSequencePlayer(host: HTMLElement, diagram: HTMLElement): S
     if (cur >= steps.length) { cur = 0; render(); } // 완성 상태에서 재생 = 처음부터
     timer = window.setInterval(advance, reduced ? 400 : STEP_INTERVAL);
     setPlayIcon(true);
+    advance(); // 첫 스텝을 바로 그린다(1.5초 기다리지 않게)
   };
 
   playB.addEventListener('click', () => (timer ? stop() : play()));
   restartB.addEventListener('click', () => { stop(); cur = 0; render(); }); // ↺ = 0으로 초기화(자동 재생 안 함)
-  prevB.addEventListener('click', () => { stop(); cur = Math.max(0, cur - 1); render(); });
-  nextB.addEventListener('click', () => { stop(); cur = Math.min(steps.length, cur + 1); render(); });
+  prevB.addEventListener('click', () => { stop(); cur = Math.max(0, cur - 1); render(); }); // 뒤로 갈 땐 그리기 없음
+  nextB.addEventListener('click', () => { // 앞으로 한 칸: 그 스텝을 그린다
+    stop();
+    if (cur < steps.length) { cur++; render(cur - 1); } else render();
+  });
 
   buildDots();
   render();
