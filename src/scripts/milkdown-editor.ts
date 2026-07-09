@@ -668,15 +668,22 @@ function makeFormatBubble() {
       view: (editorView: any) => {
         view = editorView;
         document.body.appendChild(bar);
-        const reposition = () => {
+        // 스크롤: 데스크톱 버블만 선택을 따라 다시 자리잡는다. 모바일 도킹 바는 키보드에 붙어 있어
+        // 스크롤마다 top을 다시 계산하면 흔들린다 → 스크롤엔 반응하지 않고 그 자리에 고정해 둔다.
+        const repositionScroll = () => {
+          if (bar.hidden || coarse.matches) return;
+          place();
+        };
+        // 리사이즈(키보드 높이 변화·회전)엔 둘 다 다시 붙인다. place()가 coarse면 도킹, 아니면 버블.
+        const repositionResize = () => {
           if (!bar.hidden) place();
         };
-        window.addEventListener('scroll', reposition, true);
-        window.addEventListener('resize', reposition);
-        // 터치: 키보드가 오르내리며 visualViewport가 바뀔 때 도킹 바를 다시 붙인다.
+        window.addEventListener('scroll', repositionScroll, true);
+        window.addEventListener('resize', repositionResize);
+        // 터치: 키보드가 오르내릴 때(vv resize)만 도킹 바를 다시 붙인다.
+        // vv 'scroll'은 스크롤 중 계속 발생해 흔들림의 원인이므로 듣지 않는다.
         const vv = window.visualViewport;
-        vv?.addEventListener('resize', reposition);
-        vv?.addEventListener('scroll', reposition);
+        vv?.addEventListener('resize', repositionResize);
         // 포커스만 바뀌고 선택 변화가 없으면 update가 안 오기도 한다 → 포커스/블러도 직접 듣는다.
         const onFocus = () => place();
         const onBlur = () => {
@@ -687,10 +694,9 @@ function makeFormatBubble() {
         return {
           update: () => place(),
           destroy: () => {
-            window.removeEventListener('scroll', reposition, true);
-            window.removeEventListener('resize', reposition);
-            vv?.removeEventListener('resize', reposition);
-            vv?.removeEventListener('scroll', reposition);
+            window.removeEventListener('scroll', repositionScroll, true);
+            window.removeEventListener('resize', repositionResize);
+            vv?.removeEventListener('resize', repositionResize);
             editorView.dom.removeEventListener('focus', onFocus);
             editorView.dom.removeEventListener('blur', onBlur);
             bar.remove();

@@ -434,19 +434,26 @@ a:hover {
     font-size: 1.05em;
   }
 
-  /* 나머지 셀: '라벨 : 값' 두 칸 그리드 */
+  /* 나머지 셀: 라벨을 값 위에 쌓는다(좌우 2칸 그리드는 값 칸이 좁아 코드 칩이 토막났다).
+     값이 카드 전체 폭을 쓰므로 `is_alive() == False` 같은 코드도 한 줄에 들어간다. */
   .prose tbody td:not(:first-child) {
-    display: grid;
-    grid-template-columns: 5.5em 1fr;
-    gap: 0.6em;
-    align-items: start;
+    display: block;
+    overflow-x: auto;
   }
 
   .prose tbody td:not(:first-child)::before {
     content: attr(data-label);
+    display: block;
+    margin-bottom: 0.25em;
     color: var(--text-muted);
-    font-size: 0.85em;
+    font-size: 0.8em;
     font-weight: 600;
+  }
+
+  /* 표 안 인라인 코드는 토막나지 않게: 코드 자체는 통으로 두고(넘치면 칸이 가로 스크롤),
+     둘레의 한국어 문장은 공백에서 자연스럽게 감긴다. */
+  .prose tbody td code {
+    white-space: nowrap;
   }
 }
 
