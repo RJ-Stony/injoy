@@ -259,12 +259,6 @@
       "note": "싱글톤은 꼭 필요할 때만 골라 써야 한다던 지난 글의 내용을 이어받아, 필요할 때만 만든다는 YAGNI 원칙으로 풀어낸 글"
     },
     {
-      "from": "python-threading",
-      "to": "singleton-pattern",
-      "type": "supports",
-      "note": "싱글톤 글에서 스레드를 안전하게 만들 때 쓴 Lock과 이중 검사 잠금, 그 threading 모듈의 구현 과정을 처음부터 파헤쳐 스레드 안전성을 뒷받침하는 글"
-    },
-    {
       "from": "port-forwarding",
       "to": "welcome",
       "type": "related",
