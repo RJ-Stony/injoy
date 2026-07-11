@@ -15,7 +15,7 @@ const cover = post.data.cover;
 const diagram = cover ? null : firstDiagram(post);
 ---
 
-<article class="post-card" data-slug={post.id}>
+<article class="post-card">
   <div class="text">
     <PostMeta
       category={post.data.category}
@@ -26,7 +26,6 @@ const diagram = cover ? null : firstDiagram(post);
     />
     <h2 class="title">
       <a href={href}>{post.data.title}</a>
-      <span class="card-read" hidden>읽음</span>
     </h2>
     <p class="description">{post.data.description}</p>
   </div>
@@ -145,24 +144,6 @@ const diagram = cover ? null : firstDiagram(post);
     text-decoration: none;
   }
 
-  /* 읽은 글 표시(D13) — 방문한 글 카드에 작은 배지 */
-  .card-read {
-    display: inline-block;
-    margin-left: 0.5rem;
-    padding: 0.1em 0.5em;
-    border-radius: 999px;
-    background-color: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    font-size: 0.7rem;
-    font-weight: 600;
-    vertical-align: middle;
-    white-space: nowrap;
-  }
-  .card-read[hidden] {
-    display: none;
-  }
-
   .description {
     margin: 0;
     color: var(--text-muted);
@@ -172,19 +153,6 @@ const diagram = cover ? null : firstDiagram(post);
 </style>
 
 <script>
-  // 읽은 글 표시(D13) — 이 기기에서 방문한 글 카드에 '읽음' 배지를 켠다.
-  import { getVisited } from '../scripts/reading-trace';
-  {
-    const visited = getVisited();
-    if (visited.size) {
-      for (const card of document.querySelectorAll<HTMLElement>('.post-card[data-slug]')) {
-        if (card.dataset.slug && visited.has(card.dataset.slug)) {
-          card.querySelector<HTMLElement>('.card-read')!.hidden = false;
-        }
-      }
-    }
-  }
-
   // 커버 없는 글의 카드 썸네일 = 본문 첫 mermaid 다이어그램. 글 상세와 같은 렌더러를 재사용한다.
   // 목록에 도식 글이 여럿이어도 부담 없게, 카드가 화면에 들어올 때만 그린다(지연 렌더).
   import { renderMermaidDiagrams } from '../scripts/mermaid-render';

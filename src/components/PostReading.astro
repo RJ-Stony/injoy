@@ -63,11 +63,12 @@
     // 상한(끝 근처면 감춤)은 걸지 않는다 — 로드 직후엔 다이어그램·이미지 전이라 문서 높이가
     // 아직 안 잡혀 오판한다(35차 FOUT 계열 함정). 점프 시점에만 현재 높이로 클램프한다.
     if (chip && savedY > window.innerHeight * 0.6) {
-      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
       chip.hidden = false;
       chip.addEventListener('click', () => {
         const max = document.documentElement.scrollHeight - window.innerHeight;
-        window.scrollTo({ top: Math.min(savedY, max), behavior: reduce ? 'auto' : 'smooth' });
+        // 항상 즉시 점프(behavior:'auto') — 스무스로 내리면 이미지·다이어그램 지연 로드로
+        // 문서 높이가 도중에 바뀌며 목표 지점이 어긋나 '살짝 튀는' 느낌이 났다.
+        window.scrollTo({ top: Math.min(savedY, max), behavior: 'auto' });
         chip.hidden = true;
       });
       setTimeout(() => (chip.hidden = true), 8000); // 오래 두지 않는다
