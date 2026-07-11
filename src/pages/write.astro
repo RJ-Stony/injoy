@@ -3,6 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import { withBase } from '../utils/url';
 import { EDGE_TYPES, AUTO_EDGE_TYPES } from '../utils/graph';
 import { alertOptions } from '../utils/callout-config.mjs';
+import glossaryData from '../data/glossary.json';
 
 /**
  * 인-블로그 글쓰기 에디터.
@@ -22,6 +23,7 @@ const config = {
   siteIndexUrl: withBase('/site-index.json'),
   postsDir: 'src/content/posts',
   edgesPath: 'src/data/edges.json',
+  glossaryPath: 'src/data/glossary.json',
 };
 
 const edgeTypeOptions = Object.entries(EDGE_TYPES).map(([value, v]) => ({
@@ -244,6 +246,17 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       </section>
 
       <section class="card section">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">용어</h2>
+            <p class="section-sub">본문의 굵은 용어(뜻)가 용어집에 자동으로 모여요. 여기서 빼거나 고칠 수 있어요.</p>
+          </div>
+        </div>
+        <ul id="glossary-terms" class="glossary-terms"></ul>
+        <p id="glossary-hint" class="edge-hint"></p>
+      </section>
+
+      <section class="card section">
         <h2 class="section-title">점검</h2>
         <ul id="lint-results" class="lint"></ul>
       </section>
@@ -261,6 +274,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   <script type="application/json" id="write-config" set:html={JSON.stringify(config)} />
   <script type="application/json" id="edge-type-meta" set:html={JSON.stringify(edgeTypeOptions)} />
   <script type="application/json" id="callout-meta" set:html={JSON.stringify(calloutOptions)} />
+  <script type="application/json" id="glossary-exclude" set:html={JSON.stringify(glossaryData.exclude)} />
 </BaseLayout>
 
 <script>
@@ -268,6 +282,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   import { createDatePicker, todayISO } from '../scripts/date-picker';
   import { confirmLive } from '../scripts/deploy-toast';
   import type { EditorHandle } from '../scripts/milkdown-editor';
+  import { splitCode } from '../utils/md-text';
+  import { scanGlossaryTerms, isKoreanDef } from '../utils/glossary-rules';
 
   // ---------- 설정·상태 ----------
   const CFG = JSON.parse(document.getElementById('write-config')!.textContent!);
@@ -293,8 +309,21 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     incomingNoteEdits: new Map<string, string | undefined>(),
     // acceptedEdges가 '이 글의 완전한 나가는 연결 집합'을 반영하는지. false면 reconcile가 삭제하지 않는다(데이터 보호).
     edgesLoaded: true,
+    // 용어집 제외 목록(glossary.json). 빌드타임 값으로 시작해 세션 중 토글을 얹는다.
+    glossaryExclude: new Set<string>(),
     index: { posts: [] as any[], edges: [] as any[] },
   };
+
+  // 용어집 제외 목록 기준선(빌드타임 스냅샷). 발행 시 이것과 다르면 glossary.json을 커밋에 함께 넣는다.
+  // 모듈 최상위라 파싱 실패가 스크립트 전체(미러 동기화·발행)를 죽이지 않게 try/catch로 감싼다.
+  let glossaryBaseline: string[] = [];
+  try {
+    const raw = JSON.parse(document.getElementById('glossary-exclude')?.textContent ?? '[]');
+    if (Array.isArray(raw)) glossaryBaseline = raw.filter((t): t is string => typeof t === 'string');
+  } catch {
+    /* 파싱 실패 시 빈 기준선 — 용어 스캔·표시는 계속 동작한다 */
+  }
+  for (const t of glossaryBaseline) state.glossaryExclude.add(t);
 
   const token = () => localStorage.getItem(TOKEN_KEY);
 
@@ -431,7 +460,13 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   async function loadIndex() {
     try {
       const res = await fetch(CFG.siteIndexUrl, { cache: 'no-store' });
-      state.index = await res.json();
+      const raw = await res.json();
+      // 모양 정규화 — posts·edges가 배열이 아니면(파싱은 됐지만 형태가 다른 응답)
+      // 아래 순회와 renderSuggestions가 죽어 resetForm·renderGlossary까지 막힌다.
+      state.index = {
+        posts: Array.isArray(raw?.posts) ? raw.posts : [],
+        edges: Array.isArray(raw?.edges) ? raw.edges : [],
+      };
     } catch {
       state.index = { posts: [], edges: [] };
     }
@@ -575,9 +610,18 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   const scheduleRefresh = () => {
     clearTimeout(previewTimer);
     previewTimer = setTimeout(() => {
-      renderPreview();
-      renderSuggestions();
-      runLint();
+      // 각 단계를 격리 — 한 단계가 죽어도(예: 인덱스 모양 이상) 뒤 단계까지 막히지 않게.
+      const safe = (fn: () => unknown) => {
+        try {
+          fn();
+        } catch (e) {
+          console.error('write refresh 단계 실패:', e);
+        }
+      };
+      safe(renderPreview);
+      safe(renderSuggestions);
+      safe(renderGlossary);
+      safe(runLint);
     }, 400);
   };
   $('fm-body').addEventListener('input', scheduleRefresh);
@@ -917,6 +961,132 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     ($('edge-note') as HTMLInputElement).value = '';
     renderSuggestions();
   });
+
+  // ---------- 용어집 ----------
+  // 정규식 특수문자를 이스케이프 — 용어·뜻을 그대로 마크다운에서 찾을 때 쓴다.
+  const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  /** 본문 마크다운의 `**용어**(옛뜻)` 첫 매칭을 새 뜻으로 바꾼다. 반드시 에디터를 통해 왕복해
+   *  미러 textarea와 에디터가 어긋나지 않게 한다. 성공하면 true. */
+  function replaceGloss(term: string, oldGloss: string, newGloss: string): boolean {
+    const md = mdEditor ? mdEditor.getMarkdown() : ($('fm-body') as HTMLTextAreaElement).value;
+    const re = new RegExp(`\\*\\*${escapeRe(term)}\\*\\*\\(${escapeRe(oldGloss)}\\)`);
+    if (!re.test(md)) return false;
+    const next = md.replace(re, `**${term}**(${newGloss})`);
+    if (mdEditor) mdEditor.setMarkdown(next);
+    syncMirror(next); // 에디터 onChange가 비동기라도 미러·후속 로직을 즉시 맞춘다(중복 이벤트는 syncMirror가 가드)
+    return true;
+  }
+
+  function renderGlossary() {
+    const ul = $('glossary-terms');
+    // 스캔 실패가 이 함수 뒤에 이어지는 점검(runLint)까지 죽이지 않게 방어한다.
+    let terms: { term: string; gloss: string }[] = [];
+    try {
+      const { prose } = splitCode(($('fm-body') as HTMLTextAreaElement).value);
+      terms = scanGlossaryTerms(prose);
+    } catch {
+      /* 스캔 실패 시 빈 목록으로 진행 — 아래 빈 안내가 뜬다 */
+    }
+    ul.innerHTML = '';
+    if (!terms.length) {
+      ul.innerHTML =
+        '<li class="empty">본문에 <strong>용어</strong>(뜻) 형태가 없어요. 전문 용어 첫 등장에 짧은 뜻을 붙이면 용어집에 모여요.</li>';
+      return;
+    }
+    for (const { term, gloss } of terms) {
+      const excluded = state.glossaryExclude.has(term);
+      const li = document.createElement('li');
+      li.className = 'glossary-item' + (excluded ? ' excluded' : '');
+
+      const row = document.createElement('div');
+      row.className = 'gl-row';
+      const termEl = Object.assign(document.createElement('strong'), {
+        textContent: term,
+        className: 'gl-term',
+      });
+      const glossEl = Object.assign(document.createElement('span'), {
+        textContent: gloss,
+        className: 'gl-gloss muted',
+      });
+
+      const actions = document.createElement('div');
+      actions.className = 'gl-actions';
+
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.textContent = excluded ? '되돌리기' : '용어집에서 빼기';
+      toggle.addEventListener('click', () => {
+        if (state.glossaryExclude.has(term)) state.glossaryExclude.delete(term);
+        else state.glossaryExclude.add(term);
+        renderGlossary();
+      });
+
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.textContent = '뜻 고치기';
+      edit.addEventListener('click', () => openGlossEditor(li, term, gloss));
+
+      actions.append(toggle, edit);
+      row.append(termEl, glossEl, actions);
+      li.append(row);
+      ul.appendChild(li);
+    }
+  }
+
+  /** 인라인 뜻 편집칸을 연다. 적용하면 본문 마크다운을 에디터로 왕복해 새 뜻을 반영한다. */
+  function openGlossEditor(li: HTMLElement, term: string, oldGloss: string) {
+    if (li.querySelector('.gl-edit')) return; // 이미 열려 있으면 무시
+    $('glossary-hint').textContent = '';
+    const box = document.createElement('div');
+    box.className = 'gl-edit';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = oldGloss;
+    input.setAttribute('aria-label', `${term} 새 뜻`);
+    const apply = Object.assign(document.createElement('button'), { type: 'button', textContent: '적용' });
+    const cancel = Object.assign(document.createElement('button'), { type: 'button', textContent: '취소' });
+
+    const close = () => box.remove();
+    cancel.addEventListener('click', close);
+    const commit = () => {
+      const next = input.value.trim();
+      if (!next || next === oldGloss) return close();
+      if (!replaceGloss(term, oldGloss, next)) {
+        $('glossary-hint').textContent = '본문에서 이 용어의 뜻을 찾지 못했어요. 본문이 바뀌었는지 확인해 주세요.';
+        return close();
+      }
+      // 새 뜻이 한국어 뜻풀이 조건을 못 넘으면 용어집에서 빠진다 — 적용은 하되 알려 준다.
+      if (!isKoreanDef(next)) {
+        $('glossary-hint').textContent = '이 뜻이면 용어집에서 빠져요. 한글 뜻풀이를 넣으면 다시 모여요.';
+      }
+      renderGlossary(); // 즉시 반영(스캔은 새 미러 값을 읽는다)
+    };
+    apply.addEventListener('click', commit);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      else if (e.key === 'Escape') { e.preventDefault(); close(); }
+    });
+
+    box.append(input, apply, cancel);
+    li.append(box);
+    input.focus();
+    input.select();
+  }
+
+  // 개발·테스트용 핸들(__injoyEditor·__injoyDiagramModal과 같은 관례) — 헤드리스 검증이
+  // 렌더를 강제하거나 스캔·제외 상태를 직접 계측할 수 있게 한다. 운영자 전용 페이지.
+  (window as any).__injoyGlossary = {
+    render: renderGlossary,
+    getState: () => {
+      const { prose } = splitCode(($('fm-body') as HTMLTextAreaElement).value);
+      return {
+        terms: scanGlossaryTerms(prose),
+        exclude: [...state.glossaryExclude],
+        baseline: [...glossaryBaseline],
+      };
+    },
+  };
 
   // ---------- 점검 ----------
   function stripFences(body: string) {
@@ -1262,6 +1432,15 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     return edgesToString({ ...data, edges: next });
   }
 
+  const sortedExclude = (arr: Iterable<string>) => [...arr].sort((a, b) => a.localeCompare(b, 'ko'));
+
+  /** 용어집 제외 목록이 기준선과 달라졌으면 glossary.json 내용을 돌려준다(정렬·끝 개행). 같으면 null(멱등). */
+  function glossaryFileIfChanged(): string | null {
+    const next = sortedExclude(state.glossaryExclude);
+    if (JSON.stringify(next) === JSON.stringify(sortedExclude(glossaryBaseline))) return null;
+    return JSON.stringify({ exclude: next }, null, 2) + '\n';
+  }
+
   /** 삭제되는 글을 가리키는 연결을 함께 정리 — 남겨 두면 다음 빌드가 실패한다 */
   async function edgesFileWithout(slug: string): Promise<string | null> {
     const data = await fetchEdges();
@@ -1385,6 +1564,9 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       } else if (state.acceptedEdges.length > 0) {
         status.textContent = '초안이라 연결은 이번 커밋에 저장하지 않아요. 발행으로 전환할 때 함께 저장돼요.';
       }
+      // 용어집 제외 목록 변경분은 초안·발행 상관없이 같은 커밋에 함께 담는다(그래프 검증과 무관한 데이터).
+      const glossaryContent = glossaryFileIfChanged();
+      if (glossaryContent) files.push({ path: CFG.glossaryPath, contentBase64: b64encodeUtf8(glossaryContent) });
 
       const verb = state.mode === 'edit' ? '수정' : '발행';
       const sha = await commitFiles(files, [], `post: ${($('fm-title') as HTMLInputElement).value.trim()} ${verb} (/write)`);
@@ -1394,6 +1576,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       state.pendingFiles.clear();
       state.coverPendingPath = null;
       clearDraft(); // 발행됐으니 자동저장된 초안은 지운다
+      glossaryBaseline = sortedExclude(state.glossaryExclude); // 방금 커밋한 제외 목록을 새 기준선으로(재발행 멱등)
       // acceptedEdges는 비우지 않는다 — 방금 쓴 '이 글의 연결' 상태라, 재발행 reconcile가 멱등이게.
       state.mode = 'edit';
       state.editingSlug = slug;
@@ -1472,6 +1655,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     $('delete-post').hidden = false;
     renderPreview();
     renderSuggestions();
+    renderGlossary();
     runLint();
     markLoaded(); // 방금 불러온 origin을 기준선으로 — autosave가 이 상태를 초안에 덮어쓰지 않게
     // origin으로 채운 뒤, 이 글의 로컬 편집분이 남아 있고 origin과 다르면 이어 쓸지 물어본다.
@@ -1528,6 +1712,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     $('publish-status').textContent = '';
     renderPreview();
     renderSuggestions();
+    renderGlossary();
     runLint();
     markLoaded(); // 빈 새 글 상태를 기준선으로
   }
@@ -3107,6 +3292,86 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     color: var(--text-muted);
     font-size: 0.78rem;
     font-weight: 600;
+  }
+
+  /* 용어집 — 연결(수락 목록)과 같은 카드 결. 한 줄(용어·뜻·버튼) + 인라인 편집칸. */
+  .write-root .glossary-terms {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .write-root .glossary-terms li {
+    padding: 0.55rem 0.2rem;
+    font-size: 0.9rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .write-root .glossary-terms li:first-child {
+    border-top: 0;
+  }
+
+  .write-root .glossary-terms li.empty {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+  }
+
+  .write-root .glossary-terms .gl-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .write-root .glossary-terms .gl-term {
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+
+  .write-root .glossary-terms .gl-gloss {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85rem;
+  }
+
+  .write-root .glossary-terms .gl-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-shrink: 0;
+  }
+
+  .write-root .glossary-terms .gl-actions button {
+    font-size: 0.8rem;
+    padding: 0.3em 0.7em;
+    white-space: nowrap;
+  }
+
+  /* 빠진 용어: 행 전체를 흐리게 — 용어집에 안 들어감을 한눈에 */
+  .write-root .glossary-terms li.excluded .gl-term,
+  .write-root .glossary-terms li.excluded .gl-gloss {
+    opacity: 0.45;
+    text-decoration: line-through;
+  }
+
+  .write-root .glossary-terms .gl-edit {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+  }
+
+  .write-root .glossary-terms .gl-edit input {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.85rem;
+  }
+
+  .write-root .glossary-terms .gl-edit button {
+    font-size: 0.8rem;
+    padding: 0.3em 0.7em;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .write-root .manual-edge {
