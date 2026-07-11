@@ -76,6 +76,9 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
 
   <div class="post-grid">
   <article class="post" data-pagefind-body data-pagefind-sort={`date:${pagefindSort}`}>
+    {/* 검색 필터 칩(B5)용 Pagefind 필터 — 키마다 별도 요소여야 콤마로 안 뭉친다. 빈 요소라 화면엔 안 보인다. */}
+    <span data-pagefind-filter={`category:${post.data.category}`}></span>
+    {post.data.series && <span data-pagefind-filter={`series:${post.data.series}`}></span>}
     <header class="post-header">
       <div class="meta-line" data-pagefind-ignore>
         <PostMeta

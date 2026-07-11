@@ -39,6 +39,20 @@ const data = {
       aria-label="글 연결 그래프. 노드를 끌거나 눌러 글로 이동할 수 있어요. 키보드는 화살표로 노드를 옮기고 엔터로 그 글로 이동합니다"
     ></canvas>
     <div id="graph-tooltip" hidden></div>
+    <div class="graph-search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+      <input
+        id="graph-search-input"
+        type="search"
+        list="graph-node-titles"
+        placeholder="글 제목 검색"
+        aria-label="그래프에서 글 찾기"
+        autocomplete="off"
+      />
+    </div>
+    <datalist id="graph-node-titles">
+      {data.nodes.filter((n) => n.kind === 'post').map((n) => <option value={n.label}></option>)}
+    </datalist>
     <div class="graph-tools">
       <button type="button" class="gt-btn" id="gt-play" aria-label="글이 쌓인 순서대로 재생">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l12 7-12 7z"></path></svg>
@@ -877,6 +891,33 @@ const data = {
       draw();
     });
 
+    // 제목 검색(D24) — 찾은 노드를 화면 중앙으로 끌어와 확대·강조한다.
+    const focusNode = (n) => {
+      selected = n;
+      focusTouched = true;
+      const ns = clampScale(baseView.scale * 2);
+      view.scale = ns;
+      view.tx = W / 2 - n.x * ns;
+      view.ty = H / 2 - n.y * ns;
+      pendingFit = false;
+      showTipAt(n);
+      draw();
+    };
+    const searchInput = document.getElementById('graph-search-input');
+    const runGraphSearch = () => {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) return;
+      const posts = nodes.filter((n) => n.kind === 'post');
+      const n =
+        posts.find((nd) => nd.label.toLowerCase() === q) ||
+        posts.find((nd) => nd.label.toLowerCase().includes(q));
+      if (n) focusNode(n);
+    };
+    searchInput?.addEventListener('change', runGraphSearch); // datalist에서 고르면 발화
+    searchInput?.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); runGraphSearch(); }
+    });
+
     // 첫 화면부터 그래프가 화면에 꼭 맞게 - 정착을 기다리지 않고 미리 동기로 식힌 뒤 fit.
     // (루프 안 매 프레임 fit은 흔들림을 만들었던 전력이 있어, fit은 여기서 한 번만)
     let prewarmed = false;
@@ -1126,6 +1167,43 @@ const data = {
     box-shadow: 0 2px 10px rgb(0 0 0 / 8%);
     max-width: 220px;
   }
+
+  /* 제목 검색(D24) — 캔버스 우상단 */
+  .graph-search {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.35rem 0.7rem;
+    box-shadow: 0 2px 10px rgb(0 0 0 / 8%);
+    max-width: min(60vw, 220px);
+  }
+  .graph-search svg {
+    flex-shrink: 0;
+    width: 0.95rem;
+    height: 0.95rem;
+    fill: none;
+    stroke: var(--text-muted);
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  .graph-search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    padding: 0;
+  }
+  .graph-search input:focus { outline: none; }
 
   /* 확대·축소 버튼 — 모바일·데스크톱 공통. 캔버스 우하단에 겹쳐 둔다(정적 DOM이라 스코프 CSS 적용) */
   .graph-zoom {

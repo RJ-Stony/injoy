@@ -10,6 +10,16 @@
  * 결과 URL은 dist 기준(/posts/..)이라 base('/injoy')를 앞에 붙여 바로잡는다.
  */
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { getPublishedPosts } from '../utils/post';
+import { withBase } from '../utils/url';
+
+// 빈 검색 상태(B6)·랜덤 글(F28)에 쓸 목록을 빌드타임에 뽑는다.
+const posts = await getPublishedPosts(); // 최신순
+const recentPosts = posts.slice(0, 6).map((p) => ({
+  title: p.data.title,
+  url: withBase(`/posts/${p.id}/`),
+}));
+const allPosts = posts.map((p) => ({ title: p.data.title, url: withBase(`/posts/${p.id}/`) }));
 ---
 
 <BaseLayout title="검색" description="Injoy의 글을 제목과 본문에서 찾아보세요.">
@@ -28,9 +38,42 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       />
     </div>
 
+    {/* 검색 중에만 보이는 정렬 토글(B4)·필터 칩(B5) */}
+    <div id="search-tools" class="search-tools" hidden>
+      <div class="sort-toggle" role="group" aria-label="정렬">
+        <button type="button" class="sort-btn is-on" data-sort="relevance" aria-pressed="true">관련도순</button>
+        <button type="button" class="sort-btn" data-sort="date" aria-pressed="false">최신순</button>
+      </div>
+      <div id="filter-chips" class="filter-chips" aria-label="필터"></div>
+    </div>
+
     <p id="search-count" class="search-count" role="status" aria-live="polite"></p>
     <div id="search-results" class="search-results" aria-live="polite" aria-label="검색 결과"></div>
     <button id="search-more" class="search-more" type="button" hidden>결과 더 보기</button>
+
+    {/* 입력 전 빈 상태(B6)·랜덤 글(F28) */}
+    <div id="search-empty" class="search-empty">
+      <div id="recent-terms" class="empty-block" hidden>
+        <div class="empty-head">
+          <h2>최근 검색어</h2>
+          <button type="button" id="clear-terms" class="empty-clear">지우기</button>
+        </div>
+        <div id="recent-terms-list" class="term-chips"></div>
+      </div>
+      <div class="empty-block">
+        <div class="empty-head">
+          <h2>최근 글</h2>
+          <button type="button" id="random-post" class="empty-clear random-post">🎲 아무 글이나</button>
+        </div>
+        <ul class="recent-posts">
+          {recentPosts.map((p) => (
+            <li><a href={p.url}>{p.title}</a></li>
+          ))}
+        </ul>
+      </div>
+    </div>
+
+    <script type="application/json" id="all-posts" set:html={JSON.stringify(allPosts)}></script>
 
     <p id="search-fallback" class="search-fallback" hidden>
       검색 색인은 빌드된 사이트에서만 동작해요. 로컬에서는
@@ -52,6 +95,55 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   const resultsEl = document.getElementById('search-results');
   const moreBtn = document.getElementById('search-more') as HTMLButtonElement | null;
   const fallbackEl = document.getElementById('search-fallback');
+  const toolsEl = document.getElementById('search-tools');
+  const filterChipsEl = document.getElementById('filter-chips');
+  const emptyEl = document.getElementById('search-empty');
+  const recentTermsEl = document.getElementById('recent-terms');
+  const recentTermsListEl = document.getElementById('recent-terms-list');
+
+  // 정렬(B4)·필터(B5) 상태
+  let sortMode: 'relevance' | 'date' = 'relevance';
+  const activeFilters = new Map<string, Set<string>>(); // key → 선택된 값들
+  let filtersRendered = false;
+
+  // 최근 검색어(B6) — localStorage
+  const TERMS_KEY = 'injoy-recent-searches';
+  const readTerms = (): string[] => {
+    try { return JSON.parse(localStorage.getItem(TERMS_KEY) || '[]'); } catch { return []; }
+  };
+  const saveTerm = (t: string) => {
+    const terms = [t, ...readTerms().filter((x) => x !== t)].slice(0, 8);
+    try { localStorage.setItem(TERMS_KEY, JSON.stringify(terms)); } catch {}
+  };
+  function renderRecentTerms() {
+    if (!recentTermsEl || !recentTermsListEl) return;
+    const terms = readTerms();
+    recentTermsEl.hidden = terms.length === 0;
+    recentTermsListEl.innerHTML = '';
+    for (const t of terms) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'term-chip';
+      chip.textContent = t;
+      chip.addEventListener('click', () => {
+        if (input) { input.value = t; input.focus(); }
+        run(t);
+      });
+      recentTermsListEl.appendChild(chip);
+    }
+  }
+  document.getElementById('clear-terms')?.addEventListener('click', () => {
+    try { localStorage.removeItem(TERMS_KEY); } catch {}
+    renderRecentTerms();
+  });
+
+  // 랜덤 글(F28)
+  document.getElementById('random-post')?.addEventListener('click', () => {
+    try {
+      const all = JSON.parse(document.getElementById('all-posts')?.textContent || '[]') as { url: string }[];
+      if (all.length) location.href = all[Math.floor(Math.random() * all.length)].url;
+    } catch {}
+  });
 
   type SubResult = { title: string; url: string; excerpt: string };
   type PageData = { url: string; meta?: { title?: string }; excerpt: string; sub_results?: SubResult[] };
@@ -65,10 +157,76 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       // BASE_URL이 '/injoy'(끝 슬래시 없이)로 올 수 있어 슬래시를 명시해 합친다.
       pagefind = await import(/* @vite-ignore */ `${baseNoSlash}/pagefind/pagefind.js`);
       await pagefind.init();
+      await renderFilters();
     } catch {
       loadFailed = true;
       if (fallbackEl) fallbackEl.hidden = false;
     }
+  }
+
+  // 필터 칩(B5) — 인덱스에 있는 카테고리·시리즈 값을 Pagefind로부터 받아 그린다.
+  const FILTER_LABELS: Record<string, string> = { category: '카테고리', series: '시리즈' };
+  async function renderFilters() {
+    if (filtersRendered || !filterChipsEl || !pagefind) return;
+    let filters: Record<string, Record<string, number>> = {};
+    try { filters = await pagefind.filters(); } catch { return; }
+    filterChipsEl.innerHTML = '';
+    for (const key of ['category', 'series']) {
+      const values = filters[key];
+      if (!values || Object.keys(values).length === 0) continue;
+      const group = document.createElement('div');
+      group.className = 'filter-group';
+      const label = document.createElement('span');
+      label.className = 'filter-label';
+      label.textContent = FILTER_LABELS[key] || key;
+      group.appendChild(label);
+      for (const val of Object.keys(values)) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'filter-chip';
+        chip.textContent = val;
+        chip.setAttribute('aria-pressed', 'false');
+        chip.addEventListener('click', () => {
+          const set = activeFilters.get(key) ?? new Set<string>();
+          if (set.has(val)) set.delete(val); else set.add(val);
+          if (set.size) activeFilters.set(key, set); else activeFilters.delete(key);
+          chip.setAttribute('aria-pressed', set.has(val) ? 'true' : 'false');
+          chip.classList.toggle('is-on', set.has(val));
+          const term = input?.value.trim();
+          if (term) run(term);
+        });
+        group.appendChild(chip);
+      }
+      filterChipsEl.appendChild(group);
+    }
+    filtersRendered = true;
+  }
+
+  // 정렬 토글(B4)
+  document.querySelectorAll<HTMLButtonElement>('.sort-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.sort as 'relevance' | 'date';
+      if (mode === sortMode) return;
+      sortMode = mode;
+      document.querySelectorAll<HTMLButtonElement>('.sort-btn').forEach((b) => {
+        const on = b === btn;
+        b.classList.toggle('is-on', on);
+        b.setAttribute('aria-pressed', String(on));
+      });
+      const term = input?.value.trim();
+      if (term) run(term);
+    });
+  });
+
+  // 검색용 옵션 — 관련도순은 sort 미지정, 최신순만 date desc. 필터가 있으면 함께 건다.
+  function searchOptions() {
+    const opts: any = {};
+    if (sortMode === 'date') opts.sort = { date: 'desc' };
+    if (activeFilters.size) {
+      opts.filters = {};
+      for (const [k, set] of activeFilters) opts.filters[k] = [...set];
+    }
+    return opts;
   }
   // 입력에 포커스가 오면 미리 모듈을 받아 첫 검색을 빠르게 한다.
   input?.addEventListener('focus', ensurePagefind, { once: true });
@@ -147,6 +305,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     if (resultsEl) resultsEl.innerHTML = '';
     if (countEl) countEl.textContent = '';
     if (moreBtn) moreBtn.hidden = true;
+    if (toolsEl) toolsEl.hidden = true;
+    if (emptyEl) emptyEl.hidden = false;
+    renderRecentTerms();
   }
 
   async function run(term: string) {
@@ -156,8 +317,12 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     }
     await ensurePagefind();
     if (loadFailed || !pagefind) return;
-    // 정렬을 날짜 내림차순으로 — 관련도 대신 최신 글이 위로 온다(글마다 data-pagefind-sort="date:…").
-    const search = await pagefind.debouncedSearch(term, { sort: { date: 'desc' } }, 300);
+    // 입력이 있으면 빈 상태를 감추고 정렬·필터 도구를 보인다.
+    if (emptyEl) emptyEl.hidden = true;
+    if (toolsEl) toolsEl.hidden = false;
+    saveTerm(term);
+    // 정렬(관련도 기본, 최신순 토글)·필터를 옵션으로 넘긴다.
+    const search = await pagefind.debouncedSearch(term, searchOptions(), 300);
     if (search === null) return; // 더 새 입력에 밀림 — 이 결과는 버린다
     // 맞은 글 전체의 데이터를 받아 글 수(N)와 구간 합(M)을 정직하게 센다.
     // ponytail: 전수 data() 로드는 수십 편까지 가볍다. 수백 편이면 배치 지연 로드로.
@@ -192,6 +357,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   });
 
   moreBtn?.addEventListener('click', renderBatch);
+
+  // 첫 진입: 빈 상태(최근 검색어·최근 글) 준비.
+  renderRecentTerms();
 </script>
 
 <style>
@@ -289,6 +457,137 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   .search-more:hover {
     background-color: var(--surface);
     border-color: var(--accent);
+  }
+
+  /* 정렬 토글(B4)·필터 칩(B5) */
+  .search-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    padding: 1rem 0 0.2rem;
+  }
+  .search-tools[hidden] { display: none; }
+
+  .sort-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px;
+    background: var(--surface);
+  }
+  .sort-btn {
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .sort-btn.is-on {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.7rem;
+    align-items: center;
+  }
+  .filter-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+  .filter-label {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .filter-chip {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    padding: 0.24rem 0.62rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .filter-chip:hover { border-color: var(--accent); }
+  .filter-chip.is-on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* 빈 검색 상태(B6)·랜덤(F28) */
+  .search-empty { padding-top: 1.4rem; }
+  .search-empty[hidden] { display: none; }
+  .empty-block { margin-bottom: 1.8rem; }
+  .empty-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.7rem;
+  }
+  .empty-head h2 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .empty-clear {
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    cursor: pointer;
+    padding: 0;
+  }
+  .empty-clear:hover { color: var(--accent); }
+  .random-post { font-weight: 600; }
+
+  .term-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .term-chip {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+  .term-chip:hover { border-color: var(--accent); }
+
+  .recent-posts {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+  .recent-posts a {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.98rem;
+  }
+  .recent-posts a:hover {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
   }
 
   .search-fallback {
