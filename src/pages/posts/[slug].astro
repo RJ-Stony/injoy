@@ -30,6 +30,8 @@ const { Content, headings } = await render(post);
 const minutes = readingMinutes(post);
 const cover = post.data.cover;
 const connections = await getConnections(post.id);
+// 전제 칩(C23) — 이 글이 '선행'으로 가리키는 글(먼저 읽으면 좋은 글). 나가는 requires 엣지.
+const prereqs = connections.filter((c) => c.type === 'requires' && c.direction === 'out');
 // 미니그래프 하버카드용 설명 맵 — 슬러그→description (빌드 타임 1회).
 const descOf = new Map((await getPublishedPosts()).map((p) => [p.id, p.data.description]));
 
@@ -97,6 +99,19 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
       <p class="description">{post.data.description}</p>
       {cover && <Image class="cover" src={cover} alt="" loading="eager" />}
     </header>
+
+    {
+      prereqs.length > 0 && (
+        <aside class="prereq" data-pagefind-ignore aria-label="먼저 읽으면 좋은 글">
+          <span class="prereq-label">먼저 읽으면 좋은 글</span>
+          <span class="prereq-links">
+            {prereqs.map((c) => (
+              <a href={withBase(`/posts/${c.slug}/`)}>{c.title}</a>
+            ))}
+          </span>
+        </aside>
+      )
+    }
 
     <div class="toc-inline" data-pagefind-ignore>
       <TableOfContents headings={headings} />
@@ -572,6 +587,39 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     justify-items: center;
+  }
+
+  /* 전제 칩(C23) — 본문 전 '먼저 읽으면 좋은 글' */
+  .prereq {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem 0.7rem;
+    margin: 1.4rem 0 0;
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--edge-requires, var(--accent));
+    border-radius: 8px;
+    background-color: var(--surface);
+    font-size: 0.9rem;
+  }
+  .prereq-label {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .prereq-links {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.9rem;
+  }
+  .prereq-links a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .prereq-links a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
   }
 
   .post {

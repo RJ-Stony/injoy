@@ -117,6 +117,11 @@ const data = {
 
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const focusId = new URLSearchParams(location.search).get('focus');
+    // 읽은 글 표시(D13) — 이 기기에서 방문한 글에 작은 점을 찍는다(인라인 스크립트라 직접 읽는다).
+    const readSet = (() => {
+      try { return new Set(JSON.parse(localStorage.getItem('injoy-read') || '[]')); }
+      catch { return new Set(); }
+    })();
 
     // 노드·엣지 준비
     const nodes = data.nodes.map((n) => ({ ...n, x: 0, y: 0, vx: 0, vy: 0 }));
@@ -514,6 +519,13 @@ const data = {
           ctx.beginPath();
           ctx.arc(n.x, n.y, r + 4, 0, Math.PI * 2);
           ctx.stroke();
+        }
+        // 읽은 글 표시(D13) — 방문한 글 노드 우상단에 작은 점
+        if (n.kind === 'post' && readSet.has(n.id)) {
+          ctx.beginPath();
+          ctx.arc(n.x + r * 0.72, n.y - r * 0.72, 2.6, 0, Math.PI * 2);
+          ctx.fillStyle = colors.accent;
+          ctx.fill();
         }
         // 라벨
         ctx.fillStyle = n.kind === 'post' ? colors.text : colors.muted;
