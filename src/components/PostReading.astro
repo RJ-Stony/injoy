@@ -14,11 +14,6 @@
 
 <div class="reading-progress" aria-hidden="true"><span class="bar"></span></div>
 
-<button type="button" class="resume-chip" hidden>
-  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"></path></svg>
-  <span>이어서 읽기</span>
-</button>
-
 <div class="reading-dial" data-open="false">
   <div class="rd-items">
     <button type="button" class="rd-item" data-act="focus" aria-label="집중 읽기 모드" tabindex="-1">
@@ -51,37 +46,12 @@
 
 <script>
   import { SMOOTH_DURATION } from '../scripts/smooth-details';
-  import { markVisited, currentSlug, saveScroll, readScroll } from '../scripts/reading-trace';
+  import { markVisited, currentSlug } from '../scripts/reading-trace';
 
-  // 0) 읽기 흔적(D13·E15) — 방문 기록 + 스크롤 위치 저장/복구.
+  // 0) 읽기 흔적(D13) — 이 글을 방문했다고 기록한다(그래프의 '읽은 글 점'이 이걸 쓴다).
   const slug = currentSlug();
   if (slug) {
-    const savedY = readScroll(slug); // 표시 전에 이전 방문 위치를 먼저 읽는다
     markVisited(slug);
-    const chip = document.querySelector<HTMLButtonElement>('.resume-chip');
-    // 한참 읽다 나간 흔적이 있을 때만 '이어서 읽기'를 권한다(맨 위 근처는 무의미).
-    // 상한(끝 근처면 감춤)은 걸지 않는다 — 로드 직후엔 다이어그램·이미지 전이라 문서 높이가
-    // 아직 안 잡혀 오판한다(35차 FOUT 계열 함정). 점프 시점에만 현재 높이로 클램프한다.
-    if (chip && savedY > window.innerHeight * 0.6) {
-      chip.hidden = false;
-      chip.addEventListener('click', () => {
-        const max = document.documentElement.scrollHeight - window.innerHeight;
-        // 항상 즉시 점프(behavior:'auto') — 스무스로 내리면 이미지·다이어그램 지연 로드로
-        // 문서 높이가 도중에 바뀌며 목표 지점이 어긋나 '살짝 튀는' 느낌이 났다.
-        window.scrollTo({ top: Math.min(savedY, max), behavior: 'auto' });
-        chip.hidden = true;
-      });
-      setTimeout(() => (chip.hidden = true), 8000); // 오래 두지 않는다
-    }
-    let saveTimer: ReturnType<typeof setTimeout>;
-    window.addEventListener(
-      'scroll',
-      () => {
-        clearTimeout(saveTimer);
-        saveTimer = setTimeout(() => saveScroll(slug, window.scrollY), 400);
-      },
-      { passive: true },
-    );
   }
 
   // 1) 읽기 진행 막대 + 맨 위로 항목 노출 — 스크롤을 rAF로 묶어 한 프레임에 한 번만 계산
@@ -242,40 +212,6 @@
     .reading-progress .bar {
       transition: transform 0.08s linear;
     }
-  }
-
-  /* 이어서 읽기 칩(E15) — 화면 하단 가운데. 8초 뒤 사라지거나 눌러서 저장 위치로 */
-  .resume-chip {
-    position: fixed;
-    left: 50%;
-    bottom: 1.4rem;
-    transform: translateX(-50%);
-    z-index: 61;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    background-color: var(--accent);
-    color: #fff;
-    border: 0;
-    border-radius: 999px;
-    padding: 0.55rem 1.1rem;
-    font-family: var(--font-sans);
-    font-size: 0.88rem;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 6px 18px rgb(0 0 0 / 22%);
-  }
-  .resume-chip[hidden] {
-    display: none;
-  }
-  .resume-chip svg {
-    width: 1rem;
-    height: 1rem;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
 
   /* 우하단 스피드다이얼 */
@@ -480,8 +416,7 @@
   html[data-focus='true'] .toc-inline,
   html[data-focus='true'] .toc-aside,
   html[data-focus='true'] .toc.line,
-  html[data-focus='true'] .reading-dial .rd-items,
-  html[data-focus='true'] .resume-chip {
+  html[data-focus='true'] .reading-dial .rd-items {
     display: none;
   }
 

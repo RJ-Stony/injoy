@@ -1,9 +1,8 @@
 /**
- * 읽기 흔적(D13·E15) — 방문한 글과 스크롤 위치를 localStorage에 남긴다.
+ * 읽기 흔적(D13) — 방문한 글을 localStorage에 남긴다(그래프의 '읽은 글 점'이 이걸 쓴다).
  * 정적 사이트라 서버 없이 이 기기 안에서만 쌓인다(개인 정원의 발자국).
  */
 const READ_KEY = 'injoy-read';
-const SCROLL_PREFIX = 'injoy-scroll:';
 
 export function getVisited(): Set<string> {
   try {
@@ -28,15 +27,4 @@ export function markVisited(slug: string): void {
 export function currentSlug(): string | null {
   const m = location.pathname.match(/\/posts\/([^/]+)\/?/);
   return m ? decodeURIComponent(m[1]) : null;
-}
-
-export function saveScroll(slug: string, y: number): void {
-  try {
-    localStorage.setItem(SCROLL_PREFIX + slug, String(Math.round(y)));
-  } catch {}
-}
-
-export function readScroll(slug: string): number {
-  const v = Number(localStorage.getItem(SCROLL_PREFIX + slug));
-  return Number.isFinite(v) ? v : 0;
 }
