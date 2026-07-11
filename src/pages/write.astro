@@ -2561,6 +2561,13 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     padding: 5px;
     border-radius: 14px;
     box-shadow: 0 6px 22px rgb(0 0 0 / 24%);
+    transition: opacity 0.18s ease;
+  }
+  /* 스크롤 중엔 잠시 숨겼다가(visual viewport가 패닝돼 본문에 붙어 움직이는 흔들림을 가린다)
+     멈추면 다시 키보드 위로 페이드인한다. */
+  .injoy-bubble--dock.bubble-settling {
+    opacity: 0;
+    pointer-events: none;
   }
   .injoy-bubble--dock .injoy-bubble-btn {
     flex: 1;
