@@ -392,46 +392,34 @@ const colsHalf = Math.ceil(columns.length / 2);
     }
   }
 
-  /* 인라인 스탯 — 그래프 페이지 헤더 결 */
+  /* 인라인 스탯 — 라벨(좌)·값(우)을 칸마다 정렬하는 그리드. 데스크톱 3열, 좁아지면 2·1열로.
+     예전엔 flex + · 구분이었는데 줄바꿈되면 · 가 줄 앞에 대롱거려 그리드 정렬로 바꿨다. */
   .stat-line {
     margin: 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.35rem 0.6rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.6rem 2rem;
     font-size: 0.92rem;
     color: var(--text-muted);
   }
   .stat-item {
-    white-space: nowrap;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
   }
   .stat-line strong {
     color: var(--accent);
     font-weight: 800;
   }
-  /* 항목 사이 · 구분(첫 항목 제외). 라벨+값이 한 덩어리로 붙어 있어 · 는 항목 사이에만 온다. */
-  .stat-item + .stat-item::before {
-    content: '·';
-    color: var(--border);
-    margin-right: 0.6rem;
-  }
 
-  /* 모바일 — 인라인 대신 2열 그리드로 정렬(라벨 왼쪽·값 오른쪽). · 구분자는 숨겨 줄 앞 대롱거림 제거 */
   @media (max-width: 560px) {
     .stat-line {
-      display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 0.55rem 1.1rem;
       font-size: 0.88rem;
-    }
-    .stat-item {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.4rem;
-      white-space: normal;
-    }
-    .stat-item + .stat-item::before {
-      content: none;
     }
   }
   @media (max-width: 360px) {
