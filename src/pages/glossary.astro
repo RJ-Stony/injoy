@@ -13,8 +13,8 @@ const entries = await getGlossary();
 <BaseLayout title="용어집" description="Injoy 글에 나온 전문 용어와 짧은 풀이를 한곳에 모았어요.">
   <section class="glossary">
     <h1>용어집</h1>
-    <p class="glossary-sub">글에 처음 나오는 전문 용어에 붙인 짧은 풀이를 모았어요.</p>
-    <p class="stats"><span><strong>{entries.length}</strong> 용어</span></p>
+    <p class="glossary-sub">글에 나오는 전문 용어들을 모아봤어요.</p>
+    <p class="stats" id="glossary-stats"><span><strong>{entries.length}</strong> 용어</span></p>
 
     <div class="search-box">
       <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
@@ -40,7 +40,9 @@ const entries = await getGlossary();
               <span class="g-gloss">{e.gloss}</span>
               <span class="g-sources">
                 {e.sources.map((s) => (
-                  <a href={withBase(`/posts/${s.slug}/`)}>{s.title}</a>
+                  /* 텍스트 프래그먼트(#:~:text=)로 글 안 용어 첫 등장 위치로 스크롤+하이라이트.
+                     지원 브라우저(Chrome·Edge·Safari 16.1+)만 동작, 미지원은 글 상단으로(무해). */
+                  <a href={`${withBase(`/posts/${s.slug}/`)}#:~:text=${encodeURIComponent(e.term)}`}>{s.title}</a>
                 ))}
               </span>
             </dd>
@@ -48,6 +50,10 @@ const entries = await getGlossary();
         ))
       }
     </dl>
+
+    <p class="glossary-note">
+      글 본문에 굵은 용어와 괄호 한국어 뜻(<code>**용어**(뜻)</code>)으로 쓰면 빌드 때 자동으로 모여요. 발행 화면에서 빼거나 고칠 수 있어요.
+    </p>
   </section>
 </BaseLayout>
 
@@ -56,6 +62,8 @@ const entries = await getGlossary();
   const input = document.getElementById('glossary-search') as HTMLInputElement | null;
   const items = Array.from(document.querySelectorAll<HTMLElement>('.g-item'));
   const empty = document.getElementById('glossary-empty');
+  const stats = document.getElementById('glossary-stats');
+  const total = items.length;
 
   input?.addEventListener('input', () => {
     const q = input.value.trim().toLowerCase();
@@ -66,6 +74,13 @@ const entries = await getGlossary();
       if (hit) shown++;
     }
     if (empty) empty.hidden = shown > 0;
+    // 필터 중이면 스탯 라인을 '보이는 개수/전체 용어'로 갱신해 검색이 동작함을 눈으로 보여준다.
+    if (stats) {
+      stats.innerHTML =
+        q === ''
+          ? `<span><strong>${total}</strong> 용어</span>`
+          : `<span><strong>${shown}</strong>/${total} 용어</span>`;
+    }
   });
 </script>
 
@@ -193,6 +208,24 @@ const entries = await getGlossary();
   /* 앵커로 막 점프해 온 항목을 잠깐 강조 */
   .g-item:target .g-term {
     color: var(--accent);
+  }
+
+  /* 등록 방법 안내 각주 */
+  .glossary-note {
+    margin: 1.6rem 0 0;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    line-height: 1.7;
+  }
+  .glossary-note code {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.9em;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.1em 0.4em;
   }
 
   @media (max-width: 560px) {
