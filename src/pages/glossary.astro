@@ -39,10 +39,9 @@ const entries = await getGlossary();
             <dd class="g-body">
               <span class="g-gloss">{e.gloss}</span>
               <span class="g-sources">
+                <span class="g-sources-label">이 용어가 나오는 글</span>
                 {e.sources.map((s) => (
-                  /* 텍스트 프래그먼트(#:~:text=)로 글 안 용어 첫 등장 위치로 스크롤+하이라이트.
-                     지원 브라우저(Chrome·Edge·Safari 16.1+)만 동작, 미지원은 글 상단으로(무해). */
-                  <a href={`${withBase(`/posts/${s.slug}/`)}#:~:text=${encodeURIComponent(e.term)}`}>{s.title}</a>
+                  <a href={withBase(`/posts/${s.slug}/`)}>{s.title}</a>
                 ))}
               </span>
             </dd>
@@ -50,10 +49,6 @@ const entries = await getGlossary();
         ))
       }
     </dl>
-
-    <p class="glossary-note">
-      글 본문에 굵은 용어와 괄호 한국어 뜻(<code>**용어**(뜻)</code>)으로 쓰면 빌드 때 자동으로 모여요. 발행 화면에서 빼거나 고칠 수 있어요.
-    </p>
   </section>
 </BaseLayout>
 
@@ -191,6 +186,11 @@ const entries = await getGlossary();
     gap: 0.4rem 0.9rem;
     margin-top: 0.4rem;
   }
+  .g-sources-label {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
   .g-sources a {
     color: var(--text-muted);
     font-size: 0.82rem;
@@ -210,22 +210,10 @@ const entries = await getGlossary();
     color: var(--accent);
   }
 
-  /* 등록 방법 안내 각주 */
-  .glossary-note {
-    margin: 1.6rem 0 0;
-    padding-top: 1.2rem;
-    border-top: 1px solid var(--border);
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    line-height: 1.7;
-  }
-  .glossary-note code {
-    font-family: var(--font-mono, monospace);
-    font-size: 0.9em;
-    background-color: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    padding: 0.1em 0.4em;
+  /* 작성자 스타일(display: grid)이 UA의 [hidden] 규칙을 덮어써서
+     검색 필터로 hidden을 걸어도 항목이 안 사라지던 문제를 바로잡는다. */
+  .g-item[hidden] {
+    display: none;
   }
 
   @media (max-width: 560px) {
