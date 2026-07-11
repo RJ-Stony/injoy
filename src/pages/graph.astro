@@ -44,15 +44,15 @@ const data = {
       <input
         id="graph-search-input"
         type="search"
-        list="graph-node-titles"
         placeholder="글 제목 검색"
         aria-label="그래프에서 글 찾기"
         autocomplete="off"
+        role="combobox"
+        aria-expanded="false"
+        aria-controls="graph-search-list"
       />
+      <ul class="gs-list" id="graph-search-list" role="listbox" hidden></ul>
     </div>
-    <datalist id="graph-node-titles">
-      {data.nodes.filter((n) => n.kind === 'post').map((n) => <option value={n.label}></option>)}
-    </datalist>
     <div class="graph-tools">
       <button type="button" class="gt-btn" id="gt-play" aria-label="글이 쌓인 순서대로 재생">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l12 7-12 7z"></path></svg>
@@ -916,20 +916,78 @@ const data = {
       showTipAt(n);
       draw();
     };
+    // 자체 자동완성 목록 — 브라우저 datalist(포커스만 해도 전체 노출) 대신 입력한 글자와
+    // 맞는 상위 몇 개만 보여 준다. li는 스코프 CSS가 안 붙어 전역 스타일로 꾸민다.
     const searchInput = document.getElementById('graph-search-input');
-    const runGraphSearch = () => {
-      const q = searchInput.value.trim().toLowerCase();
-      if (!q) return;
-      const posts = nodes.filter((n) => n.kind === 'post');
-      const n =
-        posts.find((nd) => nd.label.toLowerCase() === q) ||
-        posts.find((nd) => nd.label.toLowerCase().includes(q));
-      if (n) focusNode(n);
+    const searchList = document.getElementById('graph-search-list');
+    const SEARCH_LIMIT = 7;
+    let searchMatches = []; // 현재 렌더된 후보 노드
+    let searchActive = -1; // 키보드로 짚은 항목 인덱스(-1이면 없음)
+
+    const closeSearchList = () => {
+      searchList.hidden = true;
+      searchList.replaceChildren();
+      searchMatches = [];
+      searchActive = -1;
+      searchInput?.setAttribute('aria-expanded', 'false');
     };
-    searchInput?.addEventListener('change', runGraphSearch); // datalist에서 고르면 발화
+    const paintActive = () => {
+      const items = searchList.children;
+      for (let i = 0; i < items.length; i++) {
+        const on = i === searchActive;
+        items[i].classList.toggle('is-active', on);
+        items[i].setAttribute('aria-selected', on ? 'true' : 'false');
+      }
+    };
+    const chooseMatch = (n) => {
+      if (!n) return;
+      focusNode(n);
+      searchInput.value = n.label;
+      closeSearchList();
+    };
+    const renderSearchList = () => {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) { closeSearchList(); return; }
+      const posts = nodes.filter((nd) => nd.kind === 'post');
+      searchMatches = posts
+        .filter((nd) => nd.label.toLowerCase().includes(q))
+        .slice(0, SEARCH_LIMIT);
+      if (!searchMatches.length) { closeSearchList(); return; }
+      searchList.replaceChildren();
+      searchMatches.forEach((n) => {
+        const li = document.createElement('li');
+        li.setAttribute('role', 'option');
+        li.setAttribute('aria-selected', 'false');
+        li.textContent = n.label;
+        // 탭이 input blur보다 먼저 닫는 걸 막으려 pointerdown으로 선택한다.
+        li.addEventListener('pointerdown', (ev) => { ev.preventDefault(); chooseMatch(n); });
+        searchList.appendChild(li);
+      });
+      searchActive = -1;
+      searchList.hidden = false;
+      searchInput?.setAttribute('aria-expanded', 'true');
+    };
+    searchInput?.addEventListener('input', renderSearchList);
     searchInput?.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter') { ev.preventDefault(); runGraphSearch(); }
+      if (ev.key === 'ArrowDown') {
+        if (searchList.hidden || !searchMatches.length) return;
+        ev.preventDefault();
+        searchActive = (searchActive + 1) % searchMatches.length;
+        paintActive();
+      } else if (ev.key === 'ArrowUp') {
+        if (searchList.hidden || !searchMatches.length) return;
+        ev.preventDefault();
+        searchActive = (searchActive - 1 + searchMatches.length) % searchMatches.length;
+        paintActive();
+      } else if (ev.key === 'Enter') {
+        ev.preventDefault();
+        chooseMatch(searchMatches[searchActive] ?? searchMatches[0]);
+      } else if (ev.key === 'Escape') {
+        closeSearchList();
+      }
     });
+    // 포커스가 빠지면 목록을 닫는다(pointerdown 선택이 먼저 처리되므로 안전).
+    searchInput?.addEventListener('blur', closeSearchList);
 
     // 첫 화면부터 그래프가 화면에 꼭 맞게 - 정착을 기다리지 않고 미리 동기로 식힌 뒤 fit.
     // (루프 안 매 프레임 fit은 흔들림을 만들었던 전력이 있어, fit은 여기서 한 번만)
@@ -1471,6 +1529,41 @@ const data = {
 </style>
 
 <style is:global>
+  /* 검색 자동완성 목록 — li는 JS 생성이라 Astro 스코프가 안 붙으므로 전역으로 정의한다.
+     .graph-search가 이미 position:absolute라 이 목록의 위치 기준이 된다. */
+  .graph-search .gs-list {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    left: 0;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgb(0 0 0 / 15%);
+    padding: 4px;
+    margin: 0;
+    list-style: none;
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 3;
+  }
+  .graph-search .gs-list li {
+    padding: 0.45em 0.7em;
+    border-radius: 7px;
+    font-size: 0.85rem;
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .graph-search .gs-list li:hover,
+  .graph-search .gs-list li.is-active {
+    background: var(--accent-weak);
+    color: var(--accent);
+  }
+  .gs-list[hidden] { display: none; }
+
   /* 그래프 필터 바 — 칩은 JS(innerHTML)라 Astro 스코프가 안 붙으므로 전역으로 정의한다.
      그래프 위에 항상 노출(팝오버로 캔버스를 가리지 않음), 다중 선택. */
   .graph-filterbar {
