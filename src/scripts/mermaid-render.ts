@@ -67,8 +67,25 @@ function recenterSequenceText(
       right = Math.max(right, tr.right);
     }
     if (!isFinite(top)) continue;
-    const dy = (rr.top + rr.height / 2) - (top + bottom) / 2;
-    const dx = (rr.left + rr.width / 2) - (left + right) / 2;
+
+    // 노트 박스는 단일 액터 위에선 액터 폭(~147px)에 고정돼, 긴 줄이 있으면 좌우 여백이 빠듯하다.
+    // 텍스트 블록보다 좌우로 최소 NOTE_PAD씩은 남도록 박스를 넓힌다(중심 유지). 세로 여백은 noteMargin이 담당.
+    const NOTE_PAD = 20; // 좌우 최소 여백(px, 화면 기준)
+    const textW = right - left;
+    const needW = textW + NOTE_PAD * 2;
+    let box = rr;
+    if (needW > rr.width + 1) {
+      const curX = parseFloat(rect.getAttribute('x') || '0');
+      const curW = parseFloat(rect.getAttribute('width') || '0');
+      const newW = needW * scale; // 화면 px → SVG 단위
+      rect.setAttribute('x', String(curX + (curW - newW) / 2)); // 중심 유지하며 좌우로 넓힘
+      rect.setAttribute('width', String(newW));
+      box = rect.getBoundingClientRect(); // 넓힌 뒤 다시 측정
+    }
+
+    // 텍스트 블록을 (넓힌) 박스 중앙에 맞춘다. 여러 줄은 같은 delta로 옮겨 줄 간격 보존.
+    const dy = (box.top + box.height / 2) - (top + bottom) / 2;
+    const dx = (box.left + box.width / 2) - (left + right) / 2;
     if (Math.abs(dy) < 1 && Math.abs(dx) < 1) continue;
     for (const t of lines) prependTranslate(t, dx * scale, dy * scale);
   }
@@ -148,7 +165,9 @@ async function doRender(containers: HTMLElement[]): Promise<void> {
     theme: 'base',
     // 시퀀스 다이어그램의 노트·메시지 텍스트가 박스보다 길면 자동 줄바꿈한다.
     // (안 켜면 'Note over A,B'가 두 액터 사이 폭으로 잡히고 긴 한글 노트가 박스 밖으로 넘친다)
-    sequence: { wrap: true },
+    // noteMargin: 노트 텍스트와 박스 사이 여백(기본 10). 여러 줄 노트가 꽉 차 보이지 않게 넉넉히.
+    // 줄 수가 늘면 박스 높이가 그만큼 커지고 이 여백은 위아래로 유지된다.
+    sequence: { wrap: true, noteMargin: 16 },
     themeVariables: {
       darkMode: effectiveTheme() === 'dark',
       background: v('--surface'),

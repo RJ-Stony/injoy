@@ -153,6 +153,13 @@ const legendTypes = [...new Set(shown.map((c) => c.type))];
     height: auto;
   }
 
+  /* 노드(링크) 클릭·탭 시 뜨는 기본 포커스 아웃라인/탭 하이라이트(흰 테두리) 제거.
+     키보드 포커스 표시는 아래 :focus-visible circle(굵은 테두리 + accent 글자)이 담당한다. */
+  .mg-node {
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   .mg-node circle {
     fill: var(--accent-weak);
     stroke: var(--accent);
