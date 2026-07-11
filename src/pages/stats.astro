@@ -1,7 +1,7 @@
 ---
 /**
  * 블로그 통계 — 이 블로그가 지금까지 얼마나 쌓였는지 숫자와 기록 격자로 보여 준다.
- * 전부 빌드타임 집계(정적 사이트 유지). 기간 통계·기록 격자는 빌드 시점(new Date()) 기준이며,
+ * 전부 빌드타임 집계(정적 사이트 유지). 기록 격자는 빌드 시점(new Date()) 기준이며,
  * 글을 발행할 때마다 재빌드되므로 항상 최신에 가깝다.
  */
 import BaseLayout from '../layouts/BaseLayout.astro';
@@ -32,18 +32,26 @@ const mins = totalMinutes % 60;
 const timeDisplay =
   totalMinutes >= 60 ? (mins === 0 ? `${hours}시간` : `${hours}시간 ${mins}분`) : `${totalMinutes}분`;
 
+// 수정 횟수(글 단위 누적) — updatedDate가 있고 pubDate와 '다른 날'인 글의 수
+const modTotal = posts.reduce((n, p) => {
+  const u = p.data.updatedDate;
+  const y = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  return n + (u && y(u) !== y(p.data.pubDate) ? 1 : 0);
+}, 0);
+
 // 대표 지표(크게) — 방문 수는 클라이언트에서 Abacus로 채운다
 const heroTiles = [
   { label: '글', value: `${posts.length.toLocaleString('ko-KR')}편` },
   { label: '글 간의 연결', value: graph.stats.edges.toLocaleString('ko-KR') },
 ];
-// 보조 지표(작게)
-const subTiles = [
-  { label: '작성한 글자 수', value: charDisplay },
-  { label: '읽는 시간 총합', value: timeDisplay },
-  { label: '태그', value: graph.stats.tags.toLocaleString('ko-KR') },
-  { label: '카테고리', value: categories.length.toLocaleString('ko-KR') },
-  { label: '시리즈', value: seriesGroups.length.toLocaleString('ko-KR') },
+// 인라인 스탯 — <strong> 값 + muted 라벨, · 로 구분(발행 수는 hero '글' 카드가 담당)
+const inlineStats = [
+  { value: charDisplay, label: '작성한 글자' },
+  { value: timeDisplay, label: '읽는 시간' },
+  { value: `${modTotal.toLocaleString('ko-KR')}번`, label: '수정' },
+  { value: graph.stats.tags.toLocaleString('ko-KR'), label: '태그' },
+  { value: categories.length.toLocaleString('ko-KR'), label: '카테고리' },
+  { value: seriesGroups.length.toLocaleString('ko-KR'), label: '시리즈' },
 ];
 
 // 로컬 날짜(YYYY-MM-DD) — pubDate는 UTC 자정이라 KST에서도 같은 날, 오늘도 로컬 기준으로 통일한다.
@@ -69,43 +77,23 @@ for (const p of posts) {
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const today = startOfDay(new Date());
-const dayMs = 86_400_000;
-// 며칠 전인가 — 0=오늘. 미래(음수)는 창에서 제외한다.
-const dayDiff = (d: Date) => Math.round((today.getTime() - startOfDay(d).getTime()) / dayMs);
 
-// 기간 통계 — 최근 1/7/30/90일 각각 발행·수정 수
-const windows = [
-  { days: 1, label: '1일' },
-  { days: 7, label: '7일' },
-  { days: 30, label: '30일' },
-  { days: 90, label: '90일' },
-].map(({ days, label }) => {
-  let pub = 0;
-  let mod = 0;
-  for (const p of posts) {
-    const g = dayDiff(p.data.pubDate);
-    if (g >= 0 && g < days) pub++;
-    const u = p.data.updatedDate;
-    if (u && ymd(u) !== ymd(p.data.pubDate)) {
-      const gu = dayDiff(u);
-      if (gu >= 0 && gu < days) mod++;
-    }
-  }
-  return { days, label, pub, mod };
-});
-const defaultWindowIdx = 1; // 기본 활성 = 7일
+// 기록 격자 — 올해 고정(1/1 ~ 12/31). 1월 1일이 낀 주의 일요일부터 시작해 무스크롤로 한눈에.
+const year = today.getFullYear();
+const yearStart = startOfDay(new Date(year, 0, 1));
+const yearEnd = startOfDay(new Date(year, 11, 31));
+const gridStart = new Date(yearStart);
+gridStart.setDate(gridStart.getDate() - gridStart.getDay()); // 일요일까지 앞으로 당긴다
 
-// 기록 격자 — 오늘 기준 최근 1년(365일). 주 시작(일요일)에 맞춰 앞을 당긴다.
-const gridStartRaw = startOfDay(new Date(today.getTime() - 364 * dayMs));
-const gridStart = new Date(gridStartRaw);
-gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+// 하루가 올해 범위 안이고 오늘 이전(미래 아님)일 때만 실제 기록 셀
+const isActive = (d: Date) => d >= yearStart && d <= yearEnd && d <= today;
 
-// 범위 내 하루 최대 활동량(발행+수정) — level 0~3 산정 기준
+// 활성 범위 하루 최대 활동량(발행+수정) — level 0~3 산정 기준
 let maxTotal = 1;
 {
   const c = new Date(gridStart);
-  while (c <= today) {
-    if (c >= gridStartRaw) {
+  while (c <= yearEnd) {
+    if (isActive(c)) {
       const total = (pubByDate.get(ymd(c)) ?? 0) + (modByDate.get(ymd(c)) ?? 0);
       if (total > maxTotal) maxTotal = total;
     }
@@ -116,44 +104,51 @@ let maxTotal = 1;
 interface Cell {
   date: string;
   level: number;
-  inRange: boolean;
+  active: boolean;
   title: string;
 }
 const columns: { days: Cell[]; monthLabel: string | null }[] = [];
-let recordCount = 0; // 지난 1년 발행+수정 합(제목 문장에 쓴다)
+let recordCount = 0; // 올해 발행+수정 합(제목 문장에 쓴다)
 let lastMonth = -1;
 const cursor = new Date(gridStart);
-while (cursor <= today) {
-  const weekMonth = cursor.getMonth();
+while (cursor <= yearEnd) {
+  // 월 라벨 기준 = 그 컬럼의 올해 범위 안 첫 날짜(첫 주 작년 12월 패딩이 "12월" 라벨을 만드는 것 방지)
+  const weekMonth = (cursor < yearStart ? yearStart : cursor).getMonth();
   const days: Cell[] = [];
-  for (let i = 0; i < 7 && cursor <= today; i++) {
+  for (let i = 0; i < 7 && cursor <= yearEnd; i++) {
     const key = ymd(cursor);
-    const inRange = cursor >= gridStartRaw;
-    const pub = inRange ? (pubByDate.get(key) ?? 0) : 0;
-    const mod = inRange ? (modByDate.get(key) ?? 0) : 0;
+    const inYear = cursor >= yearStart && cursor <= yearEnd;
+    const active = isActive(cursor);
+    const pub = active ? (pubByDate.get(key) ?? 0) : 0;
+    const mod = active ? (modByDate.get(key) ?? 0) : 0;
     const total = pub + mod;
-    if (inRange) recordCount += total;
+    if (active) recordCount += total;
     const level = total === 0 ? 0 : Math.ceil((total / maxTotal) * 3);
-    let title = key;
-    if (total > 0) {
+    // 활성 셀은 발행/수정을 담고, 올해 안 미래 셀은 날짜만, 연 범위 밖 패딩 셀은 title 없음
+    let title = '';
+    if (active) {
       const parts = [key];
       if (pub > 0) parts.push(`발행 ${pub}`);
       if (mod > 0) parts.push(`수정 ${mod}`);
       title = parts.join(' · ');
+    } else if (inYear) {
+      title = key;
     }
-    days.push({ date: key, level, inRange, title });
+    days.push({ date: key, level, active, title });
     cursor.setDate(cursor.getDate() + 1);
   }
-  // 그 주에 월이 바뀌면 컬럼 위에 월 라벨을 단다(GitHub식).
+  // 그 주에 월이 바뀌면 컬럼 최상단 슬롯에 월 라벨을 단다(GitHub식).
   const monthLabel = weekMonth !== lastMonth ? `${weekMonth + 1}월` : null;
   lastMonth = weekMonth;
   columns.push({ days, monthLabel });
 }
+// 모바일에서 상·하반기 2줄로 자연 래핑시킬 절반 컬럼 수
+const colsHalf = Math.ceil(columns.length / 2);
 ---
 
 <BaseLayout
   title="블로그 통계"
-  description="숫자로 보는 Injoy. 글과 방문, 연결, 지난 1년의 기록이에요."
+  description="숫자로 보는 Injoy. 글과 방문, 연결, 올해의 기록이에요."
 >
   <section class="stats">
     <h1>블로그 통계</h1>
@@ -177,74 +172,46 @@ while (cursor <= today) {
       </div>
     </div>
 
-    <!-- 보조 지표 -->
-    <div class="tiles-sub">
+    <!-- 인라인 스탯 — 항목 사이 · 구분은 CSS ::before(장식)로 그린다 -->
+    <p class="stat-line">
       {
-        subTiles.map((t) => (
-          <div class="tile">
-            <span class="tile-value tile-value-sm">{t.value}</span>
-            <span class="tile-label">{t.label}</span>
-          </div>
+        inlineStats.map((s) => (
+          <span class="stat-item">
+            <strong>{s.value}</strong> {s.label}
+          </span>
         ))
       }
-    </div>
+    </p>
 
-    <!-- 기간 통계 -->
-    <h2>최근 활동</h2>
-    <div class="period">
-      <div class="period-chips" role="group" aria-label="기간 선택">
+    <!-- 기록 격자 -->
+    <h2>올해 {recordCount.toLocaleString('ko-KR')}번 기록했어요</h2>
+    <div
+      class="grass"
+      role="img"
+      aria-label={`올해 ${recordCount}번 기록한 날짜별 격자`}
+    >
+      <div class="grass-grid" style={`--cols:${columns.length};--cols-half:${colsHalf}`}>
         {
-          windows.map((w, i) => (
-            <button
-              type="button"
-              class="gf-chip period-chip"
-              data-pub={w.pub}
-              data-mod={w.mod}
-              aria-pressed={i === defaultWindowIdx ? 'true' : 'false'}
-            >
-              {w.label}
-            </button>
+          columns.map((c) => (
+            <div class="grass-col">
+              <span class="grass-month">{c.monthLabel}</span>
+              {c.days.map((d) => (
+                <span
+                  class:list={['grass-cell', d.active ? `lv${d.level}` : 'oob']}
+                  title={d.title}
+                />
+              ))}
+            </div>
           ))
         }
       </div>
-      <p class="period-readout" id="period-readout" aria-live="polite">
-        발행 {windows[defaultWindowIdx].pub}편 · 수정 {windows[defaultWindowIdx].mod}번
-      </p>
-    </div>
-
-    <!-- 기록 격자 -->
-    <h2>지난 1년 동안 {recordCount.toLocaleString('ko-KR')}번 기록했어요</h2>
-    <div
-      class="grass-scroll"
-      role="img"
-      aria-label={`지난 1년 동안 ${recordCount}번 기록한 날짜별 격자`}
-    >
-      <div class="grass-inner">
-        <div class="grass-months">
-          {columns.map((c) => <span class="grass-month">{c.monthLabel}</span>)}
-        </div>
-        <div class="grass-grid">
-          {
-            columns.map((c) => (
-              <div class="grass-col">
-                {c.days.map((d) => (
-                  <span
-                    class:list={['grass-cell', d.inRange ? `lv${d.level}` : 'oob']}
-                    title={d.title}
-                  />
-                ))}
-              </div>
-            ))
-          }
-        </div>
-        <div class="grass-legend">
-          <span>적음</span>
-          <span class="grass-cell lv0"></span>
-          <span class="grass-cell lv1"></span>
-          <span class="grass-cell lv2"></span>
-          <span class="grass-cell lv3"></span>
-          <span>많음</span>
-        </div>
+      <div class="grass-legend">
+        <span>적음</span>
+        <span class="grass-cell lv0"></span>
+        <span class="grass-cell lv1"></span>
+        <span class="grass-cell lv2"></span>
+        <span class="grass-cell lv3"></span>
+        <span>많음</span>
       </div>
     </div>
   </section>
@@ -266,18 +233,6 @@ while (cursor <= today) {
         visitsTile.hidden = true;
       });
   }
-
-  // 기간 칩 토글 — 표시만 교체(수치는 빌드타임에 심어 둔 data 속성).
-  const readout = document.getElementById('period-readout');
-  const chips = Array.from(document.querySelectorAll<HTMLButtonElement>('.period-chip'));
-  chips.forEach((chip) => {
-    chip.addEventListener('click', () => {
-      chips.forEach((c) => c.setAttribute('aria-pressed', c === chip ? 'true' : 'false'));
-      const pub = chip.dataset.pub ?? '0';
-      const mod = chip.dataset.mod ?? '0';
-      if (readout) readout.textContent = `발행 ${pub}편 · 수정 ${mod}번`;
-    });
-  });
 </script>
 
 <style>
@@ -300,8 +255,8 @@ while (cursor <= today) {
   .tile {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
-    padding: 1.2rem 1.1rem;
+    gap: 0.5rem;
+    padding: 1.6rem 1.4rem;
     border: 1px solid var(--border);
     border-radius: 12px;
     background-color: var(--surface);
@@ -323,11 +278,11 @@ while (cursor <= today) {
   .tiles-hero {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 0.9rem;
-    margin-bottom: 0.9rem;
+    gap: 1rem;
+    margin-bottom: 1.2rem;
   }
   .tile-hero .tile-value {
-    font-size: 1.9rem;
+    font-size: 2rem;
     line-height: 1.15;
   }
   /* 값이 커서 좁은 화면에선 3열이 답답하다 — 세로로 쌓는다 */
@@ -337,15 +292,28 @@ while (cursor <= today) {
     }
   }
 
-  /* 보조 지표(작게) */
-  .tiles-sub {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 0.9rem;
+  /* 인라인 스탯 — 그래프 페이지 헤더 결 */
+  .stat-line {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.6rem;
+    font-size: 0.92rem;
+    color: var(--text-muted);
   }
-  .tile-value-sm {
-    font-size: 1.3rem;
-    line-height: 1.2;
+  .stat-item {
+    white-space: nowrap;
+  }
+  .stat-line strong {
+    color: var(--accent);
+    font-weight: 800;
+  }
+  /* 항목 사이 · 구분(첫 항목 제외) */
+  .stat-item + .stat-item::before {
+    content: '·';
+    color: var(--border);
+    margin-right: 0.6rem;
   }
 
   /* 응답 전 방문 수 자리표시 — ViewCount의 vc-skeleton 결을 따른다 */
@@ -374,81 +342,33 @@ while (cursor <= today) {
     margin: 2.6rem 0 0.9rem;
   }
 
-  /* 기간 통계 */
-  .period-chips {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-  }
-  .period-chip {
-    font: inherit;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--text);
-    background-color: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 0.26em 0.85em;
-    cursor: pointer;
-    transition:
-      color 0.15s ease,
-      border-color 0.15s ease,
-      background-color 0.15s ease;
-  }
-  .period-chip:hover {
-    color: var(--accent);
-    border-color: var(--accent);
-  }
-  .period-chip[aria-pressed='true'] {
-    color: var(--accent);
-    border-color: var(--accent);
-    background-color: var(--accent-weak);
-  }
-  .period-readout {
-    margin: 0.9rem 0 0;
-    font-size: 1.35rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: var(--text);
-  }
-
-  /* 기록 격자 */
-  .grass-scroll {
-    overflow-x: auto;
-    padding-bottom: 0.5rem;
-  }
-  .grass-inner {
-    display: inline-block;
-    min-width: min-content;
-  }
-  .grass-months {
-    display: flex;
-    gap: 3px;
-    margin-bottom: 4px;
-  }
-  .grass-month {
-    flex: 0 0 13px;
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    white-space: nowrap;
-    overflow: visible;
-  }
+  /* 기록 격자 — 올해 고정, 무스크롤 fluid 격자 */
   .grass-grid {
-    display: flex;
-    gap: 3px;
+    display: grid;
+    grid-template-columns: repeat(var(--cols), 1fr);
+    gap: 2px;
   }
   .grass-col {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
+    min-width: 0;
+  }
+  /* 월 라벨 — 각 컬럼 최상단 슬롯(그 주에 월이 바뀔 때만). 높이 고정으로 셀 정렬을 맞춘다. */
+  .grass-month {
+    height: 1em;
+    line-height: 1;
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: visible;
   }
   .grass-cell {
-    width: 13px;
-    height: 13px;
-    border-radius: 3px;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 2px;
     background-color: var(--surface);
     border: 1px solid var(--border);
-    flex-shrink: 0;
   }
   .grass-cell.oob {
     opacity: 0.35;
@@ -476,6 +396,8 @@ while (cursor <= today) {
   .grass-legend .grass-cell {
     width: 11px;
     height: 11px;
+    aspect-ratio: auto;
+    flex-shrink: 0;
   }
   .grass-legend span:first-child {
     margin-right: 0.15rem;
@@ -484,12 +406,16 @@ while (cursor <= today) {
     margin-left: 0.15rem;
   }
 
+  /* 모바일 — 주 컬럼을 상·하반기 2줄로 자연 래핑(셀 크기 유지, 가로 스크롤 없음) */
+  @media (max-width: 560px) {
+    .grass-grid {
+      grid-template-columns: repeat(var(--cols-half), 1fr);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .stat-skeleton {
       animation: none;
-    }
-    .period-chip {
-      transition: none;
     }
   }
 </style>
