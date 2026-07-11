@@ -10,12 +10,6 @@
  * 결과 URL은 dist 기준(/posts/..)이라 base('/injoy')를 앞에 붙여 바로잡는다.
  */
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { getPublishedPosts } from '../utils/post';
-import { withBase } from '../utils/url';
-
-// 랜덤 글(F28)에 쓸 전체 목록을 빌드타임에 뽑는다.
-const posts = await getPublishedPosts(); // 최신순
-const allPosts = posts.map((p) => ({ title: p.data.title, url: withBase(`/posts/${p.id}/`) }));
 ---
 
 <BaseLayout title="검색" description="Injoy의 글을 제목과 본문에서 찾아보세요.">
@@ -48,7 +42,7 @@ const allPosts = posts.map((p) => ({ title: p.data.title, url: withBase(`/posts/
     <div id="search-results" class="search-results" aria-live="polite" aria-label="검색 결과"></div>
     <button id="search-more" class="search-more" type="button" hidden>결과 더 보기</button>
 
-    {/* 입력 전 빈 상태(B6)·랜덤 글(F28) */}
+    {/* 입력 전 빈 상태(B6) */}
     <div id="search-empty" class="search-empty">
       <div id="recent-terms" class="empty-block" hidden>
         <div class="empty-head">
@@ -57,12 +51,7 @@ const allPosts = posts.map((p) => ({ title: p.data.title, url: withBase(`/posts/
         </div>
         <div id="recent-terms-list" class="term-chips"></div>
       </div>
-      <div class="empty-block">
-        <button type="button" id="random-post" class="chip random-post">🎲 아무 글이나 읽기</button>
-      </div>
     </div>
-
-    <script type="application/json" id="all-posts" set:html={JSON.stringify(allPosts)}></script>
 
     <p id="search-fallback" class="search-fallback" hidden>
       검색 색인은 빌드된 사이트에서만 동작해요. 로컬에서는
@@ -125,14 +114,6 @@ const allPosts = posts.map((p) => ({ title: p.data.title, url: withBase(`/posts/
   document.getElementById('clear-terms')?.addEventListener('click', () => {
     try { localStorage.removeItem(TERMS_KEY); } catch {}
     renderRecentTerms();
-  });
-
-  // 랜덤 글(F28)
-  document.getElementById('random-post')?.addEventListener('click', () => {
-    try {
-      const all = JSON.parse(document.getElementById('all-posts')?.textContent || '[]') as { url: string }[];
-      if (all.length) location.href = all[Math.floor(Math.random() * all.length)].url;
-    } catch {}
   });
 
   type SubResult = { title: string; url: string; excerpt: string };
@@ -493,7 +474,7 @@ const allPosts = posts.map((p) => ({ title: p.data.title, url: withBase(`/posts/
     gap: 0.6rem;
   }
 
-  /* 빈 검색 상태(B6)·랜덤(F28) */
+  /* 빈 검색 상태(B6) */
   .search-empty { padding-top: 1.4rem; }
   .search-empty[hidden] { display: none; }
   .empty-block { margin-bottom: 1.8rem; }
@@ -542,7 +523,7 @@ const allPosts = posts.map((p) => ({ title: p.data.title, url: withBase(`/posts/
 <!-- 결과 카드·필터 칩·최근 검색어 칩은 스크립트가 만들어 붙이므로(createElement)
      Astro 스코프 CSS가 안 붙는다. 전역으로 두되 .search-page/.search-results로 한정한다. -->
 <style is:global>
-  /* 칩 공통 — 그래프 뷰(graph.astro .gf-chip) 결 그대로. 정적 칩(정렬·랜덤)도 이 규칙 하나로 받는다. */
+  /* 칩 공통 — 그래프 뷰(graph.astro .gf-chip) 결 그대로. 정적 칩(정렬)도 이 규칙 하나로 받는다. */
   .search-page .chip-row {
     display: flex;
     flex-wrap: wrap;
