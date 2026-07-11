@@ -22,6 +22,8 @@ const EXCLUDE_TERMS = new Set([
   '지어낸 기능',
   '이미 정해진 제약',
   '시스템 전역 동작 조정', // 용어가 아니라 문장 조각
+  '공유 자원 관리', // 뜻이 아니라 예시 나열
+  '상태 관리', // 뜻이 아니라 예시 나열
 ]);
 
 // 정의가 아닌 풀이(인용·'또는…'로 이어지는 문장 조각·출처 표기)를 거른다.
@@ -29,6 +31,14 @@ function isDefinition(gloss: string): boolean {
   if (/^["'“”‘’]/.test(gloss)) return false; // 따옴표 인용
   if (/^(또는|즉|예:|예 |by )/.test(gloss)) return false; // 문장 이어짐·출처 표기
   return true;
+}
+
+// 괄호 안이 '영어 원어'(public IP)나 짧은 음차(미라이)가 아니라
+// 실제 한국어 뜻풀이인지 가린다. 한글이 있으면서, 띄어쓰기가 있거나(구·문장)
+// 6자 이상이어야 뜻으로 인정 — 방문자가 읽고 뜻을 알 수 있는 것만 남긴다.
+function isKoreanDef(gloss: string): boolean {
+  if (!/[가-힣]/.test(gloss)) return false; // 한글이 하나도 없으면 영어 원어
+  return /\s/.test(gloss) || gloss.length >= 6; // 짧은 음차(미라이) 제외
 }
 
 /** 용어 → 앵커 id. 용어집 페이지와 하버카드 링크가 같은 값을 써야 한다. */
@@ -43,7 +53,7 @@ export async function getGlossary(): Promise<GlossaryEntry[]> {
     for (const m of prose.matchAll(PATTERN)) {
       const term = m[1].trim();
       const gloss = m[2].trim();
-      if (EXCLUDE_TERMS.has(term) || !isDefinition(gloss)) continue;
+      if (EXCLUDE_TERMS.has(term) || !isDefinition(gloss) || !isKoreanDef(gloss)) continue;
       const src = { slug: post.id, title: post.data.title };
       const existing = map.get(term);
       if (existing) {

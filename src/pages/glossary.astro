@@ -13,14 +13,28 @@ const entries = await getGlossary();
 <BaseLayout title="용어집" description="Injoy 글에 나온 전문 용어와 짧은 풀이를 한곳에 모았어요.">
   <section class="glossary">
     <h1>용어집</h1>
-    <p class="glossary-sub">
-      글에 처음 나오는 전문 용어에 붙인 짧은 풀이를 모았어요. 지금까지 <strong>{entries.length}개</strong>.
+    <p class="glossary-sub">글에 처음 나오는 전문 용어에 붙인 짧은 풀이를 모았어요.</p>
+    <p class="stats"><span><strong>{entries.length}</strong> 용어</span></p>
+
+    <div class="search-box">
+      <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+      <input
+        id="glossary-search"
+        type="search"
+        autocomplete="off"
+        placeholder="용어나 뜻으로 찾기"
+        aria-label="용어집 검색"
+      />
+    </div>
+
+    <p id="glossary-empty" class="glossary-empty" role="status" aria-live="polite" hidden>
+      찾는 용어가 없어요.
     </p>
 
     <dl class="glossary-list">
       {
         entries.map((e) => (
-          <div class="g-item" id={termSlug(e.term)}>
+          <div class="g-item" id={termSlug(e.term)} data-search={`${e.term} ${e.gloss}`.toLowerCase()}>
             <dt class="g-term">{e.term}</dt>
             <dd class="g-body">
               <span class="g-gloss">{e.gloss}</span>
@@ -37,6 +51,24 @@ const entries = await getGlossary();
   </section>
 </BaseLayout>
 
+<script>
+  // 용어·뜻을 소문자 includes로 필터링. 매칭 0이면 안내 문구를 띄운다.
+  const input = document.getElementById('glossary-search') as HTMLInputElement | null;
+  const items = Array.from(document.querySelectorAll<HTMLElement>('.g-item'));
+  const empty = document.getElementById('glossary-empty');
+
+  input?.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    let shown = 0;
+    for (const item of items) {
+      const hit = q === '' || (item.dataset.search ?? '').includes(q);
+      item.hidden = !hit;
+      if (hit) shown++;
+    }
+    if (empty) empty.hidden = shown > 0;
+  });
+</script>
+
 <style>
   .glossary {
     max-width: var(--width-content);
@@ -49,7 +81,64 @@ const entries = await getGlossary();
     margin: 0 0 0.4rem;
   }
   .glossary-sub {
-    margin: 0 0 2rem;
+    margin: 0 0 0.5rem;
+    color: var(--text-muted);
+  }
+
+  /* 그래프 페이지 헤더 스탯 라인과 같은 결 */
+  .stats {
+    margin: 0 0 1.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .stats strong {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* 검색 입력 — search.astro의 .search-box 결 */
+  .search-box {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--surface);
+    padding: 0.7rem 0.95rem;
+    margin: 0 0 1.4rem;
+    transition: border-color 0.15s ease;
+  }
+  .search-box:focus-within {
+    border-color: var(--accent);
+  }
+  .search-icon {
+    flex-shrink: 0;
+    width: 1.05rem;
+    height: 1.05rem;
+    fill: none;
+    stroke: var(--text-muted);
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  #glossary-search {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    padding: 0;
+  }
+  #glossary-search:focus {
+    outline: none;
+  }
+
+  .glossary-empty {
+    margin: 1.5rem 0;
     color: var(--text-muted);
   }
 
