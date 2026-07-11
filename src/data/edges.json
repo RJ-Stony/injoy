@@ -247,6 +247,12 @@
       "note": "첫 개발 카테고리로, 공부하며 정리하는 개발 공부 시리즈가 한 줄기로 들어오게 되었다"
     },
     {
+      "from": "polish-round-15",
+      "to": "polish-round-14",
+      "type": "extends",
+      "note": "다이어그램·코드를 다듬은 데 이어, 검색·용어집·통계로 블로그 안을 탐색하기 좋게 넓힌 과정"
+    },
+    {
       "from": "polish-round-14",
       "to": "polish-round-13",
       "type": "extends",
