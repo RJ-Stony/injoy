@@ -1,0 +1,178 @@
+---
+/**
+ * 정원 통계(F27) — 이 블로그가 지금까지 얼마나 자랐는지 숫자와 발행 잔디로 보여 준다.
+ * 전부 빌드타임 집계(정적 사이트 유지).
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getPublishedPosts, getCategories, postStats } from '../utils/post';
+import { getGraph } from '../utils/graph';
+
+const posts = await getPublishedPosts();
+const graph = await getGraph();
+const categories = await getCategories();
+
+const totalChars = posts.reduce((n, p) => {
+  const s = postStats(p);
+  return n + s.cjkChars + s.latinWords;
+}, 0);
+const totalMinutes = posts.reduce((n, p) => n + postStats(p).minutes, 0);
+
+const tiles = [
+  { label: '글', value: posts.length.toLocaleString('ko-KR') },
+  { label: '쓴 글자', value: `약 ${Math.round(totalChars / 1000)}천 자` },
+  { label: '연결', value: graph.stats.edges.toLocaleString('ko-KR') },
+  { label: '태그', value: graph.stats.tags.toLocaleString('ko-KR') },
+  { label: '카테고리', value: categories.length.toLocaleString('ko-KR') },
+  { label: '읽는 시간 합', value: `${totalMinutes.toLocaleString('ko-KR')}분` },
+];
+
+// 발행 잔디 — 날짜별 발행 수를 주 단위 격자로.
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+const byDate = new Map<string, number>();
+for (const p of posts) byDate.set(iso(p.data.pubDate), (byDate.get(iso(p.data.pubDate)) ?? 0) + 1);
+
+const dates = posts.map((p) => p.data.pubDate.getTime());
+const first = new Date(Math.min(...dates));
+const last = new Date(Math.max(...dates));
+// 주 시작(일요일)에 맞춰 앞을 당긴다.
+const start = new Date(first);
+start.setDate(start.getDate() - start.getDay());
+const maxCount = Math.max(1, ...byDate.values());
+
+// start부터 last까지 하루씩, 7일 컬럼(주)로 묶는다.
+const weeks: { date: string; count: number; level: number }[][] = [];
+let cursor = new Date(start);
+let week: { date: string; count: number; level: number }[] = [];
+while (cursor <= last || week.length % 7 !== 0) {
+  const key = iso(cursor);
+  const count = byDate.get(key) ?? 0;
+  const level = count === 0 ? 0 : Math.ceil((count / maxCount) * 3);
+  week.push({ date: key, count, level });
+  if (week.length === 7) {
+    weeks.push(week);
+    week = [];
+  }
+  cursor.setDate(cursor.getDate() + 1);
+  if (cursor > last && week.length === 0) break;
+}
+if (week.length) weeks.push(week);
+---
+
+<BaseLayout title="정원 통계" description="Injoy가 지금까지 얼마나 자랐는지 숫자와 발행 잔디로 봅니다.">
+  <section class="stats">
+    <h1>정원 통계</h1>
+    <p class="stats-sub">글은 쌓이기만 하지 않고 서로 이어지며 자랍니다. 지금까지의 기록이에요.</p>
+
+    <div class="tiles">
+      {
+        tiles.map((t) => (
+          <div class="tile">
+            <span class="tile-value">{t.value}</span>
+            <span class="tile-label">{t.label}</span>
+          </div>
+        ))
+      }
+    </div>
+
+    <h2>발행 잔디</h2>
+    <p class="grass-sub">칸 하나가 하루예요. 글을 올린 날은 진하게 물듭니다.</p>
+    <div class="grass" role="img" aria-label={`${posts.length}편을 발행한 날들의 격자`}>
+      {
+        weeks.map((w) => (
+          <div class="grass-col">
+            {w.map((d) => (
+              <span
+                class:list={['grass-cell', `lv${d.level}`]}
+                title={d.count > 0 ? `${d.date} · ${d.count}편` : d.date}
+              />
+            ))}
+          </div>
+        ))
+      }
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .stats {
+    max-width: var(--width-content);
+    margin: 0 auto;
+  }
+  .stats h1 {
+    font-size: clamp(1.7rem, 5vw, 2.2rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.4rem;
+  }
+  .stats-sub {
+    margin: 0 0 2rem;
+    color: var(--text-muted);
+  }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.9rem;
+  }
+  .tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 1.2rem 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background-color: var(--surface);
+  }
+  .tile-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+  .tile-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .stats h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 2.4rem 0 0.3rem;
+  }
+  .grass-sub {
+    margin: 0 0 1rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  .grass {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+  .grass-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .grass-cell {
+    width: 15px;
+    height: 15px;
+    border-radius: 3px;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+  }
+  .grass-cell.lv1 {
+    background-color: color-mix(in srgb, var(--accent) 35%, var(--surface));
+    border-color: transparent;
+  }
+  .grass-cell.lv2 {
+    background-color: color-mix(in srgb, var(--accent) 65%, var(--surface));
+    border-color: transparent;
+  }
+  .grass-cell.lv3 {
+    background-color: var(--accent);
+    border-color: transparent;
+  }
+</style>
