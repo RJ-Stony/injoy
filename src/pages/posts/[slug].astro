@@ -196,8 +196,10 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
   import { attachCodeStepPlayer } from '../../scripts/code-step-player';
   import { SMOOTH_DURATION, SMOOTH_EASING } from '../../scripts/smooth-details';
   import { initHoverCards } from '../../scripts/hover-card';
+  import { initGlossaryTerms } from '../../scripts/glossary-terms';
 
   initHoverCards();
+  initGlossaryTerms();
 
   const mermaidBlocks = document.querySelectorAll<HTMLPreElement>(
     '.prose pre.astro-code[data-language="mermaid"]',
@@ -923,6 +925,45 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
 </style>
 
 <style is:global>
+  /* 용어 하버카드(C8) — 스크립트가 굵은 용어를 <a.glossary-term>로 감싼다(전역).
+     데스크톱은 hover 툴팁(::after), 모바일은 탭하면 용어집으로 이동한다. */
+  .prose a.glossary-term {
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px dotted var(--text-muted);
+    position: relative;
+  }
+  .prose a.glossary-term:hover {
+    border-bottom-color: var(--accent);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .prose a.glossary-term::after {
+      content: attr(data-gloss);
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 8px);
+      transform: translateX(-50%);
+      width: max-content;
+      max-width: 16rem;
+      background-color: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.4em 0.7em;
+      font-size: 0.82rem;
+      font-weight: 500;
+      line-height: 1.5;
+      box-shadow: 0 4px 14px rgb(0 0 0 / 12%);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 40;
+    }
+    .prose a.glossary-term:hover::after {
+      opacity: 1;
+    }
+  }
+
   /* 다이어그램 엣지 흐름 애니메이션(.flow-on)·노드 라벨 정렬은 global.css로 옮겨
      본문·확대 모달이 같은 규칙을 공유한다. 여기선 IntersectionObserver가 .flow-on만 토글한다. */
 

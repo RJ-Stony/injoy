@@ -1,0 +1,156 @@
+---
+/**
+ * 연결 스키마(C21) — 글과 글을 잇는 관계 타입을 독자에게 설명하는 페이지.
+ * 단일 출처는 graph.ts의 EDGE_TYPES/AUTO_EDGE_TYPES. 그래프의 범례·필터와 같은 색(--edge-*).
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { EDGE_TYPES, AUTO_EDGE_TYPES } from '../utils/graph';
+import { withBase } from '../utils/url';
+
+const explicit = Object.entries(EDGE_TYPES);
+const auto = Object.entries(AUTO_EDGE_TYPES);
+---
+
+<BaseLayout title="연결 스키마" description="Injoy에서 글과 글을 잇는 관계 타입의 뜻을 정리했어요.">
+  <section class="schema">
+    <h1>연결 스키마</h1>
+    <p class="schema-sub">
+      글은 쌓이기만 하지 않고 서로 이어집니다. 각 연결에는 <strong>어떤 관계인지</strong> 타입이 붙어요.
+      <a href={withBase('/graph/')}>그래프</a>에서 색으로, 글 아래 '연결된 글'에서 문구로 만나는 그 타입들이에요.
+    </p>
+
+    <h2>직접 고르는 연결</h2>
+    <p class="group-note">글을 발행할 때 작성자가 관계를 판단해 붙입니다. 방향이 있어요(A → B).</p>
+    <ul class="type-list">
+      {
+        explicit.map(([key, t]) => (
+          <li class="type-row">
+            <span class:list={['sch-chip', key]}>{t.label}</span>
+            <div class="type-body">
+              <p class="type-criteria">{t.criteria}</p>
+              <p class="type-dir">
+                <span>나가는 방향: {t.out}</span>
+                <span>들어오는 방향: {t.in}</span>
+              </p>
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+
+    <h2>자동으로 모이는 연결</h2>
+    <p class="group-note">본문에서 규칙에 따라 저절로 수집돼요. 작성자가 직접 고르지 않습니다.</p>
+    <ul class="type-list">
+      {
+        auto.map(([key, t]) => (
+          <li class="type-row">
+            <span class:list={['sch-chip', key]}>{t.label}</span>
+            <div class="type-body">
+              <p class="type-criteria">{t.criteria}</p>
+            </div>
+          </li>
+        ))
+      }
+      <li class="type-row">
+        <span class="sch-chip tag">태그</span>
+        <div class="type-body">
+          <p class="type-criteria">같은 태그를 단 글끼리 옅은 점선으로 이어집니다. 주제가 가까운 이웃을 보여 줘요.</p>
+        </div>
+      </li>
+    </ul>
+  </section>
+</BaseLayout>
+
+<style>
+  .schema {
+    max-width: var(--width-content);
+    margin: 0 auto;
+  }
+  .schema h1 {
+    font-size: clamp(1.7rem, 5vw, 2.2rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.4rem;
+  }
+  .schema-sub {
+    margin: 0 0 2rem;
+    color: var(--text-muted);
+    line-height: 1.8;
+  }
+  .schema-sub a {
+    color: var(--accent);
+  }
+  .schema h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 2rem 0 0.3rem;
+  }
+  .group-note {
+    margin: 0 0 1rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  .type-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .type-row {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr;
+    gap: 0.9rem;
+    align-items: start;
+    padding: 1rem 0;
+    border-top: 1px solid var(--border);
+  }
+  .type-body {
+    min-width: 0;
+  }
+  .type-criteria {
+    margin: 0;
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .type-dir {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 1.2rem;
+    margin: 0.5rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+  }
+
+  /* 타입 칩 — 그래프 범례와 같은 색(--edge-* 단일 출처) */
+  .sch-chip {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.22em 0.7em;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #fff;
+    background-color: var(--chip, var(--accent));
+    white-space: nowrap;
+  }
+  .sch-chip.extends { --chip: var(--edge-extends); }
+  .sch-chip.supports { --chip: var(--edge-supports); }
+  .sch-chip.refines { --chip: var(--edge-refines); }
+  .sch-chip.instantiates { --chip: var(--edge-instantiates); }
+  .sch-chip.requires { --chip: var(--edge-requires); }
+  .sch-chip.triggered-by { --chip: var(--edge-triggered-by); }
+  .sch-chip.contradicts { --chip: var(--edge-contradicts); }
+  .sch-chip.related { --chip: var(--edge-related); }
+  .sch-chip.mentions { --chip: var(--text-muted); }
+  .sch-chip.tag { --chip: var(--text-muted); }
+
+  @media (max-width: 560px) {
+    .type-row {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+  }
+</style>

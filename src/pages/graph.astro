@@ -97,6 +97,7 @@ const data = {
         <span class="note">{AUTO_EDGE_TYPES.mentions.criteria}</span>
       </li>
     </ul>
+    <a class="type-guide-more" href={withBase('/schema/')}>연결 스키마 자세히 보기 →</a>
   </details>
 
   <noscript>
@@ -1437,6 +1438,18 @@ const data = {
   .type-guide .edge-type {
     margin-inline: 0;
     flex-shrink: 0;
+  }
+
+  .type-guide-more {
+    display: inline-block;
+    margin-top: 0.9rem;
+    color: var(--accent);
+    font-size: 0.9rem;
+    text-decoration: none;
+  }
+  .type-guide-more:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
   }
 
   .noscript-note {

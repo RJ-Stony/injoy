@@ -1,0 +1,115 @@
+---
+/**
+ * 용어집(C7) — 본문 voice B규칙(`**용어**(풀이)`)을 빌드타임에 모아 한 페이지로.
+ * 각 항목은 term을 슬러그화한 id를 달아, 다른 글의 용어 하버카드(C8)가 여기로 앵커 링크한다.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getGlossary, termSlug } from '../utils/glossary';
+import { withBase } from '../utils/url';
+
+const entries = await getGlossary();
+---
+
+<BaseLayout title="용어집" description="Injoy 글에 나온 전문 용어와 짧은 풀이를 한곳에 모았어요.">
+  <section class="glossary">
+    <h1>용어집</h1>
+    <p class="glossary-sub">
+      글에 처음 나오는 전문 용어에 붙인 짧은 풀이를 모았어요. 지금까지 <strong>{entries.length}개</strong>.
+    </p>
+
+    <dl class="glossary-list">
+      {
+        entries.map((e) => (
+          <div class="g-item" id={termSlug(e.term)}>
+            <dt class="g-term">{e.term}</dt>
+            <dd class="g-body">
+              <span class="g-gloss">{e.gloss}</span>
+              <span class="g-sources">
+                {e.sources.map((s) => (
+                  <a href={withBase(`/posts/${s.slug}/`)}>{s.title}</a>
+                ))}
+              </span>
+            </dd>
+          </div>
+        ))
+      }
+    </dl>
+  </section>
+</BaseLayout>
+
+<style>
+  .glossary {
+    max-width: var(--width-content);
+    margin: 0 auto;
+  }
+  .glossary h1 {
+    font-size: clamp(1.7rem, 5vw, 2.2rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.4rem;
+  }
+  .glossary-sub {
+    margin: 0 0 2rem;
+    color: var(--text-muted);
+  }
+
+  .glossary-list {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .g-item {
+    display: grid;
+    grid-template-columns: minmax(7rem, 12rem) 1fr;
+    gap: 0.5rem 1.4rem;
+    padding: 1rem 0;
+    border-top: 1px solid var(--border);
+    scroll-margin-top: 90px; /* 앵커로 점프할 때 헤더에 안 가리게 */
+  }
+  .g-term {
+    margin: 0;
+    font-weight: 700;
+    color: var(--text);
+    font-size: 1.02rem;
+    word-break: keep-all;
+  }
+  .g-body {
+    margin: 0;
+  }
+  .g-gloss {
+    display: block;
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .g-sources {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.9rem;
+    margin-top: 0.4rem;
+  }
+  .g-sources a {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    text-decoration: none;
+  }
+  .g-sources a::before {
+    content: '↳ ';
+  }
+  .g-sources a:hover {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  /* 앵커로 막 점프해 온 항목을 잠깐 강조 */
+  .g-item:target .g-term {
+    color: var(--accent);
+  }
+
+  @media (max-width: 560px) {
+    .g-item {
+      grid-template-columns: 1fr;
+      gap: 0.3rem;
+    }
+  }
+</style>
