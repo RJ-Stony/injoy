@@ -41,17 +41,17 @@ const modTotal = posts.reduce((n, p) => {
 
 // 대표 지표(크게) — 방문 수는 클라이언트에서 Abacus로 채운다
 const heroTiles = [
-  { label: '글', value: `${posts.length.toLocaleString('ko-KR')}편` },
+  { label: '전체 글 수', value: `${posts.length.toLocaleString('ko-KR')}편` },
   { label: '글 간의 연결', value: graph.stats.edges.toLocaleString('ko-KR') },
 ];
-// 인라인 스탯 — <strong> 값 + muted 라벨, · 로 구분(발행 수는 hero '글' 카드가 담당)
+// 인라인 스탯 — muted 라벨 먼저·<strong> 값 뒤, · 로 구분(발행 수는 hero '전체 글 수' 카드가 담당)
 const inlineStats = [
-  { value: charDisplay, label: '작성한 글자' },
-  { value: timeDisplay, label: '읽는 시간' },
-  { value: `${modTotal.toLocaleString('ko-KR')}번`, label: '수정' },
-  { value: graph.stats.tags.toLocaleString('ko-KR'), label: '태그' },
-  { value: categories.length.toLocaleString('ko-KR'), label: '카테고리' },
-  { value: seriesGroups.length.toLocaleString('ko-KR'), label: '시리즈' },
+  { label: '작성한 글자', value: charDisplay },
+  { label: '총 읽는 시간', value: timeDisplay },
+  { label: '글 수정', value: `${modTotal.toLocaleString('ko-KR')}번` },
+  { label: '태그', value: `${graph.stats.tags.toLocaleString('ko-KR')}개` },
+  { label: '총 카테고리', value: `${categories.length.toLocaleString('ko-KR')}개` },
+  { label: '시리즈', value: `${seriesGroups.length.toLocaleString('ko-KR')}개` },
 ];
 
 // 로컬 날짜(YYYY-MM-DD) — pubDate는 UTC 자정이라 KST에서도 같은 날, 오늘도 로컬 기준으로 통일한다.
@@ -105,7 +105,9 @@ interface Cell {
   date: string;
   level: number;
   active: boolean;
-  title: string;
+  inYear: boolean; // 올해 범위 안(미래 포함) — 툴팁 대상 여부. 범위 밖 패딩 셀은 false라 무반응.
+  pub: number;
+  mod: number;
 }
 const columns: { days: Cell[]; monthLabel: string | null }[] = [];
 let recordCount = 0; // 올해 발행+수정 합(제목 문장에 쓴다)
@@ -124,17 +126,8 @@ while (cursor <= yearEnd) {
     const total = pub + mod;
     if (active) recordCount += total;
     const level = total === 0 ? 0 : Math.ceil((total / maxTotal) * 3);
-    // 활성 셀은 발행/수정을 담고, 올해 안 미래 셀은 날짜만, 연 범위 밖 패딩 셀은 title 없음
-    let title = '';
-    if (active) {
-      const parts = [key];
-      if (pub > 0) parts.push(`발행 ${pub}`);
-      if (mod > 0) parts.push(`수정 ${mod}`);
-      title = parts.join(' · ');
-    } else if (inYear) {
-      title = key;
-    }
-    days.push({ date: key, level, active, title });
+    // 활성 셀은 발행/수정 수를 담고, 올해 안 미래 셀은 날짜만(pub·mod 0), 연 범위 밖 패딩 셀은 inYear=false
+    days.push({ date: key, level, active, inYear, pub, mod });
     cursor.setDate(cursor.getDate() + 1);
   }
   // 그 주에 월이 바뀌면 컬럼 최상단 슬롯에 월 라벨을 단다(GitHub식).
@@ -164,7 +157,7 @@ const colsHalf = Math.ceil(columns.length / 2);
         <span class="tile-value" id="visits-value"
           ><span class="stat-skeleton" aria-hidden="true"></span></span
         >
-        <span class="tile-label">전체 방문</span>
+        <span class="tile-label">전체 방문자 수</span>
       </div>
       <div class="tile tile-hero">
         <span class="tile-value">{heroTiles[1].value}</span>
@@ -177,7 +170,7 @@ const colsHalf = Math.ceil(columns.length / 2);
       {
         inlineStats.map((s) => (
           <span class="stat-item">
-            <strong>{s.value}</strong> {s.label}
+            {s.label} <strong>{s.value}</strong>
           </span>
         ))
       }
@@ -198,7 +191,9 @@ const colsHalf = Math.ceil(columns.length / 2);
               {c.days.map((d) => (
                 <span
                   class:list={['grass-cell', d.active ? `lv${d.level}` : 'oob']}
-                  title={d.title}
+                  data-date={d.inYear ? d.date : undefined}
+                  data-pub={d.inYear ? d.pub : undefined}
+                  data-mod={d.inYear ? d.mod : undefined}
                 />
               ))}
             </div>
@@ -213,6 +208,9 @@ const colsHalf = Math.ceil(columns.length / 2);
         <span class="grass-cell lv3"></span>
         <span>많음</span>
       </div>
+      <!-- 미니 툴팁 — 셀 hover(데스크톱)·탭(모바일) 시 그 날짜의 발행·수정 수를 아주 작게.
+           격자가 이미 aria-label로 요약을 읽어 주므로 장식 취급(aria-hidden). -->
+      <div id="grass-tip" aria-hidden="true" hidden></div>
     </div>
   </section>
 </BaseLayout>
@@ -232,6 +230,74 @@ const colsHalf = Math.ceil(columns.length / 2);
         // 카운터 불가 시 그 타일만 조용히 숨긴다
         visitsTile.hidden = true;
       });
+  }
+
+  // 기록 격자 미니 툴팁 — 셀의 data 속성(date/pub/mod)을 읽어 아주 작게 띄운다.
+  // 데스크톱은 hover, 모바일은 탭. 위치는 컨테이너(.grass) 기준 문서 좌표로 계산해 클램프한다.
+  const grass = document.querySelector<HTMLElement>('.grass');
+  const grid = document.querySelector<HTMLElement>('.grass-grid');
+  const tip = document.getElementById('grass-tip');
+  if (grass && grid && tip) {
+    // 셀 data → 툴팁 문구. 활동 있으면 "M월 D일 · 발행 n · 수정 m"(0인 쪽 생략), 없으면 "M월 D일".
+    const labelFor = (cell: HTMLElement) => {
+      const date = cell.dataset.date;
+      if (!date) return null; // 범위 밖 패딩 셀은 무반응
+      const [, mo, da] = date.split('-');
+      const parts = [`${Number(mo)}월 ${Number(da)}일`];
+      const pub = Number(cell.dataset.pub) || 0;
+      const mod = Number(cell.dataset.mod) || 0;
+      if (pub > 0) parts.push(`발행 ${pub}`);
+      if (mod > 0) parts.push(`수정 ${mod}`);
+      return parts.join(' · ');
+    };
+
+    // 셀 위쪽 중앙에 배치하되 컨테이너 좌우로 넘치지 않게 클램프한다.
+    const showFor = (cell: HTMLElement) => {
+      const text = labelFor(cell);
+      if (!text) {
+        hide();
+        return;
+      }
+      tip.textContent = text;
+      tip.hidden = false;
+      const host = grass.getBoundingClientRect();
+      const c = cell.getBoundingClientRect();
+      // 문서가 아닌 .grass(position:relative) 기준 좌표
+      const cellLeft = c.left - host.left;
+      const cellTop = c.top - host.top;
+      const tipW = tip.offsetWidth;
+      const tipH = tip.offsetHeight;
+      let left = cellLeft + c.width / 2 - tipW / 2;
+      left = Math.max(0, Math.min(left, host.width - tipW)); // 좌우 클램프
+      const top = cellTop - tipH - 6; // 셀 위쪽, 살짝 띄움
+      tip.style.left = `${left}px`;
+      tip.style.top = `${Math.max(0, top)}px`;
+    };
+
+    const hide = () => {
+      tip.hidden = true;
+    };
+
+    // 데스크톱: 격자에 마우스 위임(mouseover). 셀 밖으로 나가면 숨김.
+    grid.addEventListener('mouseover', (e) => {
+      const cell = (e.target as HTMLElement).closest<HTMLElement>('.grass-cell');
+      if (cell) showFor(cell);
+    });
+    grid.addEventListener('mouseleave', hide);
+
+    // 모바일: 셀 탭으로 표시, 다른 곳 탭하면 숨김.
+    grid.addEventListener('click', (e) => {
+      const cell = (e.target as HTMLElement).closest<HTMLElement>('.grass-cell');
+      if (cell && cell.dataset.date) {
+        e.stopPropagation();
+        showFor(cell);
+      } else {
+        hide();
+      }
+    });
+    document.addEventListener('click', (e) => {
+      if (!grid.contains(e.target as Node)) hide();
+    });
   }
 </script>
 
@@ -343,6 +409,29 @@ const colsHalf = Math.ceil(columns.length / 2);
   }
 
   /* 기록 격자 — 올해 고정, 무스크롤 fluid 격자 */
+  .grass {
+    position: relative; /* 미니 툴팁을 이 컨테이너 기준으로 절대 배치 */
+  }
+
+  /* 미니 툴팁 — 그래프 페이지 #graph-tooltip 결. muted 아니라 읽히는 본문색. */
+  #grass-tip {
+    position: absolute;
+    z-index: 20;
+    padding: 0.25em 0.6em;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background-color: var(--bg);
+    color: var(--text);
+    font-size: 0.72rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+    pointer-events: none;
+  }
+  #grass-tip[hidden] {
+    display: none;
+  }
+
   .grass-grid {
     display: grid;
     grid-template-columns: repeat(var(--cols), 1fr);
