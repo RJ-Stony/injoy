@@ -27,7 +27,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # fetch-depth: 0 — 통계 잔디가 글 .md의 전체 커밋 히스토리를 읽는다(얕은 클론이면 수정이 0으로 나옴).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       # withastro/action이 설치·빌드 후 pages 아티팩트(github-pages)를 업로드한다.
       - uses: withastro/action@v6
       - id: deployment
