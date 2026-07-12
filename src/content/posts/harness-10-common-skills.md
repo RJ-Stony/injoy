@@ -2,7 +2,7 @@
 title: "하네스는 과연 필요한가"
 description: "직원들과의 인터뷰로 하네스의 문제를 확인하고 공통 스킬 3종을 만들어 공유한 과정"
 pubDate: 2026-07-12
-updatedDate: 2026-07-12T03:13:57.267Z
+updatedDate: 2026-07-12T03:18:48.885Z
 category: "AI"
 tags: ["하네스", "스킬", "인터뷰", "ai"]
 draft: false
@@ -232,7 +232,7 @@ flowchart LR
 
 ```text skills/pipeline/SKILL.md
 [요청 유형 분류]
- A: 바로 응답                    (단순 질문/조회, 계획 없이)
+ A: 바로 응답                     (단순 질문/조회, 계획 없이)
  B: Exec → Verify                (작은 수정)
  C: Plan → Exec → Verify → Fix   (복잡 작업만 촘촘히 계획)
 ```
