@@ -4,7 +4,7 @@ description: "MCP 서버 하나로 문서·대화·정형 데이터·작업 기�
 pubDate: "2026-07-12T16:00:00+09:00"
 category: "AI"
 tags: ["rag", "mcp", "snowflake", "검색"]
-series: "사내 RAG 구축기"
+series: "RAG 시스템 구축"
 ---
 
 검색이 아무리 잘 돌아도, 그걸 부를 창구가 없으면 아무도 쓰지 않는다. [[rag-5-notion-pipeline|Notion 문서]]를 조각내 올렸고, [[rag-6-slack-pipeline|Slack 대화]]에서 지식만 걸러 합류시켰고, [[rag-7-eval-cost|얼마나 맞히고 얼마가 드는지]]까지 재 봤다. 그런데 정작 각자 자리에서 이 검색을 쓰려면 마지막 한 단계가 남아 있었다. 누구나, 어디서나 부를 수 있는 입구다. 그 입구를 **MCP**(Model Context Protocol; AI가 외부 도구를 부르는 규약) 서버 하나로 냈다.

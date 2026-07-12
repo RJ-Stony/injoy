@@ -4,7 +4,7 @@ description: "자체 호스팅 설계를 접고 Snowflake Cortex Search로 방�
 pubDate: "2026-07-12T12:00:00+09:00"
 category: "AI"
 tags: ["rag", "snowflake", "cortex-search", "권한"]
-series: "사내 RAG 구축기"
+series: "RAG 시스템 구축"
 ---
 
 설계서를 다 쓰고 나서, 이제 조립만 남았다고 생각했다. 서버 사양, SQL 함수, 권한 필터, 퇴직 프로세스까지 계획서 한 장에 다 담고 나니 뿌듯했다. 그 그림을 한 문장으로 줄이면 [[rag-3-selfhosted|"전부 우리가 든다"]]였다. 벡터 DB도, 임베딩 서버도, 권한 미들웨어도 사내에서 직접 세우고 직접 운영하는 쪽.
