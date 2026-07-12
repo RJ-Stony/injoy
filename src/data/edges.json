@@ -269,6 +269,72 @@
       "to": "welcome",
       "type": "related",
       "note": "개발 카테고리 내에서 시스템이 실제로 어떻게 동작하는지를 다루기 시작"
+    },
+    {
+      "from": "harness-10-common-skills",
+      "to": "harness-9-orchestration",
+      "type": "extends",
+      "note": "비개발 영역까지 받치겠다던 벤치마킹에 이어, 전 직원 인터뷰로 빈틈을 확인하고 공통 스킬 3종을 배포한 과정"
+    },
+    {
+      "from": "harness-10-common-skills",
+      "to": "harness-5-nondev-ux",
+      "type": "related",
+      "note": "비개발자에게 보이는 말을 다듬던 문제의식이, 비개발 업무 자체를 덮는 스킬로 확장된 자매 글"
+    },
+    {
+      "from": "rag-1-survey",
+      "to": "welcome",
+      "type": "related",
+      "note": "AI 카테고리로 사내 RAG 구축기 시리즈가 새 줄기로 들어옴"
+    },
+    {
+      "from": "rag-2-embedding",
+      "to": "rag-1-survey",
+      "type": "extends",
+      "note": "조사로 그린 지도를 들고, 임베딩 모델과 벡터 DB를 실제 기준으로 고른 과정"
+    },
+    {
+      "from": "rag-3-selfhosted",
+      "to": "rag-2-embedding",
+      "type": "extends",
+      "note": "고른 부품으로 서버부터 권한까지 직접 짊어지는 첫 설계를 그린 과정"
+    },
+    {
+      "from": "rag-4-managed-pivot",
+      "to": "rag-3-selfhosted",
+      "type": "extends",
+      "note": "자체 호스팅 설계를 접고, 이미 계약돼 있던 관리형 검색으로 방향을 튼 결정"
+    },
+    {
+      "from": "rag-5-notion-pipeline",
+      "to": "rag-4-managed-pivot",
+      "type": "extends",
+      "note": "관리형으로 방향을 정한 뒤, 첫 소스인 노션 블록을 검색 청크로 되살린 파이프라인"
+    },
+    {
+      "from": "rag-6-slack-pipeline",
+      "to": "rag-5-notion-pipeline",
+      "type": "extends",
+      "note": "노션에 이어 슬랙 대화를, 사람 승인 없이 데이터 신호로 걸러 같은 벡터 공간에 합류시킨 과정"
+    },
+    {
+      "from": "rag-7-eval-cost",
+      "to": "rag-6-slack-pipeline",
+      "type": "extends",
+      "note": "소스가 쌓인 뒤, 검색 품질과 비용을 느낌이 아니라 숫자로 잰 과정"
+    },
+    {
+      "from": "rag-8-mcp-serving",
+      "to": "rag-7-eval-cost",
+      "type": "extends",
+      "note": "숫자까지 확인한 검색을 MCP 서버 하나로 묶어 누구나 쓰게 만든 마무리"
+    },
+    {
+      "from": "rag-8-mcp-serving",
+      "to": "harness-7-snowflake",
+      "type": "related",
+      "note": "PC에만 쌓이던 작업 기록을 공용 저장소로 올린 같은 사건을, 하네스가 아니라 검색 쪽에서 본 글"
     }
   ]
 }
