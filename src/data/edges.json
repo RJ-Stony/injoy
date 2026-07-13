@@ -286,13 +286,13 @@
       "from": "rag-1-survey",
       "to": "welcome",
       "type": "related",
-      "note": "AI 카테고리로 RAG 시스템 구축 시리즈가 새 줄기로 들어옴"
+      "note": "AI 카테고리로 RAG 시스템 구축 시리즈가 새 가지로 들어옴"
     },
     {
       "from": "rag-2-embedding",
       "to": "rag-1-survey",
       "type": "extends",
-      "note": "조사로 그린 지도를 들고, 임베딩 모델과 벡터 DB를 실제 기준으로 고른 과정"
+      "note": "리서치로 그린 그림을 들고, 임베딩 모델과 벡터 DB를 실제 기준으로 고른 과정"
     },
     {
       "from": "rag-3-selfhosted",
