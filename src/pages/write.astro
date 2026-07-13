@@ -249,7 +249,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         <div class="section-head">
           <div>
             <h2 class="section-title">용어</h2>
-            <p class="section-sub">본문의 굵은 용어(뜻)가 용어집에 자동으로 모여요. 여기서 빼거나 고칠 수 있어요.</p>
+            <p class="section-sub">본문의 굵은 용어(뜻)가 용어 사전에 자동으로 모여요. 여기서 빼거나 고칠 수 있어요.</p>
           </div>
         </div>
         <ul id="glossary-terms" class="glossary-terms"></ul>
@@ -991,7 +991,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     ul.innerHTML = '';
     if (!terms.length) {
       ul.innerHTML =
-        '<li class="empty">본문에 <strong>용어</strong>(뜻) 형태가 없어요. 전문 용어 첫 등장에 짧은 뜻을 붙이면 용어집에 모여요.</li>';
+        '<li class="empty">본문에 <strong>용어</strong>(뜻) 형태가 없어요. 전문 용어 첫 등장에 짧은 뜻을 붙이면 용어 사전에 모여요.</li>';
       return;
     }
     for (const { term, gloss } of terms) {
@@ -1015,7 +1015,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
 
       const toggle = document.createElement('button');
       toggle.type = 'button';
-      toggle.textContent = excluded ? '되돌리기' : '용어집에서 빼기';
+      toggle.textContent = excluded ? '되돌리기' : '용어 사전에서 빼기';
       toggle.addEventListener('click', () => {
         if (state.glossaryExclude.has(term)) state.glossaryExclude.delete(term);
         else state.glossaryExclude.add(term);
@@ -1058,7 +1058,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       }
       // 새 뜻이 한국어 뜻풀이 조건을 못 넘으면 용어집에서 빠진다 — 적용은 하되 알려 준다.
       if (!isKoreanDef(next)) {
-        $('glossary-hint').textContent = '이 뜻이면 용어집에서 빠져요. 한글 뜻풀이를 넣으면 다시 모여요.';
+        $('glossary-hint').textContent = '이 뜻이면 용어 사전에서 빠져요. 한글 뜻풀이를 넣으면 다시 모여요.';
       }
       renderGlossary(); // 즉시 반영(스캔은 새 미러 값을 읽는다)
     };

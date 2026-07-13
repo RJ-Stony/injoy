@@ -10,9 +10,9 @@ import { withBase } from '../utils/url';
 const entries = await getGlossary();
 ---
 
-<BaseLayout title="용어집" description="Injoy 글에 나온 전문 용어와 짧은 풀이를 한곳에 모았어요.">
+<BaseLayout title="용어 사전" description="Injoy 글에 나온 전문 용어와 짧은 풀이를 한곳에 모았어요.">
   <section class="glossary">
-    <h1>용어집</h1>
+    <h1>용어 사전</h1>
     <p class="glossary-sub">글에 나오는 전문 용어들을 모아봤어요.</p>
     <p class="stats" id="glossary-stats"><span><strong>{entries.length}</strong> 용어</span></p>
 
@@ -23,7 +23,7 @@ const entries = await getGlossary();
         type="search"
         autocomplete="off"
         placeholder="용어나 뜻으로 찾기"
-        aria-label="용어집 검색"
+        aria-label="용어 사전 검색"
       />
     </div>
 
@@ -182,14 +182,16 @@ const entries = await getGlossary();
   }
   .g-sources {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem 0.9rem;
-    margin-top: 0.4rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+    margin-top: 0.5rem;
   }
   .g-sources-label {
     color: var(--text-muted);
     font-size: 0.8rem;
     font-weight: 600;
+    margin-bottom: 0.05rem;
   }
   .g-sources a {
     color: var(--text-muted);
