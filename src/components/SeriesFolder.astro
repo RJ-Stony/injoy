@@ -67,10 +67,12 @@ const cards = posts.map((p, i) => ({
                     ) : (
                       <span class="cf-ph">{c.n}</span>
                     )}
-                    <span class="cf-badge">{c.n}</span>
                   </span>
                   <span class="cf-cap">
-                    <span class="cf-title">{c.post.data.title}</span>
+                    <span class="cf-titlerow">
+                      <span class="cf-idx">{c.n}</span>
+                      <span class="cf-title">{c.post.data.title}</span>
+                    </span>
                     <span class="cf-meta">
                       <ViewCount slug={c.post.id} increment={false} />
                       <span class="cf-time">{c.minutes}분</span>
@@ -173,16 +175,51 @@ const cards = posts.map((p, i) => ({
       }),
     );
 
-    // 드래그 / 스와이프
-    let sx: number | null = null;
+    // 드래그 / 스와이프 — 끌면 카드가 한 장씩 따라 넘어간다(버튼 없이도, 모바일 스와이프 포함)
+    const STEP = 90; // 이만큼 끌 때마다 한 장씩
     const stage = root.querySelector<HTMLElement>('.cf-stage')!;
-    stage.addEventListener('pointerdown', (e) => (sx = e.clientX));
-    window.addEventListener('pointerup', (e) => {
-      if (sx === null) return;
-      const dx = e.clientX - sx;
-      if (Math.abs(dx) > 40) go(state.idx + (dx < 0 ? 1 : -1));
-      sx = null;
+    let dragging = false;
+    let startX = 0;
+    let startIdx = 0;
+    let moved = false;
+
+    stage.addEventListener('pointerdown', (e) => {
+      dragging = true;
+      startX = e.clientX;
+      startIdx = state.idx;
+      moved = false;
+      stage.setPointerCapture?.(e.pointerId);
     });
+    stage.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      if (Math.abs(dx) > 6) moved = true;
+      const ni = Math.max(0, Math.min(cards.length - 1, startIdx + Math.round(-dx / STEP)));
+      if (ni !== state.idx) {
+        state.idx = ni;
+        position(); // 끄는 동안엔 위치만(가볍다). 썸네일은 놓을 때 그린다
+      }
+    });
+    const endDrag = () => {
+      if (!dragging) return;
+      dragging = false;
+      if (rIC) rIC(draw, { timeout: 500 });
+      else draw();
+    };
+    stage.addEventListener('pointerup', endDrag);
+    stage.addEventListener('pointercancel', endDrag);
+    // 끌어서 넘긴 직후의 클릭(카드 링크 이동)은 취소한다
+    stage.addEventListener(
+      'click',
+      (e) => {
+        if (moved) {
+          e.preventDefault();
+          e.stopPropagation();
+          moved = false;
+        }
+      },
+      true,
+    );
 
     state.position = position;
     state.draw = draw;
@@ -263,6 +300,15 @@ const cards = posts.map((p, i) => ({
     color: inherit;
     font-family: inherit;
     text-align: left;
+    transition: background-color 0.18s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* 프레스 효과는 심플하게 — 전역 button:active의 scale(0.96)(행 전체가 쪼그라들어 과함)을 끄고,
+     은은한 배경 틴트만 부드럽게 준다. */
+  .folder-head:active {
+    transform: none;
+    background-color: color-mix(in srgb, var(--accent) 7%, transparent);
   }
 
   .folder-ic {
@@ -381,6 +427,12 @@ const cards = posts.map((p, i) => ({
     height: 13.8rem;
     perspective: 1150px;
     overflow: hidden;
+    cursor: grab;
+    touch-action: pan-y; /* 가로 드래그는 커버플로우가, 세로는 페이지 스크롤이 갖게 한다(모바일) */
+  }
+
+  .cf-stage:active {
+    cursor: grabbing;
   }
 
   .cf-track {
@@ -491,20 +543,6 @@ const cards = posts.map((p, i) => ({
     font-variant-numeric: tabular-nums;
   }
 
-  .cf-badge {
-    position: absolute;
-    top: 0.45rem;
-    left: 0.5rem;
-    z-index: 2;
-    font-size: 0.76rem;
-    font-weight: 800;
-    color: var(--accent);
-    background-color: var(--bg);
-    border-radius: 6px;
-    padding: 0.05em 0.42em;
-    font-variant-numeric: tabular-nums;
-  }
-
   /* 제목·메타 — 카드 아래쪽 솔리드 영역(썸네일과 분리, 겹침 없음) */
   .cf-cap {
     flex: 1;
@@ -517,7 +555,24 @@ const cards = posts.map((p, i) => ({
     border-top: 1px solid var(--border);
   }
 
+  /* 번호를 제목 앞에 두는 행(썸네일 위에 떠 있던 배지 대신, 제목과 함께 적절히 자리 잡는다) */
+  .cf-titlerow {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+  }
+
+  .cf-idx {
+    flex-shrink: 0;
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
   .cf-title {
+    flex: 1;
+    min-width: 0;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
