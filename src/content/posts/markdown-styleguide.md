@@ -1,8 +1,8 @@
 ---
 title: "Injoy 글쓰기(마크다운) 문법 총정리"
-description: "제목·코드·표·수식·다이어그램·콜아웃까지, Injoy에서 쓰는 모든 마크다운을 한 글에서 점검"
+description: "제목/코드/표/수식/다이어그램/콜아웃까지, Injoy에서 쓰는 모든 마크다운을 한 글에서 점검"
 pubDate: 2026-06-10
-updatedDate: 2026-06-26
+updatedDate: 2026-07-13T13:46:59.345Z
 category: "글쓰기"
 tags: ["markdown", "글쓰기"]
 draft: false
