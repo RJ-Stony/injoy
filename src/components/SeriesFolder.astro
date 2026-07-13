@@ -1,9 +1,14 @@
 ---
 /**
  * 홈 시리즈 폴더 — 같은 시리즈의 글을 폴더 하나로 묶는다.
- * 기본 닫힘(<details>). 폴더를 누르면 제자리에서 글들이 가로로 넘기는 카드로 펼쳐진다.
- * 각 카드는 썸네일(커버 > 본문 첫 다이어그램 > 번호 플레이스홀더) + 번호 + 제목 + 조회수.
- * 모바일은 손가락 스와이프, 데스크톱은 트랙패드·스크롤로 넘긴다.
+ * 기본 닫힘(<details>). 접히면 슬림한 한 줄(이름·편수·최근 글·미니 카드더미)만 보이고,
+ * 누르면 제자리에서 '커버플로우'로 펴진다 — 가운데 글이 크게 초점, 양옆은 3D로 물러난다.
+ * 한 번에 하나만 열린다(아코디언): 다른 폴더가 열려 있으면 닫는다.
+ * ‹ ›·진행 바·좌우 방향키·드래그(모바일 스와이프)로 넘긴다. 시리즈가 몇 개든 홈은 슬림한 목록.
+ *
+ * 성능: 커버플로우는 폴더를 처음 열 때 초기화(lazy)한다. mermaid 썸네일은 '보이는 카드'
+ *  (초점 ±2)만, 그 카드로 넘어올 때 한 번 그린다(공용 렌더러 큐로 직렬화). 나머지는 스켈레톤.
+ * 스크립트로 도는 커버플로우는 스코프 CSS가 안 걸리는 게 없어 전부 이 컴포넌트 스타일로 둔다.
  */
 import { Image } from 'astro:assets';
 import { readingMinutes, firstDiagram, type Post } from '../utils/post';
@@ -35,90 +40,193 @@ const cards = posts.map((p, i) => ({
     </svg>
     <span class="folder-name">{series}</span>
     <span class="folder-count">{posts.length}편</span>
-    <span class="folder-recent">최근 · {latest.data.title}</span>
+    <span class="folder-peek">
+      <span class="folder-recent">최근 · {latest.data.title}</span>
+      <span class="folder-mini" aria-hidden="true"><i></i><i></i><i></i></span>
+    </span>
     <svg class="folder-caret" viewBox="0 0 16 16" aria-hidden="true">
       <path d="M4 6l4 4 4-4"></path>
     </svg>
   </summary>
 
-  <div class="folder-track" role="list">
-    {
-      cards.map((c) => (
-        <a class="s-card" role="listitem" href={c.href}>
-          <span class="s-thumb">
-            {c.cover ? (
-              <Image src={c.cover} alt="" width={300} height={169} />
-            ) : c.diagram ? (
-              <span class="mermaid-diagram" data-source={c.diagram} />
-            ) : (
-              <span class="s-thumb-ph">{c.n}</span>
-            )}
-          </span>
-          <span class="s-meta">
-            <span class="s-num">{c.n}</span>
-            <span class="s-title">{c.post.data.title}</span>
-          </span>
-          <span class="s-foot">
-            <ViewCount slug={c.post.id} increment={false} />
-            <span class="s-time">{c.minutes}분</span>
-          </span>
-        </a>
-      ))
-    }
+  <div class="cf">
+    <div class="cf-stage">
+      <div class="cf-track" role="list">
+        {
+          cards.map((c) => (
+            <a class="cf-card" role="listitem" href={c.href} data-n={c.n}>
+              <span class="cf-thumb">
+                {c.cover ? (
+                  <Image src={c.cover} alt="" width={320} height={320} />
+                ) : c.diagram ? (
+                  <span class="mermaid-diagram" data-source={c.diagram} />
+                ) : (
+                  <span class="cf-ph">{c.n}</span>
+                )}
+              </span>
+              <span class="cf-badge">{c.n}</span>
+              <span class="cf-cap">
+                <span class="cf-title">{c.post.data.title}</span>
+                <span class="cf-meta">
+                  <ViewCount slug={c.post.id} increment={false} />
+                  <span class="cf-time">{c.minutes}분</span>
+                </span>
+              </span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+    <div class="cf-nav">
+      <button type="button" class="cf-arrow cf-prev" aria-label="이전 글">‹</button>
+      <span class="cf-now" aria-live="polite">1 / {posts.length}</span>
+      <div class="cf-bar" aria-hidden="true"><span></span></div>
+      <button type="button" class="cf-arrow cf-next" aria-label="다음 글">›</button>
+    </div>
   </div>
 </details>
 
 <script>
-  // 캐러셀 카드의 mermaid 썸네일 — 화면(폴더)이 열려 보일 때만 렌더한다.
-  // 공용 렌더러는 내부 큐로 직렬화되어 홈의 일반 카드 썸네일과 동시에 그려도 안전하다.
   import { renderMermaidDiagrams } from '../scripts/mermaid-render';
-  import { SMOOTH_DURATION } from '../scripts/smooth-details';
 
-  // 폴더를 펴면 펼침 애니메이션(SMOOTH_DURATION)과 mermaid 모듈 로드·SVG 렌더가
-  // 메인스레드를 다퉈 버벅인다. 렌더를 펼침이 끝난 뒤(SMOOTH_DURATION)로 미루고, 그 뒤 한가할 때
-  // 그린다 — 펼치는 동안엔 스켈레톤만 돌아 화면이 끊기지 않는다(idle이 일찍 와도 펼침 중엔 안 그림).
-  const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
-  const deferAfterExpand = (fn: () => void) =>
-    setTimeout(() => (ric ? ric(fn, { timeout: 500 }) : fn()), SMOOTH_DURATION + 80);
+  // 보이는 창(초점 기준 좌우 몇 장까지 그리고, 몇 장까지 살려 둘지)
+  const VISIBLE = 2; // 초점 ±2 = 5장 렌더
+  const HIDE_BEYOND = 3; // ±3 넘으면 완전히 감춰 성능·잔상 방지
 
-  const diagrams = Array.from(
-    document.querySelectorAll<HTMLElement>('.series-folder .folder-track .mermaid-diagram'),
-  );
-  if (diagrams.length > 0) {
-    const drawn: HTMLElement[] = [];
-    if ('IntersectionObserver' in window) {
-      const io = new IntersectionObserver(
-        (entries, obs) => {
-          for (const e of entries) {
-            if (!e.isIntersecting) continue;
-            const el = e.target as HTMLElement;
-            drawn.push(el);
-            obs.unobserve(el);
-            deferAfterExpand(() => renderMermaidDiagrams([el]));
-          }
-        },
-        { rootMargin: '200px' },
-      );
-      diagrams.forEach((d) => io.observe(d));
-    } else {
-      drawn.push(...diagrams);
-      renderMermaidDiagrams(diagrams);
-    }
-    // 라이트/다크 전환 시 이미 그린 썸네일을 다시 그린다(글 카드와 같은 패턴).
-    const rerender = () => {
-      if (drawn.length > 0) renderMermaidDiagrams(drawn);
+  type CF = {
+    cards: HTMLElement[];
+    idx: number;
+    layout: () => void;
+    drawn: Set<HTMLElement>;
+  };
+
+  // 한 커버플로우 초기화 — 폴더를 처음 열 때만 부른다.
+  function initCoverflow(root: HTMLElement): CF {
+    const track = root.querySelector<HTMLElement>('.cf-track')!;
+    const cards = Array.from(track.querySelectorAll<HTMLElement>('.cf-card'));
+    const now = root.querySelector<HTMLElement>('.cf-now')!;
+    const bar = root.querySelector<HTMLElement>('.cf-bar span')!;
+    const drawn = new Set<HTMLElement>();
+    const state: CF = { cards, idx: 0, layout: () => {}, drawn };
+
+    // 초점 근처 카드의 mermaid 썸네일을 (한 번만) 그린다. 나머지는 :empty 스켈레톤.
+    const drawNear = () => {
+      for (const c of cards) {
+        const off = Math.abs(cards.indexOf(c) - state.idx);
+        if (off > VISIBLE) continue;
+        const el = c.querySelector<HTMLElement>('.mermaid-diagram');
+        if (el && !drawn.has(el)) {
+          drawn.add(el);
+          renderMermaidDiagrams([el]);
+        }
+      }
     };
-    window.addEventListener('injoy:theme-change', rerender);
-    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rerender);
+
+    state.layout = () => {
+      cards.forEach((c, i) => {
+        const off = i - state.idx;
+        c.style.setProperty('--off', String(off));
+        c.style.setProperty('--abs', String(Math.abs(off)));
+        c.dataset.hidden = Math.abs(off) > HIDE_BEYOND ? '1' : '0';
+        c.classList.toggle('is-focus', off === 0);
+        // 초점 카드만 실제 링크로 동작, 나머지는 클릭 시 그 카드로 이동
+        c.setAttribute('tabindex', off === 0 ? '0' : '-1');
+      });
+      now.textContent = `${state.idx + 1} / ${cards.length}`;
+      bar.style.width = `${((state.idx + 1) / cards.length) * 100}%`;
+      drawNear();
+    };
+
+    const go = (n: number) => {
+      state.idx = Math.max(0, Math.min(cards.length - 1, n));
+      state.layout();
+    };
+
+    root.querySelector('.cf-prev')!.addEventListener('click', () => go(state.idx - 1));
+    root.querySelector('.cf-next')!.addEventListener('click', () => go(state.idx + 1));
+
+    // 초점 아닌 카드 클릭 = 그 카드로 이동(링크 이동 막음). 초점 카드는 그대로 링크.
+    cards.forEach((c, i) =>
+      c.addEventListener('click', (e) => {
+        if (i !== state.idx) {
+          e.preventDefault();
+          go(i);
+        }
+      }),
+    );
+
+    // 좌우 방향키
+    root.querySelector('.cf-stage')!.addEventListener('keydown', (e) => {
+      const k = (e as KeyboardEvent).key;
+      if (k === 'ArrowLeft') {
+        e.preventDefault();
+        go(state.idx - 1);
+      } else if (k === 'ArrowRight') {
+        e.preventDefault();
+        go(state.idx + 1);
+      }
+    });
+
+    // 드래그 / 스와이프
+    let sx: number | null = null;
+    const stage = root.querySelector<HTMLElement>('.cf-stage')!;
+    stage.addEventListener('pointerdown', (e) => (sx = e.clientX));
+    window.addEventListener('pointerup', (e) => {
+      if (sx === null) return;
+      const dx = e.clientX - sx;
+      if (Math.abs(dx) > 40) go(state.idx + (dx < 0 ? 1 : -1));
+      sx = null;
+    });
+
+    state.layout();
+    return state;
   }
+
+  // 폴더 배선 — 아코디언(하나만) + lazy 커버플로우 + 테마 재렌더
+  const folders = Array.from(document.querySelectorAll<HTMLDetailsElement>('.series-folder'));
+  const cfs = new WeakMap<HTMLDetailsElement, CF>();
+
+  for (const f of folders) {
+    f.addEventListener('toggle', () => {
+      if (!f.open) return;
+      // 아코디언: 다른 열린 폴더는 닫는다
+      for (const o of folders) if (o !== f && o.open) o.open = false;
+      // 처음 열릴 때 커버플로우 초기화
+      if (!cfs.has(f)) {
+        const cf = f.querySelector<HTMLElement>('.cf');
+        if (cf) cfs.set(f, initCoverflow(cf));
+      } else {
+        cfs.get(f)!.layout();
+      }
+    });
+  }
+
+  // 라이트/다크 전환 시 이미 그린 썸네일을 다시 그린다(글 카드와 같은 패턴).
+  const rerender = () => {
+    for (const f of folders) {
+      const cf = cfs.get(f);
+      if (cf && cf.drawn.size > 0) renderMermaidDiagrams(Array.from(cf.drawn));
+    }
+  };
+  window.addEventListener('injoy:theme-change', rerender);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rerender);
 </script>
 
 <style>
   .series-folder {
-    margin-bottom: 1.5rem;
+    margin-bottom: 0.7rem;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background-color: var(--surface);
+    overflow: hidden;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.25s ease;
+  }
+
+  .series-folder[open] {
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+    box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
   }
 
   .folder-head {
@@ -155,18 +263,49 @@ const cards = posts.map((p, i) => ({
     font-variant-numeric: tabular-nums;
   }
 
-  .folder-recent {
+  .folder-peek {
     margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    min-width: 0;
+  }
+
+  .folder-recent {
     font-size: 0.82rem;
     color: var(--text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 16rem;
+    max-width: 15rem;
   }
 
-  .series-folder[open] .folder-recent {
-    display: none;
+  /* 접힘 상태의 '미니 카드더미' — 안에 묶음이 있다는 정체성 */
+  .folder-mini {
+    position: relative;
+    width: 2.3rem;
+    height: 1.4rem;
+    flex-shrink: 0;
+  }
+  .folder-mini i {
+    position: absolute;
+    width: 1rem;
+    height: 1.4rem;
+    border-radius: 3px;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+  }
+  .folder-mini i:nth-child(1) {
+    left: 0;
+    transform: rotate(-9deg);
+  }
+  .folder-mini i:nth-child(2) {
+    left: 0.5rem;
+    z-index: 1;
+  }
+  .folder-mini i:nth-child(3) {
+    left: 1rem;
+    transform: rotate(9deg);
   }
 
   .folder-caret {
@@ -180,99 +319,121 @@ const cards = posts.map((p, i) => ({
     stroke-linecap: round;
     stroke-linejoin: round;
     transition:
-      transform 0.2s ease,
+      transform 0.25s ease,
       stroke 0.15s ease;
   }
 
+  .series-folder[open] .folder-peek {
+    display: none;
+  }
   .series-folder[open] .folder-caret {
     margin-left: auto;
     transform: rotate(180deg);
   }
-
   .folder-head:hover .folder-caret {
     stroke: var(--accent);
   }
 
-  /* 가로로 넘기는 카드 트랙 */
-  .folder-track {
-    display: flex;
-    gap: 0.7rem;
-    margin: 0;
-    padding: 0.2rem 1.1rem 1.05rem;
-    overflow-x: auto;
-    /* scroll-snap-align:start가 첫 카드를 스크롤포트 시작에 붙여 좌측 패딩(1.1rem)을 먹어 버린다.
-       스냅 기준을 패딩만큼 안으로 밀어 첫 카드도 오른쪽 끝과 같은 여백을 갖게 한다. */
-    scroll-padding-inline: 1.1rem;
-    scroll-snap-type: x proximity;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
+  /* ===== 커버플로우 ===== */
+  .cf {
+    padding: 0.4rem 1.1rem 1rem;
   }
 
-  .folder-track::-webkit-scrollbar {
-    height: 6px;
-  }
-  .folder-track::-webkit-scrollbar-thumb {
-    background-color: var(--border);
-    border-radius: 999px;
-  }
-
-  .s-card {
-    flex: 0 0 9.5rem;
-    scroll-snap-align: start;
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background-color: var(--bg);
+  .cf-stage {
+    position: relative;
+    height: 11rem;
+    perspective: 1100px;
     overflow: hidden;
+    outline: none;
+  }
+
+  .cf-track {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+  }
+
+  .cf-card {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 9.5rem;
+    height: 9.5rem;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background-color: var(--bg);
     text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    will-change: transform;
+    /* --off(초점 기준 거리), --abs(절댓값)로 위치·회전·깊이·투명도를 잡는다(transform만 = GPU) */
+    transform: translate(-50%, -50%)
+      translateX(calc(var(--off, 0) * 8.1rem))
+      translateZ(calc(var(--abs, 0) * -170px))
+      rotateY(calc(var(--off, 0) * -34deg))
+      scale(calc(1 - var(--abs, 0) * 0.06));
+    opacity: calc(1 - var(--abs, 0) * 0.3);
+    z-index: calc(50 - var(--abs, 0));
+    filter: brightness(calc(1 - var(--abs, 0) * 0.13));
     transition:
-      border-color 0.15s ease,
-      transform 0.15s ease;
+      transform 0.45s cubic-bezier(0.3, 0.7, 0.3, 1),
+      opacity 0.45s ease,
+      filter 0.45s ease;
   }
 
-  .s-card:hover {
-    border-color: var(--accent);
-    text-decoration: none;
-    transform: translateY(-2px);
+  .cf-card[data-hidden='1'] {
+    opacity: 0;
+    pointer-events: none;
   }
 
-  .s-thumb {
-    height: 5.3rem;
+  .cf-card.is-focus {
+    box-shadow: 0 10px 28px rgb(0 0 0 / 18%);
+  }
+
+  .cf-thumb {
+    position: absolute;
+    inset: 0;
     background-color: var(--surface);
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
     line-height: 0;
   }
 
-  .s-thumb img {
+  .cf-thumb img {
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
 
-  .s-thumb .mermaid-diagram {
+  .cf-thumb .mermaid-diagram {
     width: 100%;
     height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.3rem;
+    padding: 0.35rem;
     line-height: normal;
   }
 
-  /* 렌더 전 스켈레톤 — 다이어그램은 idle에 미뤄 그리므로(아래 script), 그 사이 빈 칸 대신
-     잔잔히 반짝이는 자리표시를 보인다. svg가 채워지면 :empty가 풀려 저절로 사라진다(순수 CSS). */
-  .s-thumb .mermaid-diagram:empty {
-    background: linear-gradient(90deg, var(--border), var(--surface), var(--border));
-    background-size: 200% 100%;
-    animation: s-thumb-shimmer 1.2s linear infinite;
+  .cf-thumb .mermaid-diagram svg {
+    max-width: 100%;
+    max-height: 100%;
+    height: auto;
+    display: block;
   }
 
-  @keyframes s-thumb-shimmer {
+  /* 렌더 전 스켈레톤 — 초점으로 넘어와 그려지면 :empty가 풀려 저절로 사라진다(순수 CSS) */
+  .cf-thumb .mermaid-diagram:empty {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--border), var(--surface), var(--border));
+    background-size: 200% 100%;
+    animation: cf-shimmer 1.2s linear infinite;
+  }
+
+  @keyframes cf-shimmer {
     0% {
       background-position: 200% 0;
     }
@@ -281,84 +442,154 @@ const cards = posts.map((p, i) => ({
     }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .s-thumb .mermaid-diagram:empty {
-      animation: none;
-    }
-  }
-
-  .s-thumb .mermaid-diagram svg {
-    max-width: 100%;
-    max-height: 100%;
-    height: auto;
-    display: block;
-  }
-
-  .s-thumb-ph {
-    font-size: 1.7rem;
+  .cf-ph {
+    font-size: 2.2rem;
     font-weight: 800;
     color: var(--accent);
-    opacity: 0.35;
+    opacity: 0.3;
     font-variant-numeric: tabular-nums;
   }
 
-  .s-meta {
-    display: flex;
-    align-items: baseline;
-    gap: 0.4rem;
-    padding: 0.55rem 0.6rem 0.25rem;
-  }
-
-  .s-num {
-    flex-shrink: 0;
-    font-size: 0.78rem;
-    font-weight: 700;
+  .cf-badge {
+    position: absolute;
+    top: 0.45rem;
+    left: 0.5rem;
+    z-index: 2;
+    font-size: 0.76rem;
+    font-weight: 800;
     color: var(--accent);
+    background-color: var(--bg);
+    border-radius: 6px;
+    padding: 0.05em 0.42em;
     font-variant-numeric: tabular-nums;
   }
 
-  .s-title {
-    font-size: 0.85rem;
-    line-height: 1.35;
-    color: var(--text);
+  .cf-cap {
+    position: absolute;
+    inset: auto 0 0 0;
+    z-index: 2;
+    padding: 1.4rem 0.6rem 0.55rem;
+    background: linear-gradient(transparent, var(--bg) 55%);
+  }
+
+  .cf-title {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    font-size: 0.82rem;
+    font-weight: 650;
+    line-height: 1.3;
+    color: var(--text);
   }
 
-  .s-card:hover .s-title {
+  .cf-card.is-focus .cf-title {
     color: var(--accent);
   }
 
-  .s-foot {
+  .cf-meta {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-top: auto;
-    padding: 0 0.65rem 0.6rem;
+    gap: 0.4rem;
+    margin-top: 0.25rem;
   }
 
-  .s-foot :global(.meta-stat) {
+  .cf-meta :global(.meta-stat) {
     margin-left: 0;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
   }
 
-  .s-time {
-    font-size: 0.72rem;
+  .cf-time {
+    font-size: 0.7rem;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
+  }
+
+  /* 내비게이션 */
+  .cf-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.7rem;
+    margin-top: 0.7rem;
+  }
+
+  .cf-arrow {
+    flex-shrink: 0;
+    width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background-color: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 1.05rem;
+    line-height: 1;
+    transition:
+      border-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .cf-arrow:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .cf-now {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 3rem;
+    text-align: center;
+  }
+
+  .cf-bar {
+    flex: 1;
+    max-width: 12rem;
+    height: 4px;
+    border-radius: 2px;
+    background-color: var(--border);
+    overflow: hidden;
+  }
+
+  .cf-bar span {
+    display: block;
+    height: 100%;
+    width: 12.5%;
+    background-color: var(--accent);
+    border-radius: 2px;
+    transition: width 0.35s ease;
   }
 
   @media (max-width: 480px) {
     .folder-recent {
       display: none;
     }
-    .folder-caret {
-      margin-left: auto;
+    .cf-stage {
+      height: 9.5rem;
     }
-    .s-card {
-      flex-basis: 8.5rem;
+    .cf-card {
+      width: 8rem;
+      height: 8rem;
+      transform: translate(-50%, -50%)
+        translateX(calc(var(--off, 0) * 6.7rem))
+        translateZ(calc(var(--abs, 0) * -150px))
+        rotateY(calc(var(--off, 0) * -34deg))
+        scale(calc(1 - var(--abs, 0) * 0.06));
+    }
+    .cf-bar {
+      max-width: 7rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cf-card,
+    .cf-bar span,
+    .folder-caret {
+      transition: none;
+    }
+    .cf-thumb .mermaid-diagram:empty {
+      animation: none;
     }
   }
 </style>
