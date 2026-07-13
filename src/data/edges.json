@@ -3,8 +3,8 @@
     {
       "from": "how-to-write",
       "to": "welcome",
-      "type": "extends",
-      "note": "첫 글에서 얘기한 발행에 드는 공수를 최소화하는 원칙을 구체적인 절차로 풀어낸 글"
+      "type": "refines",
+      "note": "첫 글에서 얘기한 '발행 공수를 최소화한다'는 원칙을, 마크다운 파일 하나로 바로 발행되는 구체적인 절차로 더 또렷하게 푼 글"
     },
     {
       "from": "markdown-styleguide",
@@ -211,6 +211,18 @@
       "note": "쌓기를 마치고 하네스를 가볍게 만드는 과정"
     },
     {
+      "from": "harness-8-trimming",
+      "to": "harness-3-serena-proxy",
+      "type": "contradicts",
+      "note": "3편에서 붙인 Serena(코드 분석 MCP)를, 모델이 좋아지며 더는 필요 없다고 보고 다시 걷어낸 과정. 붙였던 결정을 되돌린 관계"
+    },
+    {
+      "from": "harness-8-trimming",
+      "to": "yagni",
+      "type": "instantiates",
+      "note": "미리 쌓아 둔 코드 분석 MCP와 저장소 파이프라인을, 안 쓰게 되자 걷어낸 이야기. '필요할 때만 만든다'는 YAGNI가 실제 하네스에서 벌어진 사례"
+    },
+    {
       "from": "harness-1-benchmarking",
       "to": "welcome",
       "type": "related",
@@ -303,8 +315,8 @@
     {
       "from": "rag-4-managed-pivot",
       "to": "rag-3-selfhosted",
-      "type": "extends",
-      "note": "자체 호스팅 설계를 접고, 이미 계약돼 있던 관리형 검색으로 방향을 튼 결정"
+      "type": "contradicts",
+      "note": "서버부터 권한까지 직접 짊어지겠다던 자체 호스팅 설계를 접고, 이미 계약돼 있던 관리형 검색으로 방향을 튼 결정. 앞 편의 방향을 뒤집은 관계"
     },
     {
       "from": "rag-5-notion-pipeline",
