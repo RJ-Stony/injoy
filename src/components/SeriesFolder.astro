@@ -1,14 +1,16 @@
 ---
 /**
  * 홈 시리즈 폴더 — 같은 시리즈의 글을 폴더 하나로 묶는다.
- * 기본 닫힘(<details>). 접히면 슬림한 한 줄(이름·편수·최근 글·미니 카드더미)만 보이고,
- * 누르면 제자리에서 '커버플로우'로 펴진다 — 가운데 글이 크게 초점, 양옆은 3D로 물러난다.
- * 한 번에 하나만 열린다(아코디언): 다른 폴더가 열려 있으면 닫는다.
- * ‹ ›·진행 바·좌우 방향키·드래그(모바일 스와이프)로 넘긴다. 시리즈가 몇 개든 홈은 슬림한 목록.
+ * 접히면 슬림한 한 줄(이름·편수·최근 글·미니 카드더미)만, 누르면 제자리에서 '커버플로우'로 편다.
+ * 가운데 글이 크게 초점, 양옆은 3D로 물러난다. 한 번에 하나만 열린다(아코디언).
+ *  - 열고 닫힘은 grid-rows 높이 애니메이션이라, 다른 폴더를 열면 하나는 부드럽게 닫히고
+ *    하나는 부드럽게 열린다(예전 <details> 즉시 토글이 주던 '순간이동' 위화감 제거).
+ *  - 카드는 썸네일(위) + 제목·메타(아래 솔리드)로 나뉘어, 다이어그램이 제목에 안 가린다.
+ *  - ‹ ›·진행 바·좌우 방향키·드래그(모바일 스와이프)로 넘긴다.
  *
- * 성능: 커버플로우는 폴더를 처음 열 때 초기화(lazy)한다. mermaid 썸네일은 '보이는 카드'
- *  (초점 ±2)만, 그 카드로 넘어올 때 한 번 그린다(공용 렌더러 큐로 직렬화). 나머지는 스켈레톤.
- * 스크립트로 도는 커버플로우는 스코프 CSS가 안 걸리는 게 없어 전부 이 컴포넌트 스타일로 둔다.
+ * 성능: 커버플로우는 폴더를 처음 열 때 초기화(lazy). mermaid 썸네일은 '보이는 카드'(초점 ±2)만,
+ *  그 카드로 넘어올 때 한 번 그린다(공용 렌더러 큐로 직렬화). 나머지는 :empty 스켈레톤.
+ * 접근성: 헤더는 aria-expanded 버튼, 본문은 region. 스크립트로 도는 부분이라 전부 이 컴포넌트 스타일.
  */
 import { Image } from 'astro:assets';
 import { readingMinutes, firstDiagram, type Post } from '../utils/post';
@@ -31,8 +33,8 @@ const cards = posts.map((p, i) => ({
 }));
 ---
 
-<details class="series-folder">
-  <summary class="folder-head">
+<section class="series-folder" data-open="false">
+  <button type="button" class="folder-head" aria-expanded="false">
     <svg class="folder-ic" viewBox="0 0 24 24" aria-hidden="true">
       <path
         d="M3 7.6c0-1.2 1-2.1 2.2-2.1h3.3c.5 0 1 .2 1.4.6l.9 1c.3.4.8.6 1.3.6h6.5c1.2 0 2.2 1 2.2 2.1V17c0 1.2-1 2.2-2.2 2.2H5.2C4 19.2 3 18.2 3 17V7.6Z"
@@ -47,79 +49,78 @@ const cards = posts.map((p, i) => ({
     <svg class="folder-caret" viewBox="0 0 16 16" aria-hidden="true">
       <path d="M4 6l4 4 4-4"></path>
     </svg>
-  </summary>
+  </button>
 
-  <div class="cf">
-    <div class="cf-stage">
-      <div class="cf-track" role="list">
-        {
-          cards.map((c) => (
-            <a class="cf-card" role="listitem" href={c.href} data-n={c.n}>
-              <span class="cf-thumb">
-                {c.cover ? (
-                  <Image src={c.cover} alt="" width={320} height={320} />
-                ) : c.diagram ? (
-                  <span class="mermaid-diagram" data-source={c.diagram} />
-                ) : (
-                  <span class="cf-ph">{c.n}</span>
-                )}
-              </span>
-              <span class="cf-badge">{c.n}</span>
-              <span class="cf-cap">
-                <span class="cf-title">{c.post.data.title}</span>
-                <span class="cf-meta">
-                  <ViewCount slug={c.post.id} increment={false} />
-                  <span class="cf-time">{c.minutes}분</span>
-                </span>
-              </span>
-            </a>
-          ))
-        }
+  <div class="sf-body">
+    <div class="sf-body-in">
+      <div class="cf">
+        <div class="cf-stage">
+          <div class="cf-track" role="list">
+            {
+              cards.map((c) => (
+                <a class="cf-card" role="listitem" href={c.href} data-n={c.n}>
+                  <span class="cf-thumb">
+                    {c.cover ? (
+                      <Image src={c.cover} alt="" width={320} height={200} />
+                    ) : c.diagram ? (
+                      <span class="mermaid-diagram" data-source={c.diagram} />
+                    ) : (
+                      <span class="cf-ph">{c.n}</span>
+                    )}
+                    <span class="cf-badge">{c.n}</span>
+                  </span>
+                  <span class="cf-cap">
+                    <span class="cf-title">{c.post.data.title}</span>
+                    <span class="cf-meta">
+                      <ViewCount slug={c.post.id} increment={false} />
+                      <span class="cf-time">{c.minutes}분</span>
+                    </span>
+                  </span>
+                </a>
+              ))
+            }
+          </div>
+        </div>
+        <div class="cf-nav">
+          <button type="button" class="cf-arrow cf-prev" aria-label="이전 글">‹</button>
+          <span class="cf-now" aria-live="polite">1 / {posts.length}</span>
+          <div class="cf-bar" aria-hidden="true"><span></span></div>
+          <button type="button" class="cf-arrow cf-next" aria-label="다음 글">›</button>
+        </div>
       </div>
     </div>
-    <div class="cf-nav">
-      <button type="button" class="cf-arrow cf-prev" aria-label="이전 글">‹</button>
-      <span class="cf-now" aria-live="polite">1 / {posts.length}</span>
-      <div class="cf-bar" aria-hidden="true"><span></span></div>
-      <button type="button" class="cf-arrow cf-next" aria-label="다음 글">›</button>
-    </div>
   </div>
-</details>
+</section>
 
 <script>
   import { renderMermaidDiagrams } from '../scripts/mermaid-render';
 
-  // 보이는 창(초점 기준 좌우 몇 장까지 그리고, 몇 장까지 살려 둘지)
   const VISIBLE = 2; // 초점 ±2 = 5장 렌더
   const HIDE_BEYOND = 3; // ±3 넘으면 완전히 감춰 성능·잔상 방지
 
   type CF = {
-    cards: HTMLElement[];
     idx: number;
     layout: () => void;
     drawn: Set<HTMLElement>;
   };
 
-  // 한 커버플로우 초기화 — 폴더를 처음 열 때만 부른다.
   function initCoverflow(root: HTMLElement): CF {
     const track = root.querySelector<HTMLElement>('.cf-track')!;
     const cards = Array.from(track.querySelectorAll<HTMLElement>('.cf-card'));
     const now = root.querySelector<HTMLElement>('.cf-now')!;
     const bar = root.querySelector<HTMLElement>('.cf-bar span')!;
     const drawn = new Set<HTMLElement>();
-    const state: CF = { cards, idx: 0, layout: () => {}, drawn };
+    const state: CF = { idx: 0, layout: () => {}, drawn };
 
-    // 초점 근처 카드의 mermaid 썸네일을 (한 번만) 그린다. 나머지는 :empty 스켈레톤.
     const drawNear = () => {
-      for (const c of cards) {
-        const off = Math.abs(cards.indexOf(c) - state.idx);
-        if (off > VISIBLE) continue;
+      cards.forEach((c, i) => {
+        if (Math.abs(i - state.idx) > VISIBLE) return;
         const el = c.querySelector<HTMLElement>('.mermaid-diagram');
         if (el && !drawn.has(el)) {
           drawn.add(el);
           renderMermaidDiagrams([el]);
         }
-      }
+      });
     };
 
     state.layout = () => {
@@ -129,7 +130,6 @@ const cards = posts.map((p, i) => ({
         c.style.setProperty('--abs', String(Math.abs(off)));
         c.dataset.hidden = Math.abs(off) > HIDE_BEYOND ? '1' : '0';
         c.classList.toggle('is-focus', off === 0);
-        // 초점 카드만 실제 링크로 동작, 나머지는 클릭 시 그 카드로 이동
         c.setAttribute('tabindex', off === 0 ? '0' : '-1');
       });
       now.textContent = `${state.idx + 1} / ${cards.length}`;
@@ -145,7 +145,6 @@ const cards = posts.map((p, i) => ({
     root.querySelector('.cf-prev')!.addEventListener('click', () => go(state.idx - 1));
     root.querySelector('.cf-next')!.addEventListener('click', () => go(state.idx + 1));
 
-    // 초점 아닌 카드 클릭 = 그 카드로 이동(링크 이동 막음). 초점 카드는 그대로 링크.
     cards.forEach((c, i) =>
       c.addEventListener('click', (e) => {
         if (i !== state.idx) {
@@ -154,18 +153,6 @@ const cards = posts.map((p, i) => ({
         }
       }),
     );
-
-    // 좌우 방향키
-    root.querySelector('.cf-stage')!.addEventListener('keydown', (e) => {
-      const k = (e as KeyboardEvent).key;
-      if (k === 'ArrowLeft') {
-        e.preventDefault();
-        go(state.idx - 1);
-      } else if (k === 'ArrowRight') {
-        e.preventDefault();
-        go(state.idx + 1);
-      }
-    });
 
     // 드래그 / 스와이프
     let sx: number | null = null;
@@ -182,26 +169,32 @@ const cards = posts.map((p, i) => ({
     return state;
   }
 
-  // 폴더 배선 — 아코디언(하나만) + lazy 커버플로우 + 테마 재렌더
-  const folders = Array.from(document.querySelectorAll<HTMLDetailsElement>('.series-folder'));
-  const cfs = new WeakMap<HTMLDetailsElement, CF>();
+  // 폴더 배선 — 아코디언(하나만, 부드러운 높이) + lazy 커버플로우 + 테마 재렌더
+  const folders = Array.from(document.querySelectorAll<HTMLElement>('.series-folder'));
+  const cfs = new WeakMap<HTMLElement, CF>();
 
-  for (const f of folders) {
-    f.addEventListener('toggle', () => {
-      if (!f.open) return;
-      // 아코디언: 다른 열린 폴더는 닫는다
-      for (const o of folders) if (o !== f && o.open) o.open = false;
-      // 처음 열릴 때 커버플로우 초기화
+  const setOpen = (f: HTMLElement, open: boolean) => {
+    f.dataset.open = String(open);
+    f.querySelector('.folder-head')!.setAttribute('aria-expanded', String(open));
+    if (open) {
       if (!cfs.has(f)) {
         const cf = f.querySelector<HTMLElement>('.cf');
         if (cf) cfs.set(f, initCoverflow(cf));
       } else {
         cfs.get(f)!.layout();
       }
+    }
+  };
+
+  for (const f of folders) {
+    f.querySelector('.folder-head')!.addEventListener('click', () => {
+      const willOpen = f.dataset.open !== 'true';
+      // 아코디언: 여는 순간, 열려 있던 다른 폴더는 부드럽게 닫는다(둘 다 높이 트랜지션이라 동시에 진행)
+      if (willOpen) for (const o of folders) if (o !== f && o.dataset.open === 'true') setOpen(o, false);
+      setOpen(f, willOpen);
     });
   }
 
-  // 라이트/다크 전환 시 이미 그린 썸네일을 다시 그린다(글 카드와 같은 패턴).
   const rerender = () => {
     for (const f of folders) {
       const cf = cfs.get(f);
@@ -224,22 +217,23 @@ const cards = posts.map((p, i) => ({
       box-shadow 0.25s ease;
   }
 
-  .series-folder[open] {
+  .series-folder[data-open='true'] {
     border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
     box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
   }
 
   .folder-head {
+    width: 100%;
     display: flex;
     align-items: center;
     gap: 0.6rem;
     padding: 0.9rem 1.1rem;
     cursor: pointer;
-    list-style: none;
-  }
-
-  .folder-head::-webkit-details-marker {
-    display: none;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    text-align: left;
   }
 
   .folder-ic {
@@ -254,6 +248,7 @@ const cards = posts.map((p, i) => ({
 
   .folder-name {
     font-weight: 700;
+    font-size: 1rem;
     color: var(--text);
   }
 
@@ -319,19 +314,32 @@ const cards = posts.map((p, i) => ({
     stroke-linecap: round;
     stroke-linejoin: round;
     transition:
-      transform 0.25s ease,
+      transform 0.28s ease,
       stroke 0.15s ease;
   }
 
-  .series-folder[open] .folder-peek {
+  .series-folder[data-open='true'] .folder-peek {
     display: none;
   }
-  .series-folder[open] .folder-caret {
+  .series-folder[data-open='true'] .folder-caret {
     margin-left: auto;
     transform: rotate(180deg);
   }
   .folder-head:hover .folder-caret {
     stroke: var(--accent);
+  }
+
+  /* 부드러운 열고 닫힘 — grid-rows 0fr↔1fr (높이를 애니메이션해 아코디언 전환이 매끄럽다) */
+  .sf-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.34s ease;
+  }
+  .series-folder[data-open='true'] .sf-body {
+    grid-template-rows: 1fr;
+  }
+  .sf-body-in {
+    overflow: hidden;
   }
 
   /* ===== 커버플로우 ===== */
@@ -341,10 +349,9 @@ const cards = posts.map((p, i) => ({
 
   .cf-stage {
     position: relative;
-    height: 11rem;
-    perspective: 1100px;
+    height: 12.5rem;
+    perspective: 1150px;
     overflow: hidden;
-    outline: none;
   }
 
   .cf-track {
@@ -357,8 +364,8 @@ const cards = posts.map((p, i) => ({
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 9.5rem;
-    height: 9.5rem;
+    width: 10rem;
+    height: 11.4rem;
     border-radius: 12px;
     overflow: hidden;
     border: 1px solid var(--border);
@@ -366,13 +373,15 @@ const cards = posts.map((p, i) => ({
     text-decoration: none;
     color: inherit;
     cursor: pointer;
+    display: flex;
+    flex-direction: column;
     will-change: transform;
-    /* --off(초점 기준 거리), --abs(절댓값)로 위치·회전·깊이·투명도를 잡는다(transform만 = GPU) */
+    /* --off(초점 기준 거리), --abs(절댓값)로 위치·회전·깊이·투명도(transform만 = GPU) */
     transform: translate(-50%, -50%)
-      translateX(calc(var(--off, 0) * 8.1rem))
-      translateZ(calc(var(--abs, 0) * -170px))
-      rotateY(calc(var(--off, 0) * -34deg))
-      scale(calc(1 - var(--abs, 0) * 0.06));
+      translateX(calc(var(--off, 0) * 8.6rem))
+      translateZ(calc(var(--abs, 0) * -175px))
+      rotateY(calc(var(--off, 0) * -33deg))
+      scale(calc(1 - var(--abs, 0) * 0.055));
     opacity: calc(1 - var(--abs, 0) * 0.3);
     z-index: calc(50 - var(--abs, 0));
     filter: brightness(calc(1 - var(--abs, 0) * 0.13));
@@ -391,13 +400,16 @@ const cards = posts.map((p, i) => ({
     box-shadow: 0 10px 28px rgb(0 0 0 / 18%);
   }
 
+  /* 썸네일 — 카드 위쪽. 제목이 위에 겹치지 않아 LR 다이어그램도 안 가린다 */
   .cf-thumb {
-    position: absolute;
-    inset: 0;
+    position: relative;
+    height: 7rem;
+    flex-shrink: 0;
     background-color: var(--surface);
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
     line-height: 0;
   }
 
@@ -413,7 +425,7 @@ const cards = posts.map((p, i) => ({
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.35rem;
+    padding: 0.4rem;
     line-height: normal;
   }
 
@@ -464,12 +476,16 @@ const cards = posts.map((p, i) => ({
     font-variant-numeric: tabular-nums;
   }
 
+  /* 제목·메타 — 카드 아래쪽 솔리드 영역(썸네일과 분리, 겹침 없음) */
   .cf-cap {
-    position: absolute;
-    inset: auto 0 0 0;
-    z-index: 2;
-    padding: 1.4rem 0.6rem 0.55rem;
-    background: linear-gradient(transparent, var(--bg) 55%);
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.5rem 0.6rem 0.55rem;
+    background-color: var(--bg);
+    border-top: 1px solid var(--border);
   }
 
   .cf-title {
@@ -477,7 +493,7 @@ const cards = posts.map((p, i) => ({
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    font-size: 0.82rem;
+    font-size: 0.81rem;
     font-weight: 650;
     line-height: 1.3;
     color: var(--text);
@@ -491,7 +507,7 @@ const cards = posts.map((p, i) => ({
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    margin-top: 0.25rem;
+    margin-top: auto;
   }
 
   .cf-meta :global(.meta-stat) {
@@ -505,13 +521,13 @@ const cards = posts.map((p, i) => ({
     font-variant-numeric: tabular-nums;
   }
 
-  /* 내비게이션 */
+  /* 내비게이션 — 대칭 중앙 정렬(진행 바는 고정 폭이라 화살표가 좌우 균형을 맞춘다) */
   .cf-nav {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.7rem;
-    margin-top: 0.7rem;
+    margin-top: 0.75rem;
   }
 
   .cf-arrow {
@@ -539,13 +555,13 @@ const cards = posts.map((p, i) => ({
     font-size: 0.78rem;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
-    min-width: 3rem;
+    min-width: 2.8rem;
     text-align: center;
   }
 
   .cf-bar {
-    flex: 1;
-    max-width: 12rem;
+    width: 8rem;
+    flex-shrink: 0;
     height: 4px;
     border-radius: 2px;
     background-color: var(--border);
@@ -566,26 +582,30 @@ const cards = posts.map((p, i) => ({
       display: none;
     }
     .cf-stage {
-      height: 9.5rem;
+      height: 11.5rem;
     }
     .cf-card {
-      width: 8rem;
-      height: 8rem;
+      width: 8.6rem;
+      height: 10.6rem;
       transform: translate(-50%, -50%)
-        translateX(calc(var(--off, 0) * 6.7rem))
+        translateX(calc(var(--off, 0) * 7.4rem))
         translateZ(calc(var(--abs, 0) * -150px))
-        rotateY(calc(var(--off, 0) * -34deg))
-        scale(calc(1 - var(--abs, 0) * 0.06));
+        rotateY(calc(var(--off, 0) * -33deg))
+        scale(calc(1 - var(--abs, 0) * 0.055));
+    }
+    .cf-thumb {
+      height: 6rem;
     }
     .cf-bar {
-      max-width: 7rem;
+      width: 5.5rem;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .cf-card,
     .cf-bar span,
-    .folder-caret {
+    .folder-caret,
+    .sf-body {
       transition: none;
     }
     .cf-thumb .mermaid-diagram:empty {
