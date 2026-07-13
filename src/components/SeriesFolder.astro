@@ -176,6 +176,8 @@ const cards = posts.map((p, i) => ({
     );
 
     // 드래그 / 스와이프 — 끌면 카드가 한 장씩 따라 넘어간다(버튼 없이도, 모바일 스와이프 포함)
+    // ★setPointerCapture는 쓰지 않는다 — 캡처가 이어지는 click의 타깃을 가로채 카드 링크 이동을 막았다.
+    //   대신 드래그하는 동안에만 window에 move/up을 걸고, 끝나면 뗀다(그래서 그냥 클릭은 링크로 그대로 이동).
     const STEP = 90; // 이만큼 끌 때마다 한 장씩
     const stage = root.querySelector<HTMLElement>('.cf-stage')!;
     let dragging = false;
@@ -183,14 +185,7 @@ const cards = posts.map((p, i) => ({
     let startIdx = 0;
     let moved = false;
 
-    stage.addEventListener('pointerdown', (e) => {
-      dragging = true;
-      startX = e.clientX;
-      startIdx = state.idx;
-      moved = false;
-      stage.setPointerCapture?.(e.pointerId);
-    });
-    stage.addEventListener('pointermove', (e) => {
+    const onMove = (e: PointerEvent) => {
       if (!dragging) return;
       const dx = e.clientX - startX;
       if (Math.abs(dx) > 6) moved = true;
@@ -199,16 +194,25 @@ const cards = posts.map((p, i) => ({
         state.idx = ni;
         position(); // 끄는 동안엔 위치만(가볍다). 썸네일은 놓을 때 그린다
       }
-    });
-    const endDrag = () => {
+    };
+    const onUp = () => {
       if (!dragging) return;
       dragging = false;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
       if (rIC) rIC(draw, { timeout: 500 });
       else draw();
     };
-    stage.addEventListener('pointerup', endDrag);
-    stage.addEventListener('pointercancel', endDrag);
-    // 끌어서 넘긴 직후의 클릭(카드 링크 이동)은 취소한다
+    stage.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return; // 좌클릭·터치만
+      dragging = true;
+      startX = e.clientX;
+      startIdx = state.idx;
+      moved = false;
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    });
+    // 실제로 끌어서 넘긴 직후의 클릭(카드 링크 이동)만 취소한다. 그냥 클릭은 통과 → 링크 이동.
     stage.addEventListener(
       'click',
       (e) => {
@@ -592,17 +596,23 @@ const cards = posts.map((p, i) => ({
   .cf-meta {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.5rem;
     margin-top: auto;
+    font-size: 0.72rem;
+    line-height: 1;
+    color: var(--text-muted);
   }
 
+  /* 조회수 칩과 '분'을 같은 크기·같은 세로선에 맞춘다(아이콘·숫자·분이 한 줄에 정렬) */
   .cf-meta :global(.meta-stat) {
     margin-left: 0;
-    font-size: 0.7rem;
+    font-size: inherit;
+    line-height: 1;
   }
 
   .cf-time {
-    font-size: 0.7rem;
+    font-size: inherit;
+    line-height: 1;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
   }
