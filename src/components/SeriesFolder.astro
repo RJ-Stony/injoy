@@ -82,10 +82,14 @@ const cards = posts.map((p, i) => ({
           </div>
         </div>
         <div class="cf-nav">
-          <button type="button" class="cf-arrow cf-prev" aria-label="이전 글">‹</button>
+          <button type="button" class="cf-arrow cf-prev" aria-label="이전 글">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+          </button>
           <span class="cf-now" aria-live="polite">1 / {posts.length}</span>
           <div class="cf-bar" aria-hidden="true"><span></span></div>
-          <button type="button" class="cf-arrow cf-next" aria-label="다음 글">›</button>
+          <button type="button" class="cf-arrow cf-next" aria-label="다음 글">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg>
+          </button>
         </div>
       </div>
     </div>
@@ -98,9 +102,21 @@ const cards = posts.map((p, i) => ({
   const VISIBLE = 2; // 초점 ±2 = 5장 렌더
   const HIDE_BEYOND = 3; // ±3 넘으면 완전히 감춰 성능·잔상 방지
 
+  // 펼침(높이 애니 0.34s)이 끝난 뒤 한가할 때 실행 — 무거운 mermaid 렌더가 펼침과 겹쳐
+  // 버벅이지 않게 뒤로 미룬다(그 사이엔 :empty 스켈레톤만 돈다).
+  const rIC = (
+    window as unknown as {
+      requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void;
+    }
+  ).requestIdleCallback;
+  const deferAfterExpand = (fn: () => void) =>
+    setTimeout(() => (rIC ? rIC(fn, { timeout: 500 }) : fn()), 380);
+
   type CF = {
     idx: number;
-    layout: () => void;
+    position: () => void;
+    draw: () => void;
+    reopen: () => void;
     drawn: Set<HTMLElement>;
   };
 
@@ -110,20 +126,10 @@ const cards = posts.map((p, i) => ({
     const now = root.querySelector<HTMLElement>('.cf-now')!;
     const bar = root.querySelector<HTMLElement>('.cf-bar span')!;
     const drawn = new Set<HTMLElement>();
-    const state: CF = { idx: 0, layout: () => {}, drawn };
+    const state = { idx: 0, drawn } as CF;
 
-    const drawNear = () => {
-      cards.forEach((c, i) => {
-        if (Math.abs(i - state.idx) > VISIBLE) return;
-        const el = c.querySelector<HTMLElement>('.mermaid-diagram');
-        if (el && !drawn.has(el)) {
-          drawn.add(el);
-          renderMermaidDiagrams([el]);
-        }
-      });
-    };
-
-    state.layout = () => {
+    // 위치·회전·카운터만(가볍다, 즉시). transform만 건드려 GPU 합성.
+    const position = () => {
       cards.forEach((c, i) => {
         const off = i - state.idx;
         c.style.setProperty('--off', String(off));
@@ -134,12 +140,25 @@ const cards = posts.map((p, i) => ({
       });
       now.textContent = `${state.idx + 1} / ${cards.length}`;
       bar.style.width = `${((state.idx + 1) / cards.length) * 100}%`;
-      drawNear();
+    };
+
+    // 초점 ±2 카드의 mermaid 썸네일을 한 번만 그린다(무겁다).
+    const draw = () => {
+      cards.forEach((c, i) => {
+        if (Math.abs(i - state.idx) > VISIBLE) return;
+        const el = c.querySelector<HTMLElement>('.mermaid-diagram');
+        if (el && !drawn.has(el)) {
+          drawn.add(el);
+          renderMermaidDiagrams([el]);
+        }
+      });
     };
 
     const go = (n: number) => {
       state.idx = Math.max(0, Math.min(cards.length - 1, n));
-      state.layout();
+      position(); // 위치는 즉시
+      if (rIC) rIC(draw, { timeout: 500 }); // 썸네일은 한가할 때(넘기는 동안 안 버벅이게)
+      else draw();
     };
 
     root.querySelector('.cf-prev')!.addEventListener('click', () => go(state.idx - 1));
@@ -165,7 +184,17 @@ const cards = posts.map((p, i) => ({
       sx = null;
     });
 
-    state.layout();
+    state.position = position;
+    state.draw = draw;
+    // 다시 열릴 때도 위치는 즉시, 썸네일은 펼침이 끝난 뒤
+    state.reopen = () => {
+      position();
+      deferAfterExpand(draw);
+    };
+
+    // 첫 열림: 위치는 즉시(펼침과 함께), 무거운 썸네일은 펼침이 끝난 뒤
+    position();
+    deferAfterExpand(draw);
     return state;
   }
 
@@ -181,7 +210,7 @@ const cards = posts.map((p, i) => ({
         const cf = f.querySelector<HTMLElement>('.cf');
         if (cf) cfs.set(f, initCoverflow(cf));
       } else {
-        cfs.get(f)!.layout();
+        cfs.get(f)!.reopen();
       }
     }
   };
@@ -349,7 +378,7 @@ const cards = posts.map((p, i) => ({
 
   .cf-stage {
     position: relative;
-    height: 12.5rem;
+    height: 13.8rem;
     perspective: 1150px;
     overflow: hidden;
   }
@@ -365,7 +394,7 @@ const cards = posts.map((p, i) => ({
     top: 50%;
     left: 50%;
     width: 10rem;
-    height: 11.4rem;
+    height: 12.8rem;
     border-radius: 12px;
     overflow: hidden;
     border: 1px solid var(--border);
@@ -499,8 +528,10 @@ const cards = posts.map((p, i) => ({
     color: var(--text);
   }
 
+  /* 초점 카드는 제목을 더 넉넉히 보여 준다(데스크톱은 폭이 좁아 2줄로 잘리던 걸 3줄까지) */
   .cf-card.is-focus .cf-title {
     color: var(--accent);
+    -webkit-line-clamp: 3;
   }
 
   .cf-meta {
@@ -539,11 +570,22 @@ const cards = posts.map((p, i) => ({
     background-color: var(--bg);
     color: var(--text);
     cursor: pointer;
-    font-size: 1.05rem;
-    line-height: 1;
+    padding: 0;
+    display: grid;
+    place-items: center;
     transition:
       border-color 0.15s ease,
       color 0.15s ease;
+  }
+
+  .cf-arrow svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   .cf-arrow:hover {
@@ -595,6 +637,10 @@ const cards = posts.map((p, i) => ({
     }
     .cf-thumb {
       height: 6rem;
+    }
+    /* 모바일은 지금이 좋으니 초점 카드도 2줄 유지 */
+    .cf-card.is-focus .cf-title {
+      -webkit-line-clamp: 2;
     }
     .cf-bar {
       width: 5.5rem;
