@@ -335,6 +335,12 @@
       "to": "harness-7-snowflake",
       "type": "related",
       "note": "PC에만 쌓이던 작업 기록을 공용 저장소로 올린 같은 사건을, 하네스가 아니라 검색 쪽에서 본 글"
+    },
+    {
+      "from": "rag-4-managed-pivot",
+      "to": "rag-2-embedding",
+      "type": "extends",
+      "note": "임베딩 모델과 벡터 DB를 고르고 나서 이미 잘 제공되어 있는 서비스가 있다는 것을 발견한 과정"
     }
   ]
 }
