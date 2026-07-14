@@ -30,20 +30,39 @@ interface Step { els: Element[] }
  * 결정적 시간순은 y좌표뿐이므로, y로 정렬한 뒤 '메시지 텍스트가 새 스텝을 연다'는
  * 규칙으로 묶는다. 메시지의 라인·활성화·뒤따르는 노트는 직전 메시지 스텝에 붙는다.
  * 첫 메시지 전에 나오는 노트(선행 노트)는 자기 스텝을 연다.
+ *
+ * ★줄바꿈된 라벨: 긴 메시지 라벨은 mermaid가 여러 개의 `text.messageText`로 나눠 그린다
+ * (화살표는 하나뿐인데). 매 텍스트가 새 스텝을 열면 2줄 라벨이 스텝 2개로 쪼개진다.
+ * 직전 메시지 텍스트와 한 줄 높이(자기 높이의 1.6배) 안쪽에 붙은 텍스트는 '같은 메시지의
+ * 다음 줄'로 보고 스텝을 새로 열지 않는다. gap·height 둘 다 줌에 같이 스케일되니 비율은
+ * 줌과 무관하다(모달 확대에서도 안전). 다음 메시지는 화살표+행 간격만큼 훨씬 멀어 안 겹친다.
  */
 function collectSteps(svg: SVGSVGElement): Step[] {
-  const items = [...svg.querySelectorAll(SELECTOR)].map((el) => ({
-    el, y: el.getBoundingClientRect().top,
-    starter: el.tagName.toLowerCase() === 'text' && el.classList.contains('messageText'),
-  }));
+  const items = [...svg.querySelectorAll(SELECTOR)].map((el) => {
+    const r = el.getBoundingClientRect();
+    return {
+      el, y: r.top, h: r.height,
+      starter: el.tagName.toLowerCase() === 'text' && el.classList.contains('messageText'),
+    };
+  });
   if (items.length === 0) return [];
   items.sort((a, b) => a.y - b.y);
   const steps: Step[] = [];
+  let prevStarterY = -Infinity;
+  let prevStarterH = 0;
   for (const it of items) {
-    // 메시지 텍스트는 새 스텝을 연다. 스텝이 아직 없으면(선행 노트 등) 첫 요소도 새 스텝.
-    if (it.starter || steps.length === 0) {
-      steps.push({ els: [] });
+    let opensStep: boolean;
+    if (it.starter) {
+      // 같은 메시지의 줄바꿈된 다음 줄이면 스텝을 새로 열지 않는다.
+      const sameMessage = steps.length > 0 && it.y - prevStarterY < prevStarterH * 1.6;
+      opensStep = !sameMessage;
+      prevStarterY = it.y;
+      prevStarterH = it.h;
+    } else {
+      // 라인·활성화·뒤따르는 노트는 직전 스텝에 붙는다. 선행 노트 등 첫 요소만 새 스텝.
+      opensStep = steps.length === 0;
     }
+    if (opensStep) steps.push({ els: [] });
     steps[steps.length - 1].els.push(it.el);
   }
   return steps;

@@ -619,6 +619,31 @@ function makeFormatBubble() {
       bar.style.right = '';
     };
 
+    // 타이핑할 때 캐럿이 키보드·도킹 바에 가리면 그만큼 위로 스크롤해 보이게 한다.
+    // 모바일에서 브라우저 기본 '캐럿 보이기'는 키보드에 가린 영역을 모르고(레이아웃 뷰포트
+    // 기준) 스크롤해서, 캐럿이 키보드·플로팅 바 뒤에 숨는다. 도킹 바가 떠 있으면 그 바의
+    // 실제 화면 위치(getBoundingClientRect)를 하단 경계로 삼는다 - 캐럿 좌표와 같은 좌표계라
+    // iOS의 visualViewport 좌표계 문제를 피한다. 코드 블록처럼 바가 숨은 경우만 vv로 폴백.
+    const CARET_MARGIN = 12; // 캐럿 아래로 확보할 여백
+    const ensureCaretVisible = () => {
+      if (!coarse.matches || !view || !view.hasFocus()) return;
+      let caret;
+      try {
+        caret = view.coordsAtPos(view.state.selection.head);
+      } catch {
+        return;
+      }
+      let safeBottom: number;
+      if (!bar.hidden) {
+        safeBottom = bar.getBoundingClientRect().top - CARET_MARGIN;
+      } else {
+        const vv = window.visualViewport;
+        safeBottom = (vv ? vv.offsetTop + vv.height : window.innerHeight) - CARET_MARGIN;
+      }
+      const overflow = caret.bottom - safeBottom;
+      if (overflow > 0) window.scrollBy(0, overflow);
+    };
+
     // 선택 상태에 따라 버블/도킹 바를 배치한다. 포커스 없음·코드 안에서는 숨긴다.
     const place = () => {
       if (!view || !view.hasFocus()) {
@@ -709,7 +734,12 @@ function makeFormatBubble() {
         editorView.dom.addEventListener('focus', onFocus);
         editorView.dom.addEventListener('blur', onBlur);
         return {
-          update: () => place(),
+          update: (v: any, prevState: any) => {
+            place();
+            // '작성할 때'(문서가 바뀐 트랜잭션)만 캐럿을 키보드 위로 끌어올린다.
+            // 포커스·선택 이동만으로는 스크롤하지 않는다(사용자 명시).
+            if (!prevState || !v.state.doc.eq(prevState.doc)) ensureCaretVisible();
+          },
           destroy: () => {
             window.removeEventListener('scroll', repositionScroll, true);
             window.removeEventListener('resize', repositionResize);
