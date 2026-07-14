@@ -56,7 +56,7 @@ flowchart LR
 
 뽑아낸 메모리는 세션이 시작될 때 [`SessionStart`](https://docs.claude.com/en/docs/claude-code/hooks) [훅](https://docs.claude.com/en/docs/claude-code/hooks)으로 주입한다. 사용자가 보는 첫 줄에 "이전 작업 기록 3건을 불러왔어요" 같은 안내가 뜨는 게 그 결과라고 할 수 있다.
 
-얼마나 넣을지는 두 가지 과정으로 제공된다. 위의 `maxCount`(**종류별 건수**)와 설정 파일의 전체 상한이다.
+얼마나 넣을지는 두 가지로 정한다. 위의 `maxCount`(**종류별 건수**)와 설정 파일의 전체 상한이다.
 
 ```js scripts/memory-loader.mjs
 // 전체 주입량 상한은 설정에서 읽는다(기본은 50)

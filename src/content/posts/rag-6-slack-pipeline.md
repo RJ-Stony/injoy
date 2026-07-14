@@ -1,6 +1,6 @@
 ---
-title: "슬랙 잡담에서 지식만 걸러내기"
-description: "화이트리스트 봇과 자동 신호 필터로 슬랙 대화를 검색 소스에 합류시킨 과정"
+title: "Slack 잡담에서 지식만 걸러내기"
+description: "봇 초대 채널과 자동 신호 필터로 Slack 대화를 검색 소스에 합류시킨 과정"
 pubDate: "2026-07-12T14:00:00+09:00"
 category: "AI"
 tags: ["rag", "slack", "airbyte", "검색"]

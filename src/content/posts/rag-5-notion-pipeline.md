@@ -1,6 +1,6 @@
 ---
-title: "노션 문서가 검색 조각이 되기까지"
-description: "블록 계층 추적과 청킹으로 노션 전체를 검색 서비스에 올린 파이프라인"
+title: "Notion 문서가 검색 조각이 되기까지"
+description: "블록 계층 추적과 청킹으로 Notion 전체를 검색 서비스에 올린 파이프라인"
 pubDate: "2026-07-12T13:00:00+09:00"
 category: "AI"
 tags: ["rag", "notion", "snowflake", "파이프라인"]

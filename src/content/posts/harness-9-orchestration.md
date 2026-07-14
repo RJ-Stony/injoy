@@ -1,6 +1,6 @@
 ---
 title: "에이전트를 멀티로 사용하는 네 가지 방법"
-description: "개발을 넘어 다른 영역까지 커버하기 위한 멀티에이전트 오케스트레이션을 다시 벤치마킹"
+description: "개발을 넘어 다른 영역까지 받치기 위한 멀티에이전트 오케스트레이션을 다시 벤치마킹"
 pubDate: 2026-06-29
 updatedDate: 2026-07-02T12:39:34.574Z
 category: "AI"
@@ -148,4 +148,4 @@ flowchart LR
 
 기준은 [[harness-8-trimming|8편]] 그대로였다. *AI가 멋대로 건너뛸 수 있는 일은 단단히 잡되, 무거운 건 버린다.* 데몬도, 사용자 폴더 변조도 버리고, 들여다보이는 훅 라우팅만 가져오면 될 것 같다. 내 블로그이자 사내 도구라는 두 마음이 같은 결론을 가리킨 게, 이번엔 꽤 다행이었다.
 
-참고한 글은 Anthropic의 [Building Effective Agents](https://www.anthropic.com/engineering/building-effective-agents), Claude Code의 [서브에이전트](https://code.claude.com/docs/en/sub-agents)·[agent-teams](https://code.claude.com/docs/en/agent-teams) 문서, 그리고 [agent-teams(wshobson)](https://github.com/wshobson/agents/tree/main/plugins/agent-teams)·[SuperClaude](https://github.com/SuperClaude-Org/SuperClaude_Framework)·[OMC](https://github.com/Yeachan-Heo/oh-my-claudecode)·[ruflo](https://github.com/ruvnet/ruflo)의 코드이다. 같이 확인해보면 좋을 것 같다. ☺️
+참고한 글은 Anthropic의 [Building Effective Agents](https://www.anthropic.com/engineering/building-effective-agents), Claude Code의 [서브에이전트](https://code.claude.com/docs/en/sub-agents)·[agent-teams](https://code.claude.com/docs/en/agent-teams) 문서, [agent-teams(wshobson)](https://github.com/wshobson/agents/tree/main/plugins/agent-teams)·[SuperClaude](https://github.com/SuperClaude-Org/SuperClaude_Framework)·[OMC](https://github.com/Yeachan-Heo/oh-my-claudecode)·[ruflo](https://github.com/ruvnet/ruflo)의 코드이다. 같이 확인해보면 좋을 것 같다. ☺️
