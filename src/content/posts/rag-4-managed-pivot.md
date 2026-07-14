@@ -1,8 +1,8 @@
 ---
-title: "이미 갖고 있던 창고를 발견했다"
-description: "자체 호스팅 설계를 접고 Snowflake Cortex Search로 방향을 튼 결정"
+title: "이미 가지고 있던 걸 이용하기로 했다"
+description: "자체 호스팅하는 설계를 접어두고, Snowflake Cortex Search를 이용하기로 방향을 틀게 된 결정"
 pubDate: 2026-07-12
-updatedDate: 2026-07-14T00:30:48.783Z
+updatedDate: 2026-07-14T05:52:47.741Z
 category: "AI"
 tags: ["rag", "snowflake", "cortex-search", "권한"]
 draft: false
