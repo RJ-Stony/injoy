@@ -22,3 +22,9 @@ npm-debug.log*
 # 로컬 도구·스킬 작업 폴더
 .claude/
 _workspace/
+.agents/
+skills-lock.json
+
+# 276-harness: Claude/Serena 로컬 상태 (자동 추가, 커밋 금지)
+.serena/
+.superpowers/

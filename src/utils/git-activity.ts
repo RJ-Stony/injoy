@@ -1,8 +1,10 @@
 import { execSync } from 'node:child_process';
 
 /**
- * 커밋 기준 활동 집계 — 글 .md 파일의 git 히스토리를 빌드타임에 읽어
- * 날짜별 발행·수정 수를 낸다. 파일별 가장 오래된 커밋이 발행, 나머지는 수정.
+ * 커밋 기준 활동 집계 — 글(src/content/posts) + 페이지(src/pages/*.md, about 등)의
+ * git 히스토리를 빌드타임에 읽어 날짜별 활동 수를 낸다. 글은 파일별 가장 오래된 커밋이
+ * 발행, 나머지는 수정. 페이지(about)는 '글'이 아니라 발행/수정 총계엔 넣지 않고, 잔디 점
+ * (활동 달력)·'N번 기록'에만 반영한다 — 즉 about을 고친 날도 잔디에 심긴다.
  * updatedDate는 글당 하나뿐이라 여러 번 고친 걸 못 세지만, 커밋은 전부 잡힌다.
  *
  * 주의: 배포(GitHub Actions)에서 checkout이 얕은 클론이면 커밋이 1개만 보여
@@ -22,7 +24,7 @@ export function getGitActivity(): GitActivity | null {
   try {
     // 커밋마다 'C<날짜>' 한 줄 + 그 커밋이 바꾼 파일 목록. 최신순.
     out = execSync(
-      "git log --date=short --pretty=format:C%ad --name-only -- src/content/posts",
+      "git log --date=short --pretty=format:C%ad --name-only -- src/content/posts src/pages",
       { cwd: process.cwd(), encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
     );
   } catch {
@@ -39,7 +41,8 @@ export function getGitActivity(): GitActivity | null {
       continue;
     }
     const f = line.trim();
-    if (!curDate || !f.endsWith('.md') || !f.startsWith('src/content/posts/')) continue;
+    const tracked = f.startsWith('src/content/posts/') || f.startsWith('src/pages/');
+    if (!curDate || !f.endsWith('.md') || !tracked) continue;
     (datesByFile.get(f) ?? datesByFile.set(f, []).get(f)!).push(curDate);
   }
   if (datesByFile.size === 0) return null;
@@ -50,16 +53,18 @@ export function getGitActivity(): GitActivity | null {
   let totalMod = 0;
   const bump = (m: Map<string, number>, d: string) => m.set(d, (m.get(d) ?? 0) + 1);
 
-  for (const dates of datesByFile.values()) {
-    // 최신순이라 마지막 원소가 가장 오래된 커밋 = 발행.
+  for (const [file, dates] of datesByFile) {
+    const isPost = file.startsWith('src/content/posts/');
+    // 최신순이라 마지막 원소가 가장 오래된 커밋 = 발행(글만). 페이지(about)는 발행 개념이
+    // 없어 전부 수정 점으로만 찍고 '글 발행/수정' 총계엔 넣지 않는다(잔디·N번 기록엔 반영).
     for (let i = 0; i < dates.length; i++) {
-      const isPub = i === dates.length - 1;
+      const isPub = isPost && i === dates.length - 1;
       if (isPub) {
         bump(pubByDate, dates[i]);
         totalPub++;
       } else {
         bump(modByDate, dates[i]);
-        totalMod++;
+        if (isPost) totalMod++;
       }
     }
   }

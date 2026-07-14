@@ -1530,6 +1530,91 @@ git commit -m "post: 실행 흐름이 있는 코드 블록에 스텝 마커 주�
 
 ---
 
+### Task 16: 연결된 글을 미니그래프 중심으로 재구성
+
+**Files:**
+- Modify: `src/components/MiniGraph.astro` (후킹 강화)
+- Modify: `src/pages/posts/[slug].astro` (섹션 재구성 + flow 옵저버 + 설명 맵)
+- Modify: `src/scripts/hover-card.ts` (노드 타깃 추가 + note 줄)
+- Modify: `src/styles/global.css` (필요 시 - hc-note 스타일)
+
+**Interfaces:**
+- Consumes: Task 6 MiniGraph, Task 5 hover-card(.hover-card 팝오버·fill 구조), 기존 `injoy-edge-flow` keyframes(global.css)와 smooth-details(전 details 부드러운 펼침 자동 적용).
+- 사용자 확정: 그래프가 기본, 리스트는 '목록으로 보기' 접이식으로 유지(데스크톱·모바일 동일). 후킹 = 엣지 흐름 애니 + 노드 하버카드 + 노드 크기 차등. 선 위 관계 라벨은 채택 안 함.
+
+- [ ] **Step 1: 섹션 재구성 ([slug].astro)**
+
+connections 섹션에서 MiniGraph를 본체로, 기존 `ul#connections-list`를 `<details class="connections-fold">`로 감싼다:
+
+```astro
+          <MiniGraph title={post.data.title} connections={connections} descriptions={descOf} />
+          <details class="connections-fold">
+            <summary>목록으로 보기</summary>
+            <ul id="connections-list">…기존 li 그대로…</ul>
+          </details>
+```
+
+- 접힌 리스트가 '처음 3개 + 더 보기' 역할을 대신하므로 `connections-more` 버튼(마크업)과 그 스크립트·CSS(숨김 규칙 포함)는 제거하고, 접힘 안에서는 전체 목록을 보여준다(기능 대체이지 손실 아님 - 보고서에 명시).
+- smooth-details가 details에 자동 적용되는지 확인(전 details 대상이면 공짜, 아니면 기존 패턴 따라 연결).
+- frontmatter에 설명 맵 추가: `const descOf = new Map((await getPublishedPosts()).map((p) => [p.id, p.data.description]));` (getPublishedPosts는 이미 import돼 있음 - 빌드 타임 1회).
+
+- [ ] **Step 2: MiniGraph 후킹 강화**
+
+- Props에 `descriptions: Map<string, string>` 추가.
+- **노드 크기 차등**: mentions 5.5 / related 6.5 / 그 외 명시 타입 8, 중심 11. 라벨 y 오프셋은 r에 비례해 조정.
+- **하버카드 데이터**: 각 `a.mg-node`에 `data-title={n.title}`, `data-description={descriptions.get(n.slug) ?? ''}`, `data-category={n.phrase}`(관계 문구를 카테고리 줄에), `data-note={n.note ?? ''}`.
+- **엣지 흐름 애니**: 각 엣지에 베이스 라인은 그대로 두고 흐름 오버레이 라인 추가 - `<line class="mg-flow" … stroke-dasharray="2 9" stroke-linecap="round" />`(같은 stroke 색, opacity 0.9). 스코프 스타일에서:
+
+```css
+  @media (prefers-reduced-motion: no-preference) {
+    .mini-graph.flow-on .mg-flow {
+      animation: injoy-edge-flow 0.9s linear infinite;
+    }
+  }
+  .mini-graph .mg-flow {
+    opacity: 0;
+  }
+  .mini-graph.flow-on .mg-flow {
+    opacity: 0.9;
+  }
+```
+
+`injoy-edge-flow`는 global.css의 전역 keyframes(스코프 스타일에서도 이름 참조 가능 - 안 되면 keyframes만 is:global로). 모든 라인이 중심(x1,y1)에서 시작하므로 흐름 방향은 중심->바깥 균일. **dashoffset 진행 방향이 바깥쪽인지 실측**(반대면 dasharray 부호/값 반전).
+
+- [ ] **Step 3: flow 옵저버 + 하버카드 타깃 ([slug].astro, hover-card.ts)**
+
+- [slug].astro: 기존 flowObserver가 있으니 `.mini-graph`도 observe 대상에 추가(같은 flow-on 토글). mermaid 컨테이너 전용 로직(스태거)이 미니그래프에 오작동하지 않게 가드(el.classList.contains('mini-graph')면 스태거 스킵 또는 셀렉터가 svg g.node라 자연 무해 - 확인).
+- hover-card.ts: 타깃 셀렉터에 `.connections .mg-node[data-title]` 추가. fill()의 위키링크 경로를 data-title 있는 SVGAElement에도 쓰도록 일반화(`classList.contains('wiki-link')` 분기를 `dataset.title` 존재 분기로 바꾸는 쪽이 자연스러움 - 각주 경로와 구분 유지). `data-note`가 있으면 카드에 note 줄 추가:
+
+```ts
+      const note = (a as HTMLElement).dataset.note;
+      if (note) {
+        const n = document.createElement('p');
+        n.className = 'hc-note';
+        n.textContent = note;
+        card.append(n);
+      }
+```
+
+global.css에 `.hover-card .hc-note`(설명보다 옅게, 이탤릭 없이 작게). SVGAElement는 `dataset`을 지원한다(SVGElement.dataset) - href·getBoundingClientRect도 동일 동작 확인.
+
+- [ ] **Step 4: 검증**
+
+- npm run build 성공, 연결 있는 글에서: 그래프 렌더 + `details.connections-fold` 존재 + 옛 `connections-more` 마크업·스크립트 0건.
+- 노드 반지름이 타입별 차등(계측), 흐름 오버레이 라인 수 = 엣지 수, flow-on 토글 시 opacity 전환(transition none 주입 계측).
+- 노드 mouseenter -> 하버카드에 관계 문구(카테고리 줄)+제목+설명+note 표시, 위키링크·각주 카드 회귀 없음.
+- 모바일 390: 그래프+접힌 리스트 배치, 탭으로 리스트 펼침(smooth-details), 노드 탭 = 글 이동(하버카드 없음).
+- 다크·라이트, reduced-motion에서 흐름 애니 미적용.
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add src/components/MiniGraph.astro "src/pages/posts/[slug].astro" src/scripts/hover-card.ts src/styles/global.css
+git commit -m "post: 연결된 글을 미니그래프 중심으로 재구성 (흐름 애니·하버카드·크기 차등)"
+```
+
+---
+
 ### Task 11: 그래프 초기 화면맞춤 + 타임랩스 컨트롤
 
 **Files:**
