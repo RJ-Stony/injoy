@@ -310,7 +310,7 @@
       "from": "rag-5-notion-pipeline",
       "to": "rag-4-managed-pivot",
       "type": "extends",
-      "note": "관리형으로 방향을 정한 뒤, 첫 소스인 노션 블록을 검색 청크로 되살린 파이프라인"
+      "note": "관리형으로 방향을 정한 뒤, 첫 소스인 Notion 블록을 검색 청크로 살린 파이프라인"
     },
     {
       "from": "rag-6-slack-pipeline",
