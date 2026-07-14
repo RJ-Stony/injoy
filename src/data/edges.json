@@ -307,18 +307,6 @@
       "note": "리서치로 그린 그림을 들고, 임베딩 모델과 벡터 DB를 실제 기준으로 고른 과정"
     },
     {
-      "from": "rag-3-selfhosted",
-      "to": "rag-2-embedding",
-      "type": "extends",
-      "note": "결정된 사안으로 서버부터 권한까지 직접 짊어지는 첫 설계를 그린 과정"
-    },
-    {
-      "from": "rag-4-managed-pivot",
-      "to": "rag-3-selfhosted",
-      "type": "contradicts",
-      "note": "서버부터 권한까지 직접 짊어지겠다던 자체 호스팅 설계를 접고, 이미 계약돼 있던 관리형 검색으로 방향을 튼 결정. 앞 편의 방향을 뒤집은 관계"
-    },
-    {
       "from": "rag-5-notion-pipeline",
       "to": "rag-4-managed-pivot",
       "type": "extends",
