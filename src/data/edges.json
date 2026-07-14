@@ -4,7 +4,7 @@
       "from": "how-to-write",
       "to": "welcome",
       "type": "refines",
-      "note": "첫 글에서 얘기한 '발행 공수를 최소화한다'는 원칙을, 마크다운 파일 하나로 바로 발행되는 구체적인 절차로 더 또렷하게 푼 글"
+      "note": "첫 글에서 얘기한 '발행에 드는 공수를 최소화한다'는 원칙을, 마크다운 파일 하나로 바로 발행되는 구체적인 절차로 더 또렷하게 푼 글"
     },
     {
       "from": "markdown-styleguide",
@@ -52,7 +52,7 @@
       "from": "polish-round-3",
       "to": "welcome",
       "type": "related",
-      "note": "'미래의 나에게 보내는 기록'이라던 첫 글의 독자관을, 검색하다 우연히 들어온 비개발자 독자까지 끌어안도록 넓힌 글"
+      "note": "'미래의 나에게 보내는 가이드'라던 첫 글의 독자관을, 검색하다 우연히 들어온 비개발자 독자까지 끌어안도록 넓힌 글"
     },
     {
       "from": "polish-round-3",
@@ -280,7 +280,7 @@
       "from": "port-forwarding",
       "to": "welcome",
       "type": "related",
-      "note": "개발 카테고리 내에서 시스템이 실제로 어떻게 동작하는지를 다루기 시작"
+      "note": "개발 카테고리 내에서 시스템이 실제로 어떻게 동작하는지를 다루기 시작했다"
     },
     {
       "from": "harness-10-common-skills",
@@ -298,7 +298,7 @@
       "from": "rag-1-survey",
       "to": "welcome",
       "type": "related",
-      "note": "AI 카테고리로 RAG 시스템 구축 시리즈가 새 가지로 들어옴"
+      "note": "AI 카테고리로 RAG 시스템 구축 시리즈가 새 가지로 들어왔다"
     },
     {
       "from": "rag-2-embedding",
