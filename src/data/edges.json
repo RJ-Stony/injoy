@@ -310,13 +310,13 @@
       "from": "rag-5-notion-pipeline",
       "to": "rag-4-managed-pivot",
       "type": "extends",
-      "note": "관리형으로 방향을 정한 뒤, 첫 소스인 Notion 블록을 검색 청크로 살린 파이프라인"
+      "note": "관리형 서비스로 방향을 정한 뒤, 첫 소스인 Notion을 청크로 가져가게 된 과정"
     },
     {
       "from": "rag-6-slack-pipeline",
       "to": "rag-5-notion-pipeline",
       "type": "extends",
-      "note": "노션에 이어 슬랙 대화를, 사람 승인 없이 데이터 신호로 걸러 같은 벡터 공간에 합류시킨 과정"
+      "note": "Notion에 이어 Slack을 벡터 공간에 합류시킨 과정"
     },
     {
       "from": "rag-7-eval-cost",
