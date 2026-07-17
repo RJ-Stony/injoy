@@ -12,6 +12,8 @@ export const GET: APIRoute = async () => {
     term: e.term,
     gloss: e.gloss,
     url: withBase(`/glossary/#${termSlug(e.term)}`),
+    // 어느 글이 이 뜻을 정의했는지 — /write가 '뜻 충돌'을 경고할 때 쓴다(하버카드는 무시).
+    slugs: e.sources.map((s) => s.slug),
   }));
   return new Response(JSON.stringify(data), {
     headers: { 'content-type': 'application/json; charset=utf-8' },

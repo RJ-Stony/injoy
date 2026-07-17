@@ -21,6 +21,11 @@ export interface GlossaryEntry {
 // 풀이가 아니라 문장 조각인 것들(수동 제외 — 오탐 최소화). /write에서 작성자가 관리한다.
 const EXCLUDE_TERMS = new Set<string>(glossaryData.exclude);
 
+// 스캐너가 못 잡는 용어(이미지 캡션·일부만 굵게 한 구 등)를 작성자가 손수 얹는 목록.
+// 자동 스캔과 같은 온톨로지에 합쳐지며, /write 용어 패널에서 CRUD한다(glossary.json에 저장).
+interface ManualTerm { term: string; gloss: string; slug?: string }
+const MANUAL_TERMS: ManualTerm[] = ((glossaryData as { manual?: ManualTerm[] }).manual ?? []);
+
 /** 용어 → 앵커 id. 용어집 페이지와 하버카드 링크가 같은 값을 써야 한다. */
 export const termSlug = (t: string): string =>
   t.replace(/[^a-zA-Z0-9가-힣]+/g, '-').replace(/^-|-$/g, '');
@@ -41,6 +46,20 @@ export async function getGlossary(): Promise<GlossaryEntry[]> {
       } else {
         map.set(term, { term, gloss, sources: [src] });
       }
+    }
+  }
+  // 수동 용어를 얹는다. 작성자가 직접 정한 뜻이라 isDefinition/isKoreanDef 검사는 건너뛰고,
+  // 이미 자동으로 잡힌 용어면 뜻을 작성자 값으로 덮되(명시적 의도 우선) 출처는 합친다.
+  const titleBySlug = new Map(posts.map((p) => [p.id, p.data.title] as const));
+  for (const { term, gloss, slug } of MANUAL_TERMS) {
+    if (!term?.trim() || !gloss?.trim() || EXCLUDE_TERMS.has(term)) continue;
+    const src = slug && titleBySlug.has(slug) ? { slug, title: titleBySlug.get(slug)! } : null;
+    const existing = map.get(term);
+    if (existing) {
+      existing.gloss = gloss;
+      if (src && !existing.sources.some((s) => s.slug === src.slug)) existing.sources.push(src);
+    } else {
+      map.set(term, { term, gloss, sources: src ? [src] : [] });
     }
   }
   return [...map.values()].sort((a, b) => a.term.localeCompare(b.term, 'ko'));

@@ -249,10 +249,19 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         <div class="section-head">
           <div>
             <h2 class="section-title">용어</h2>
-            <p class="section-sub">본문의 굵은 용어(뜻)가 용어 사전에 자동으로 모여요. 여기서 빼거나 고칠 수 있어요.</p>
+            <p class="section-sub">본문의 굵은 용어(뜻)가 용어 사전에 자동으로 모여요. 여기서 빼거나 고칠 수 있어요. 이미지 캡션이나 일부만 굵게 한 구(예: OG <strong>태그</strong>에서 <strong>OG 태그</strong> 전체)처럼 자동으로 안 잡히는 건 아래에서 직접 추가하세요.</p>
           </div>
         </div>
         <ul id="glossary-terms" class="glossary-terms"></ul>
+        <div class="gl-add">
+          <button type="button" id="glossary-add-toggle" class="gl-add-toggle">+ 용어 직접 추가</button>
+          <div id="glossary-add-form" class="gl-add-form" hidden>
+            <input id="gl-add-term" type="text" placeholder="용어 (예: OG 태그)" aria-label="추가할 용어" />
+            <input id="gl-add-gloss" type="text" placeholder="뜻 (예: 링크 공유 미리보기 메타)" aria-label="추가할 용어의 뜻" />
+            <button type="button" id="gl-add-apply">추가</button>
+          </div>
+        </div>
+        <p id="glossary-warn" class="edge-hint"></p>
         <p id="glossary-hint" class="edge-hint"></p>
       </section>
 
@@ -275,6 +284,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   <script type="application/json" id="edge-type-meta" set:html={JSON.stringify(edgeTypeOptions)} />
   <script type="application/json" id="callout-meta" set:html={JSON.stringify(calloutOptions)} />
   <script type="application/json" id="glossary-exclude" set:html={JSON.stringify(glossaryData.exclude)} />
+  <script type="application/json" id="glossary-manual" set:html={JSON.stringify((glossaryData as { manual?: unknown[] }).manual ?? [])} />
 </BaseLayout>
 
 <script>
@@ -311,6 +321,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     edgesLoaded: true,
     // 용어집 제외 목록(glossary.json). 빌드타임 값으로 시작해 세션 중 토글을 얹는다.
     glossaryExclude: new Set<string>(),
+    // 스캐너가 못 잡아 손수 얹은 용어(이미지 캡션·부분 굵게 등). glossary.json의 manual로 저장된다.
+    glossaryManual: [] as { term: string; gloss: string; slug?: string }[],
     index: { posts: [] as any[], edges: [] as any[] },
   };
 
@@ -324,6 +336,20 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     /* 파싱 실패 시 빈 기준선 — 용어 스캔·표시는 계속 동작한다 */
   }
   for (const t of glossaryBaseline) state.glossaryExclude.add(t);
+
+  // 수동 용어 기준선(빌드타임 스냅샷). 발행 시 이것과 다르면 glossary.json을 커밋에 함께 넣는다.
+  let glossaryManualBaseline: { term: string; gloss: string; slug?: string }[] = [];
+  try {
+    const raw = JSON.parse(document.getElementById('glossary-manual')?.textContent ?? '[]');
+    if (Array.isArray(raw)) {
+      glossaryManualBaseline = raw
+        .filter((m: any) => m && typeof m.term === 'string' && typeof m.gloss === 'string')
+        .map((m: any) => ({ term: m.term, gloss: m.gloss, ...(m.slug ? { slug: m.slug } : {}) }));
+    }
+  } catch {
+    /* 파싱 실패 시 빈 기준선 */
+  }
+  state.glossaryManual = glossaryManualBaseline.map((m) => ({ ...m }));
 
   const token = () => localStorage.getItem(TOKEN_KEY);
 
@@ -989,49 +1015,149 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       /* 스캔 실패 시 빈 목록으로 진행 — 아래 빈 안내가 뜬다 */
     }
     ul.innerHTML = '';
-    if (!terms.length) {
+    if (!terms.length && !state.glossaryManual.length) {
       ul.innerHTML =
-        '<li class="empty">본문에 <strong>용어</strong>(뜻) 형태가 없어요. 전문 용어 첫 등장에 짧은 뜻을 붙이면 용어 사전에 모여요.</li>';
-      return;
+        '<li class="empty">본문에 <strong>용어</strong>(뜻) 형태가 없어요. 전문 용어 첫 등장에 짧은 뜻을 붙이거나, 아래에서 직접 추가하세요.</li>';
     }
+
+    // 자동으로 잡힌 용어 — 뜻 고치기 / 용어 사전에서 빼기.
     for (const { term, gloss } of terms) {
       const excluded = state.glossaryExclude.has(term);
-      const li = document.createElement('li');
-      li.className = 'glossary-item' + (excluded ? ' excluded' : '');
-
-      const row = document.createElement('div');
-      row.className = 'gl-row';
-      const termEl = Object.assign(document.createElement('strong'), {
-        textContent: term,
-        className: 'gl-term',
-      });
-      const glossEl = Object.assign(document.createElement('span'), {
-        textContent: gloss,
-        className: 'gl-gloss muted',
-      });
-
-      const actions = document.createElement('div');
-      actions.className = 'gl-actions';
-
-      const toggle = document.createElement('button');
-      toggle.type = 'button';
-      toggle.textContent = excluded ? '되돌리기' : '용어 사전에서 빼기';
-      toggle.addEventListener('click', () => {
-        if (state.glossaryExclude.has(term)) state.glossaryExclude.delete(term);
-        else state.glossaryExclude.add(term);
-        renderGlossary();
-      });
-
-      const edit = document.createElement('button');
-      edit.type = 'button';
-      edit.textContent = '뜻 고치기';
-      edit.addEventListener('click', () => openGlossEditor(li, term, gloss));
-
-      actions.append(toggle, edit);
-      row.append(termEl, glossEl, actions);
-      li.append(row);
+      const li = glossaryItem(term, gloss, excluded ? 'excluded' : '');
+      const actions = li.querySelector('.gl-actions')!;
+      actions.append(
+        glButton(excluded ? '되돌리기' : '용어 사전에서 빼기', () => {
+          if (state.glossaryExclude.has(term)) state.glossaryExclude.delete(term);
+          else state.glossaryExclude.add(term);
+          renderGlossary();
+        }),
+        glButton('뜻 고치기', () => openGlossEditor(li, term, gloss)),
+      );
       ul.appendChild(li);
     }
+
+    // 손수 얹은 용어(이미지 캡션·부분 굵게 등) — 용어·뜻 함께 고치기 / 지우기.
+    state.glossaryManual.forEach((m, i) => {
+      const li = glossaryItem(m.term, m.gloss, 'manual');
+      const badge = Object.assign(document.createElement('span'), { textContent: '직접 추가', className: 'gl-badge' });
+      const actions = li.querySelector('.gl-actions')!;
+      li.querySelector('.gl-row')!.insertBefore(badge, actions);
+      actions.append(
+        glButton('고치기', () => openManualEditor(li, i)),
+        glButton('지우기', () => { state.glossaryManual.splice(i, 1); renderGlossary(); }),
+      );
+      ul.appendChild(li);
+    });
+
+    void warnGlossaryDivergence(terms); // 다른 글과 뜻이 어긋나면 경고만(비차단)
+  }
+
+  /** 용어 항목 li의 뼈대(용어·뜻·액션칸)를 만든다. 액션 버튼은 호출부가 붙인다. */
+  function glossaryItem(term: string, gloss: string, cls: string): HTMLElement {
+    const li = document.createElement('li');
+    li.className = 'glossary-item' + (cls ? ' ' + cls : '');
+    const row = document.createElement('div');
+    row.className = 'gl-row';
+    const termEl = Object.assign(document.createElement('strong'), { textContent: term, className: 'gl-term' });
+    const glossEl = Object.assign(document.createElement('span'), { textContent: gloss, className: 'gl-gloss muted' });
+    const actions = Object.assign(document.createElement('div'), { className: 'gl-actions' });
+    row.append(termEl, glossEl, actions);
+    li.append(row);
+    return li;
+  }
+  function glButton(label: string, on: () => void): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.addEventListener('click', on);
+    return b;
+  }
+
+  /** 손수 얹은 용어의 용어·뜻을 함께 고친다(마크다운은 안 건드림 — glossary.json에만 산다). */
+  function openManualEditor(li: HTMLElement, i: number) {
+    if (li.querySelector('.gl-edit')) return;
+    const m = state.glossaryManual[i];
+    if (!m) return;
+    const box = Object.assign(document.createElement('div'), { className: 'gl-edit' });
+    const termIn = Object.assign(document.createElement('input'), { type: 'text', value: m.term });
+    termIn.setAttribute('aria-label', '용어');
+    const glossIn = Object.assign(document.createElement('input'), { type: 'text', value: m.gloss });
+    glossIn.setAttribute('aria-label', '뜻');
+    const commit = () => {
+      const t = termIn.value.trim(), g = glossIn.value.trim();
+      if (t && g) state.glossaryManual[i] = { term: t, gloss: g, ...(m.slug ? { slug: m.slug } : {}) };
+      renderGlossary();
+    };
+    box.append(
+      termIn, glossIn,
+      glButton('적용', commit),
+      glButton('취소', () => box.remove()),
+    );
+    for (const el of [termIn, glossIn]) {
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        else if (e.key === 'Escape') { e.preventDefault(); box.remove(); }
+      });
+    }
+    li.append(box);
+    termIn.focus();
+    termIn.select();
+  }
+
+  /** 추가 폼에서 새 수동 용어를 얹는다. 슬러그는 지금 쓰는 글에 묶는다(출처 링크·뜻 충돌 판정용). */
+  function addManualTerm() {
+    const t = ($('gl-add-term') as HTMLInputElement).value.trim();
+    const g = ($('gl-add-gloss') as HTMLInputElement).value.trim();
+    const hint = $('glossary-hint');
+    if (!t || !g) { hint.textContent = '용어와 뜻을 모두 적어 주세요.'; return; }
+    if (state.glossaryManual.some((m) => m.term === t)) { hint.textContent = '이미 추가한 용어예요.'; return; }
+    const slug = state.editingSlug ?? (($('fm-slug') as HTMLInputElement).value.trim() || undefined);
+    state.glossaryManual.push({ term: t, gloss: g, ...(slug ? { slug } : {}) });
+    ($('gl-add-term') as HTMLInputElement).value = '';
+    ($('gl-add-gloss') as HTMLInputElement).value = '';
+    hint.textContent = '';
+    renderGlossary();
+  }
+
+  // 이미 발행된 용어집(다른 글이 정의한 뜻)을 받아 '뜻 충돌'을 경고만 하는 용도로 캐시한다.
+  let existingGlossaryCache: Map<string, { gloss: string; slugs: string[] }> | null = null;
+  async function loadExistingGlossary() {
+    if (existingGlossaryCache) return existingGlossaryCache;
+    const map = new Map<string, { gloss: string; slugs: string[] }>();
+    try {
+      const base = String(CFG.base ?? '/').replace(/\/$/, '');
+      const res = await fetch(`${base}/glossary.json`);
+      if (res.ok) {
+        const arr = await res.json();
+        if (Array.isArray(arr))
+          for (const e of arr)
+            if (e && typeof e.term === 'string')
+              map.set(e.term, { gloss: String(e.gloss ?? ''), slugs: Array.isArray(e.slugs) ? e.slugs : [] });
+      }
+    } catch {
+      /* 색인이 없거나(첫 빌드 전) 실패하면 경고를 생략한다 */
+    }
+    existingGlossaryCache = map;
+    return map;
+  }
+  async function warnGlossaryDivergence(detected: { term: string; gloss: string }[]) {
+    const el = $('glossary-warn');
+    if (!el) return;
+    const existing = await loadExistingGlossary();
+    const here = state.editingSlug;
+    const seen = new Set<string>();
+    const conflicts: string[] = [];
+    for (const { term, gloss } of [...detected, ...state.glossaryManual]) {
+      if (seen.has(term)) continue;
+      seen.add(term);
+      const prev = existing.get(term);
+      if (!prev || prev.gloss === gloss) continue;
+      // 이 글만 출처면 내 옛 뜻이라 무시하고, 다른 글이 정의한 뜻과 다를 때만 알린다.
+      if (prev.slugs.some((s) => s !== here)) conflicts.push(`"${term}"`);
+    }
+    el.textContent = conflicts.length
+      ? `${conflicts.join(', ')}의 뜻이 다른 글에 이미 다르게 있어요. 표시는 최신 글 뜻이 이겨요.`
+      : '';
   }
 
   /** 인라인 뜻 편집칸을 연다. 적용하면 본문 마크다운을 에디터로 왕복해 새 뜻을 반영한다. */
@@ -1078,15 +1204,31 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   // 렌더를 강제하거나 스캔·제외 상태를 직접 계측할 수 있게 한다. 운영자 전용 페이지.
   (window as any).__injoyGlossary = {
     render: renderGlossary,
+    addManual: addManualTerm,
     getState: () => {
       const { prose } = splitCode(($('fm-body') as HTMLTextAreaElement).value);
       return {
         terms: scanGlossaryTerms(prose),
         exclude: [...state.glossaryExclude],
+        manual: state.glossaryManual.map((m) => ({ ...m })),
         baseline: [...glossaryBaseline],
+        file: glossaryFileIfChanged(),
       };
     },
   };
+
+  // 용어 직접 추가 폼 — 토글로 열고, 추가하면 목록에 붙는다.
+  $('glossary-add-toggle')?.addEventListener('click', () => {
+    const form = $('glossary-add-form');
+    form.hidden = !form.hidden;
+    if (!form.hidden) ($('gl-add-term') as HTMLInputElement).focus();
+  });
+  $('gl-add-apply')?.addEventListener('click', addManualTerm);
+  for (const id of ['gl-add-term', 'gl-add-gloss']) {
+    $(id)?.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter') { e.preventDefault(); addManualTerm(); }
+    });
+  }
 
   // ---------- 점검 ----------
   function stripFences(body: string) {
@@ -1433,12 +1575,18 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   }
 
   const sortedExclude = (arr: Iterable<string>) => [...arr].sort((a, b) => a.localeCompare(b, 'ko'));
+  const sortedManual = (arr: { term: string; gloss: string; slug?: string }[]) =>
+    [...arr].sort((a, b) => a.term.localeCompare(b.term, 'ko'));
 
-  /** 용어집 제외 목록이 기준선과 달라졌으면 glossary.json 내용을 돌려준다(정렬·끝 개행). 같으면 null(멱등). */
+  /** 용어집 제외·수동 목록이 기준선과 달라졌으면 glossary.json 내용을 돌려준다(정렬·끝 개행). 같으면 null(멱등). */
   function glossaryFileIfChanged(): string | null {
-    const next = sortedExclude(state.glossaryExclude);
-    if (JSON.stringify(next) === JSON.stringify(sortedExclude(glossaryBaseline))) return null;
-    return JSON.stringify({ exclude: next }, null, 2) + '\n';
+    const exclude = sortedExclude(state.glossaryExclude);
+    const manual = sortedManual(state.glossaryManual);
+    const same =
+      JSON.stringify(exclude) === JSON.stringify(sortedExclude(glossaryBaseline)) &&
+      JSON.stringify(manual) === JSON.stringify(sortedManual(glossaryManualBaseline));
+    if (same) return null;
+    return JSON.stringify({ exclude, manual }, null, 2) + '\n';
   }
 
   /** 삭제되는 글을 가리키는 연결을 함께 정리 — 남겨 두면 다음 빌드가 실패한다 */
@@ -1577,6 +1725,8 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       state.coverPendingPath = null;
       clearDraft(); // 발행됐으니 자동저장된 초안은 지운다
       glossaryBaseline = sortedExclude(state.glossaryExclude); // 방금 커밋한 제외 목록을 새 기준선으로(재발행 멱등)
+      glossaryManualBaseline = sortedManual(state.glossaryManual); // 수동 용어도 기준선 갱신
+      existingGlossaryCache = null; // 새로 발행된 뜻을 다음 충돌 검사에 반영
       // acceptedEdges는 비우지 않는다 — 방금 쓴 '이 글의 연결' 상태라, 재발행 reconcile가 멱등이게.
       state.mode = 'edit';
       state.editingSlug = slug;
@@ -3370,6 +3520,49 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   .write-root .glossary-terms .gl-edit button {
     font-size: 0.8rem;
     padding: 0.3em 0.7em;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* 손수 얹은 용어 표시 배지 */
+  .write-root .glossary-terms li.manual .gl-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.1em 0.55em;
+    white-space: nowrap;
+    align-self: center;
+  }
+
+  /* 용어 직접 추가 */
+  .write-root .gl-add {
+    margin-top: 0.7rem;
+  }
+  .write-root .gl-add-toggle {
+    font-size: 0.85rem;
+    padding: 0.35em 0.8em;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .write-root .gl-add-form {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+  }
+  .write-root .gl-add-form input {
+    flex: 1 1 12rem;
+    min-width: 0;
+    font-size: 0.85rem;
+  }
+  .write-root .gl-add-form button {
+    font-size: 0.8rem;
+    padding: 0.3em 0.9em;
     white-space: nowrap;
     flex-shrink: 0;
   }
