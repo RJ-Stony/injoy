@@ -1,6 +1,6 @@
 import { getPublishedPosts } from './post';
 import { splitCode } from './md-text';
-import { PATTERN, isDefinition, isKoreanDef } from './glossary-rules';
+import { PATTERN, isDefinition, isKoreanDef, stripMd } from './glossary-rules';
 import glossaryData from '../data/glossary.json';
 
 /**
@@ -36,8 +36,8 @@ export async function getGlossary(): Promise<GlossaryEntry[]> {
   for (const post of posts) {
     const { prose } = splitCode(post.body);
     for (const m of prose.matchAll(PATTERN)) {
-      const term = m[1].trim();
-      const gloss = m[2].trim();
+      const term = stripMd(m[1].trim());
+      const gloss = stripMd(m[2].trim());
       if (EXCLUDE_TERMS.has(term) || !isDefinition(gloss) || !isKoreanDef(gloss)) continue;
       const src = { slug: post.id, title: post.data.title };
       const existing = map.get(term);

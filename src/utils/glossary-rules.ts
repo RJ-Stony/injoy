@@ -4,8 +4,15 @@
  * 그대로 들어간다. 코드 펜스 제거는 호출부에서 md-text.ts의 splitCode로 먼저 걷어 낸다.
  */
 
-// **용어**(풀이). 풀이는 2~30자, 용어는 1~24자.
-export const PATTERN = /\*\*([^*\n]{1,24})\*\*\(([^)\n]{2,30})\)/g;
+// **용어**(풀이). 풀이는 2~80자, 용어는 1~30자.
+// 상한은 실측 기반 — 작성자 B규칙 풀이가 실제로 31~64자에 이르러(블록 32자·Dynamic Table 64자),
+// 옛 상한 30자가 정성 들인 풀이일수록 사전에서 조용히 빠뜨리고 있었다.
+export const PATTERN = /\*\*([^*\n]{1,30})\*\*\(([^)\n]{2,80})\)/g;
+
+// 긁어 온 용어·뜻에서 마크다운 잔재를 걷는다 — 뜻 안의 **강조** 마커, TARGET\_LAG 같은
+// 이스케이프 백슬래시. 안 걷으면 사전에 별표가 그대로 노출되고, 하버카드는 렌더된
+// 본문 텍스트(이스케이프 해제됨)와 정확 일치가 깨져 못 붙는다.
+export const stripMd = (s: string): string => s.replace(/\*\*|\*/g, '').replace(/\\(?=[\\`*_{}[\]()#+\-.!~])/g, '');
 
 // 정의가 아닌 풀이(인용·'또는…'로 이어지는 문장 조각·출처 표기)를 거른다.
 export function isDefinition(gloss: string): boolean {
@@ -32,8 +39,8 @@ export function scanGlossaryTerms(prose: string): { term: string; gloss: string 
   const out: { term: string; gloss: string }[] = [];
   // matchAll은 정규식을 내부 복제해 쓰므로 전역 PATTERN의 lastIndex를 건드리지 않는다(공유 안전).
   for (const m of prose.matchAll(PATTERN)) {
-    const term = m[1].trim();
-    const gloss = m[2].trim();
+    const term = stripMd(m[1].trim());
+    const gloss = stripMd(m[2].trim());
     if (seen.has(term)) continue;
     if (!isDefinition(gloss) || !isKoreanDef(gloss)) continue;
     seen.add(term);
