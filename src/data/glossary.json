@@ -11,18 +11,70 @@
     "Qdrant"
   ],
   "manual": [
-    { "term": "포트포워딩", "gloss": "port forwarding; 바깥에서 온 요청을 공유기가 내부의 정해진 기기·포트로 넘기는 규칙", "slug": "port-forwarding" },
-    { "term": "공인 IP", "gloss": "public IP; 인터넷 전체에서 통하는 대표 주소", "slug": "port-forwarding" },
-    { "term": "사설 IP", "gloss": "private IP; 내부망 안에서만 쓰는 주소", "slug": "port-forwarding" },
-    { "term": "포트", "gloss": "port; 한 기기 안에서 어느 프로그램으로 갈지 가르는 번호", "slug": "port-forwarding" },
-    { "term": "방화벽", "gloss": "firewall; 오가는 통신을 규칙대로 막거나 허용하는 관문", "slug": "port-forwarding" },
-    { "term": "PAT", "gloss": "Port Address Translation; 포트까지 바꿔 여러 기기가 공인 IP 하나를 나눠 쓰게 하는 주소 변환", "slug": "port-forwarding" },
-    { "term": "SNAT", "gloss": "Source NAT; 나가는 통신의 출발지 주소를 바꾸는 변환", "slug": "port-forwarding" },
-    { "term": "DNAT", "gloss": "Destination NAT; 들어오는 통신의 도착지 주소를 바꾸는 변환", "slug": "port-forwarding" },
-    { "term": "UPnP", "gloss": "Universal Plug and Play; 기기가 공유기에 포트 개방을 자동으로 요청하는 규약", "slug": "port-forwarding" },
-    { "term": "Mirai", "gloss": "2016년 허술한 IoT 기기를 노려 퍼진 봇넷", "slug": "port-forwarding" },
-    { "term": "원자적 교체", "gloss": "atomic rename; 임시 파일에 쓴 뒤 이름만 바꿔 한 번에 갈아끼우는 방식", "slug": "harness-4-memory" },
-    { "term": "냉각", "gloss": "alpha cooling; 힘 시뮬레이션의 흔들림을 점점 잦아들게 하는 감쇠", "slug": "polish-round-12" },
-    { "term": "OMC", "gloss": "Oh-My-ClaudeCode; Claude Code 설정을 모아 둔 오픈소스 플러그인", "slug": "harness-1-benchmarking" }
+    {
+      "term": "공인 IP",
+      "gloss": "public IP; 인터넷 전체에서 통하는 대표 주소",
+      "slug": "port-forwarding"
+    },
+    {
+      "term": "냉각",
+      "gloss": "alpha cooling; 힘 시뮬레이션의 흔들림을 점점 잦아들게 하는 감쇠",
+      "slug": "polish-round-12"
+    },
+    {
+      "term": "방화벽",
+      "gloss": "firewall; 오가는 통신을 규칙대로 막거나 허용하는 관문",
+      "slug": "port-forwarding"
+    },
+    {
+      "term": "사설 IP",
+      "gloss": "private IP; 내부망 안에서만 쓰는 주소",
+      "slug": "port-forwarding"
+    },
+    {
+      "term": "원자적 교체",
+      "gloss": "atomic rename; 임시 파일에 쓴 뒤 이름만 바꿔 한 번에 갈아끼우는 방식",
+      "slug": "harness-4-memory"
+    },
+    {
+      "term": "포트",
+      "gloss": "port; 한 기기 안에서 어느 프로그램으로 갈지 가르는 번호",
+      "slug": "port-forwarding"
+    },
+    {
+      "term": "포트포워딩",
+      "gloss": "port forwarding; 바깥에서 온 요청을 공유기가 내부의 정해진 기기/포트로 넘기는 규칙",
+      "slug": "port-forwarding"
+    },
+    {
+      "term": "DNAT",
+      "gloss": "Destination NAT; 들어오는 통신의 도착지 주소를 바꾸는 변환",
+      "slug": "port-forwarding"
+    },
+    {
+      "term": "Mirai",
+      "gloss": "2016년 허술한 IoT 기기를 노려 퍼진 봇넷",
+      "slug": "port-forwarding"
+    },
+    {
+      "term": "OMC",
+      "gloss": "Oh-My-ClaudeCode; Claude Code 설정을 모아 둔 오픈소스 플러그인",
+      "slug": "harness-1-benchmarking"
+    },
+    {
+      "term": "PAT",
+      "gloss": "Port Address Translation; 포트까지 바꿔 여러 기기가 공인 IP 하나를 나눠 쓰게 하는 주소 변환",
+      "slug": "port-forwarding"
+    },
+    {
+      "term": "SNAT",
+      "gloss": "Source NAT; 나가는 통신의 출발지 주소를 바꾸는 변환",
+      "slug": "port-forwarding"
+    },
+    {
+      "term": "UPnP",
+      "gloss": "Universal Plug and Play; 기기가 공유기에 포트 개방을 자동으로 요청하는 규약",
+      "slug": "port-forwarding"
+    }
   ]
 }
