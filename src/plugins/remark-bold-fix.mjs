@@ -1,24 +1,52 @@
 /**
- * CommonMark 플랭킹 규칙 때문에 굵게(**…**)가 깨지는 경우를 보정한다.
+ * CommonMark 플랭킹 규칙 때문에 굵게(**…**)와 기울임(*…*)이 깨지는 경우를 보정한다.
  *
  * 예: **"결과 10개"**라고 — 닫는 ** 바로 앞이 따옴표(구두점)이고 바로 뒤가
  * 한글(글자)이라 '우측 플랭킹'이 아니어서 강조가 안 잡히고, 별표가 리터럴
  * **…** 로 그대로 화면에 남는다. (여는 쪽도 글자**"… 처럼 막힌다.)
+ * 단일 별표 기울임(*…*)도 같은 이유로 깨진다. 예: *"…증거를 대라"*는 처럼
+ * 닫는 * 앞이 따옴표, 뒤가 조사면 리터럴 *…* 로 남는다.
  *
- * 정상 굵게(**굵게**)는 파싱 단계에서 이미 strong 노드가 되어 text 노드에
- * 남지 않는다. 그래서 'text 노드에 아직 **…** 가 남아 있다'는 건 곧 구두점에
- * 막혀 실패한 경우뿐 → 그것만 strong 으로 바꾼다(정상 굵게엔 영향 0).
- * 코드(inlineCode/code)는 별도 노드 타입이라 자연히 제외되고, 줄바꿈을 품은
- * 정상 멀티라인 강조도 \n 제외 패턴이라 잡지 않는다.
+ * 정상 강조(**굵게**, *기울임*)는 파싱 단계에서 이미 strong/emphasis 노드가 되어
+ * text 노드에 남지 않는다. 그래서 'text 노드에 아직 **…** 나 *…* 가 남아 있다'는
+ * 건 곧 구두점에 막혀 실패한 경우뿐 → 그것만 strong/emphasis 로 바꾼다(정상
+ * 강조엔 영향 0). 코드(inlineCode/code)는 별도 노드 타입이라 자연히 제외되고,
+ * 줄바꿈을 품은 정상 멀티라인 강조도 \n 제외 패턴이라 잡지 않는다. 수식은
+ * remarkMath 가 먼저 돌아 별도 노드가 되므로 곱셈 별표 등은 text 에 남지 않는다.
  *
- * 단, 작성자가 별표를 일부러 이스케이프한 경우(\*\*…\*\*)도 파싱 뒤엔 똑같이
- * 리터럴 text '**…**'로 도착한다(이스케이프된 리터럴을 보이려는 의도). 이건
- * 굵게로 바꾸면 안 되므로, 원문에서 해당 text 구간에 '\*'(이스케이프된 별표)가
- * 있으면 그 노드는 건드리지 않는다.
+ * 단, 작성자가 별표를 일부러 이스케이프한 경우(\*\*…\*\* 나 \*…\*)도 파싱 뒤엔
+ * 똑같이 리터럴 text 로 도착한다(이스케이프된 리터럴을 보이려는 의도). 이건
+ * 강조로 바꾸면 안 되므로, 원문에서 해당 text 구간에 '\*'(이스케이프된 별표)가
+ * 있으면 그 노드는 통째로 건드리지 않는다. 이 스킵 가드는 굵게·기울임 보정이
+ * 함께 공유한다.
  */
 
 // **  비공백으로 시작·끝  ** , 가운데에 *·줄바꿈은 없음(다른 강조와 안 엉키게)
 const BOLD_RE = /\*\*(\S(?:[^*\n]*\S)?)\*\*/g;
+// *  비공백으로 시작·끝  * , 앞뒤가 *가 아니어서 **(굵게)와 안 엉킨다. 내부에 *·줄바꿈 없음
+const EM_RE = /(?<!\*)\*(?!\*)(\S(?:[^*\n]*\S)?)\*(?!\*)/g;
+
+// value 를 re 로 쪼개, 매칭 구간은 type 노드로, 나머지는 text 노드로 만든다.
+function splitByRe(value, re, type) {
+  re.lastIndex = 0;
+  if (!re.test(value)) return [{ type: 'text', value }];
+  re.lastIndex = 0;
+
+  const parts = [];
+  let last = 0;
+  for (const match of value.matchAll(re)) {
+    const [whole, inner] = match;
+    if (match.index > last) {
+      parts.push({ type: 'text', value: value.slice(last, match.index) });
+    }
+    parts.push({ type, children: [{ type: 'text', value: inner }] });
+    last = match.index + whole.length;
+  }
+  if (last < value.length) {
+    parts.push({ type: 'text', value: value.slice(last) });
+  }
+  return parts;
+}
 
 export default function remarkBoldFix() {
   const transform = (node, src) => {
@@ -31,31 +59,18 @@ export default function remarkBoldFix() {
       }
 
       // 원문에서 이 텍스트가 차지하는 구간에 이스케이프된 별표(\*)가 있으면 건드리지 않는다.
-      // 작성자가 \*\*…\*\* 로 일부러 리터럴 별표를 보이려 한 것을 굵게로 바꾸지 않기 위함.
+      // 작성자가 \*\*…\*\* 나 \*…\* 로 일부러 리터럴 별표를 보이려 한 것을 강조로 바꾸지 않기 위함.
       const s = child.position?.start?.offset;
       const e = child.position?.end?.offset;
       if (typeof src === 'string' && typeof s === 'number' && typeof e === 'number') {
         if (src.slice(s, e).includes('\\*')) return [child];
       }
 
-      BOLD_RE.lastIndex = 0;
-      if (!BOLD_RE.test(child.value)) return [child];
-      BOLD_RE.lastIndex = 0;
-
-      const parts = [];
-      let last = 0;
-      for (const match of child.value.matchAll(BOLD_RE)) {
-        const [whole, inner] = match;
-        if (match.index > last) {
-          parts.push({ type: 'text', value: child.value.slice(last, match.index) });
-        }
-        parts.push({ type: 'strong', children: [{ type: 'text', value: inner }] });
-        last = match.index + whole.length;
-      }
-      if (last < child.value.length) {
-        parts.push({ type: 'text', value: child.value.slice(last) });
-      }
-      return parts;
+      // 먼저 굵게(**…**)를 보정하고, 그때 생긴 text 조각들에 기울임(*…*)을 한 번 더 보정한다.
+      const boldParts = splitByRe(child.value, BOLD_RE, 'strong');
+      return boldParts.flatMap((part) =>
+        part.type === 'text' ? splitByRe(part.value, EM_RE, 'emphasis') : [part]
+      );
     });
   };
 
