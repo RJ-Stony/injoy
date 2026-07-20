@@ -12,8 +12,8 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getPublishedPosts } from '../utils/post';
 
-// 카테고리별 시리즈 목록을 빌드타임에 집계한다. 시리즈가 여러 카테고리에 걸치면
-// (예: "블로그 다듬기 기록"이 블로그·회고 양쪽) 각 카테고리에 모두 넣는다.
+// 카테고리별 시리즈 목록을 빌드타임에 집계한다. 한 시리즈의 글들이 여러
+// 카테고리에 걸치면 각 카테고리에 모두 넣는다.
 // 검색 필터에서 "카테고리 선택 → 그 카테고리의 시리즈"라는 위계를 그리는 데 쓴다.
 const posts = await getPublishedPosts();
 const seriesByCategory: Record<string, string[]> = {};

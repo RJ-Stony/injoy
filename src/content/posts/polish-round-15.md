@@ -46,7 +46,7 @@ flowchart TD
 카테고리별 시리즈 목록은 빌드할 때 미리 모아 두도록 했다.
 
 ```ts
-// 시리즈가 여러 카테고리에 걸치면(예: "블로그 다듬기 기록"이 블로그/회고 양쪽) 각각에 넣는다
+// 시리즈가 여러 카테고리에 걸치면 각각에 넣는다
 const seriesByCategory: Record<string, string[]> = {};
 for (const post of posts) {
   const { category, series } = post.data;
