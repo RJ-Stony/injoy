@@ -61,7 +61,7 @@ flowchart TD
     Goal --> C4["메타데이터 필터링<br/>20%"]
 ```
 
-후보는 셋이었다. 개념 학습과 초기 PoC에 좋은 **ChromaDB**, 표준 PostgreSQL 확장 기능인 **자체 호스팅 pgvector**(pgvector; PostgreSQL에 벡터 검색을 더해 주는 확장 기능), Rust로 짜여 있어 자체 호스팅 DB 중 성능이 가장 좋은 **Qdrant**(p50 기준 약 4ms)였다. ChromaDB는 멀티 유저에 약해 사내 공용으로는 부족하다고 생각했고, Qdrant는 지금 규모에서는 과했다.
+후보는 셋이었다. 개념 학습과 초기 PoC에 좋은 **ChromaDB**, 표준 PostgreSQL 확장 기능인 자체 호스팅 **pgvector**(pgvector; PostgreSQL에 벡터 검색을 더해 주는 확장 기능), Rust로 짜여 있어 자체 호스팅 DB 중 성능이 가장 좋은 **Qdrant**(p50 기준 약 4ms)였다. ChromaDB는 멀티 유저에 약해 사내 공용으로는 부족하다고 생각했고, Qdrant는 지금 규모에서는 과했다.
 
 남은 pgvector가 왜 SaaS를 제치고 1위였는지가 사실 이 글의 중요한 부분이다.
 
