@@ -328,13 +328,13 @@
       "from": "rag-8-mcp-serving",
       "to": "rag-7-eval-cost",
       "type": "extends",
-      "note": "숫자까지 확인한 검색을 MCP 서버 하나로 묶어 누구나 쓰게 만든 마무리"
+      "note": "검색 과정을 MCP 서버 하나로 묶어 누구나 사용하게 만든 과정"
     },
     {
       "from": "rag-8-mcp-serving",
       "to": "harness-7-snowflake",
       "type": "related",
-      "note": "PC에만 쌓이던 작업 기록을 공용 저장소로 올린 같은 사건을, 하네스가 아니라 검색 쪽에서 본 글"
+      "note": "PC에만 쌓이던 작업 기록을 공용 저장소로 올린 같은 사건을 다른 관점에서 보게 된 글"
     },
     {
       "from": "rag-4-managed-pivot",

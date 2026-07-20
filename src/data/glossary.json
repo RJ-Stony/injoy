@@ -22,11 +22,6 @@
       "slug": "port-forwarding"
     },
     {
-      "term": "냉각",
-      "gloss": "alpha cooling; 힘 시뮬레이션의 흔들림을 점점 잦아들게 하는 감쇠",
-      "slug": "polish-round-12"
-    },
-    {
       "term": "방화벽",
       "gloss": "firewall; 오가는 통신을 규칙대로 막거나 허용하는 관문",
       "slug": "port-forwarding"
