@@ -90,7 +90,7 @@ flowchart LR
 }
 ```
 
-그러고 나면 채팅에서 가로채는 현상이 일어난다. 사용자가 프롬프트를 보내면 메인 세션의 Claude가 읽기 *전에* `keyword-detector`가 먼저 돌아 *plan*이나 *team* 같은 매직 키워드를 스캔하고, 스캔이 완료되면, "이 작업은 `team-plan`에게 넘겨라"는 지시를 `additionalContext`로 찔러 넣는다. 메인 Claude는 **덮어쓴** **`CLAUDE.md`** **규칙과 방금 주입된 지시에 의해**, 스스로 판단하길 멈추고 *오케스트레이터 역할만* 하게 된다.
+그러고 나면 채팅에서 가로채는 현상이 일어난다. 사용자가 프롬프트를 보내면 메인 세션의 Claude가 읽기 *전에* `keyword-detector`가 먼저 돌아 *plan*이나 *team* 같은 매직 키워드를 스캔하고, "이 작업은 `team-plan`에게 넘겨라"는 지시를 `additionalContext`로 찔러 넣는다. 메인 Claude는 **덮어쓴** **`CLAUDE.md`** **규칙과 방금 주입된 지시에 의해**, 스스로 판단하길 멈추고 *오케스트레이터 역할만* 하게 된다.
 
 ```mermaid
 flowchart TD

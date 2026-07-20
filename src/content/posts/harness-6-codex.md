@@ -9,7 +9,7 @@ draft: false
 series: "하네스 엔지니어링"
 ---
 
-여기까지 만든 하네스는 [Claude Code](https://docs.claude.com/en/docs/claude-code) 위에서만 돌았다. 그런데 사내에서 [Codex](https://github.com/openai/codex)(OpenAI의 코딩 에이전트)도 쓰고 있었기에 이를 위한 하네스도 저절로 필요했다. 둘은 **런타임**(runtime; AI가 실제로 도는 실행 환경)이 다르다. 하네스를 Codex에서도 쓰려면, 같은 로직을 Codex의 방식으로 다시 구현해야 했다.
+여기까지 만든 하네스는 [Claude Code](https://docs.claude.com/en/docs/claude-code) 위에서만 돌았다. 그런데 사내에서 [Codex](https://github.com/openai/codex)(OpenAI의 코딩 에이전트)도 쓰고 있었기에, Codex용 하네스도 자연히 필요해졌다. 둘은 **런타임**(runtime; AI가 실제로 도는 실행 환경)이 다르다. 하네스를 Codex에서도 쓰려면, 같은 로직을 Codex의 방식으로 다시 구현해야 했다.
 
 ## 그 전엔 어떤 것에 묶여 있었나
 
@@ -51,7 +51,7 @@ developer_instructions = """
 """
 ```
 
-**에이전트마다** ***모델/권한/추론 강도*****도 따로 줬다.** 구현을 담당하는 에이전트는 쓰기 권한과 중간 수준의 추론을, 검증하는 에이전트는 읽기 전용에 가벼운 추론을 주었다. [[harness-1-benchmarking|1편]]에서 검토자에게 읽기 도구만 줬던 권한 분리가, 여기서는 샌드박스 모드라는 더 강한 형태로 줄 수 있었다.
+**에이전트마다** ***모델/권한/추론 강도*****도 따로 줬다.** 구현을 담당하는 에이전트는 쓰기 권한과 중간 수준의 추론을, 검증하는 에이전트는 읽기 전용에 가벼운 추론을 주었다. [[harness-1-benchmarking|1편]]에서 검토자에게 읽기 도구만 줬던 권한 분리가, 여기서는 샌드박스 모드라는 더 강한 형태로 나타났다.
 
 ```toml codex/agents/verifier.toml
 name = "verifier"
@@ -71,7 +71,7 @@ model_reasoning_effort = "low"        # 검증은 무거운 추론이 필요 없
 }
 ```
 
-[[harness-2-self-bypass|2편]]의 편집 범위 점검도, [[harness-4-memory|4편]]의 메모리 불러오기도, [[harness-5-nondev-ux|5편]]의 가시화도 전부 `codex-` 접두어가 붙은 모습으로 다시 태어나게 되었다. 그리고 워크플로우 스킬(`harness-plan`·`harness-exec`·`harness-verify` ...)도 `codex/skills/` 아래 같은 이름으로 옮겨지게 되었다.
+[[harness-2-self-bypass|2편]]의 편집 범위 점검도, [[harness-4-memory|4편]]의 메모리 불러오기도, [[harness-5-nondev-ux|5편]]의 가시화도 전부 `codex-` 접두어가 붙은 모습으로 다시 만들어지게 되었다. 워크플로우 스킬(`harness-plan`·`harness-exec`·`harness-verify` ...)도 `codex/skills/` 아래 같은 이름으로 옮겨지게 되었다.
 
 ```mermaid
 flowchart TD
