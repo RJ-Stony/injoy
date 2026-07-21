@@ -10,7 +10,7 @@
       "from": "markdown-styleguide",
       "to": "how-to-write",
       "type": "supports",
-      "note": "글쓰기 가이드가 약속한 문법들이 실제로 어떻게 렌더링되는지 보여 주는 근거"
+      "note": "글쓰기 가이드가 약속한 문법들이 실제로 어떻게 렌더링되는지 보여 주는 글"
     },
     {
       "from": "markdown-styleguide",
@@ -64,7 +64,7 @@
       "from": "polish-round-3",
       "to": "markdown-styleguide",
       "type": "related",
-      "note": "글마다 풀이 강도를 달리한 판단의 대상"
+      "note": "글마다 풀이 강도를 달리한 판단의 대상이 되는 글"
     },
     {
       "from": "polish-round-3",
@@ -142,7 +142,7 @@
       "from": "polish-round-5",
       "to": "markdown-styleguide",
       "type": "related",
-      "note": "LLM Wiki 만들기를 보류하며 보니, 위키링크로 글을 잇고 타입 연결로 그래프를 짜는 이 체계가 이미 그 뼈대였음을 확인한 글"
+      "note": "LLM Wiki 만들기를 보류하며 보니, 위키 링크로 글을 잇고 타입 연결로 그래프를 짜는 이 체계가 이미 그 뼈대였음을 확인한 글"
     },
     {
       "from": "polish-round-3",
