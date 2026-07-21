@@ -4,7 +4,7 @@
       "from": "how-to-write",
       "to": "welcome",
       "type": "refines",
-      "note": "첫 글에서 얘기한 '발행에 드는 공수를 최소화한다'는 원칙을, 마크다운 파일 하나로 바로 발행되는 구체적인 절차로 더 또렷하게 푼 글"
+      "note": "첫 글에서 얘기한 '발행에 드는 공수를 최소화한다'는 원칙을, 마크다운 파일 하나로 바로 발행되는 구체적인 절차로 푼 글"
     },
     {
       "from": "markdown-styleguide",
@@ -40,7 +40,7 @@
       "from": "wysiwyg-editor",
       "to": "how-to-write",
       "type": "related",
-      "note": "보이는 대로 편집으로 바꾼 뒤에도 글을 올리는 전체 절차는 이 글에 그대로 정리해 두었다"
+      "note": "보이는 대로의 편집 과정을 바꾼 뒤에도 글을 올리는 전체 절차는 이 글에 그대로 정리해 두었다"
     },
     {
       "from": "polish-round-4",
@@ -58,7 +58,7 @@
       "from": "polish-round-3",
       "to": "how-to-write",
       "type": "supports",
-      "note": "용어가 빽빽한 글부터 풀이를 단 사례로 how-to-write를 가장 먼저 손봤다. 발행 안내 글이 비개발자에게도 읽히도록 보탠 근거"
+      "note": "발행을 안내하는 글이 비개발자에게도 읽히도록 보탠 근거"
     },
     {
       "from": "polish-round-3",
@@ -112,7 +112,7 @@
       "from": "polish-round",
       "to": "how-to-write",
       "type": "related",
-      "note": "서식 버블/이미지 alt/각주 자동 번호로 쓰는 화면을 다듬었지만, 글을 올리는 전체 절차는 여전히 how-to-write 그대로임을 짚은 글"
+      "note": "이미지 alt/각주 자동 번호로 쓰는 화면을 다듬었지만, 글을 올리는 전체 절차는 여전히 그대로임을 짚은 글"
     },
     {
       "from": "polish-round-8",
