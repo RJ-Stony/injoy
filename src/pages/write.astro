@@ -239,13 +239,13 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         <ul id="lint-results" class="lint"></ul>
       </section>
 
+      <p class="settings">
+        <button id="token-clear" type="button" class="linklike">이 기기에서 토큰 지우기</button>
+      </p>
       <div class="publish-bar">
         <span id="publish-status" role="status"></span>
         <button id="publish" type="button" class="primary big">발행하기</button>
       </div>
-      <p class="settings">
-        <button id="token-clear" type="button" class="linklike">이 기기에서 토큰 지우기</button>
-      </p>
     </section>
   </div>
 
@@ -2997,7 +2997,9 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     color: light-dark(#1a7f4f, #4ecb96);
   }
 
-  /* ---------- 발행 (우측 하단) ---------- */
+  /* ---------- 발행 (하단 고정) ---------- */
+  /* 긴 글에서도 스크롤 어디서든 발행하도록 화면 하단에 붙는 막대.
+     z-index는 본문 위, 삽입 툴바(40)·사이트 헤더(50)보다는 아래로 둔다. */
   .write-root .publish-bar {
     display: flex;
     align-items: center;
@@ -3005,6 +3007,19 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     gap: 1.1rem;
     flex-wrap: wrap;
     margin-top: 0.4rem;
+    position: sticky;
+    bottom: 0;
+    z-index: 35;
+    padding: 0.8rem 1rem;
+    border-top: 1px solid var(--border);
+    border-radius: 12px 12px 0 0;
+    background-color: var(--surface);
+    box-shadow: 0 -8px 24px rgb(0 0 0 / 12%);
+  }
+
+  /* 고정 막대에 마지막 콘텐츠가 가리지 않게 에디터 하단 여백 확보 */
+  .write-root #editor {
+    padding-bottom: 1.5rem;
   }
 
   .write-root #publish-status {
