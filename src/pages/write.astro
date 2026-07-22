@@ -3201,5 +3201,23 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     .write-root .publish-bar .big {
       width: 100%;
     }
+
+    /* 입력칸 자동 확대 방지: iOS는 16px 미만 컨트롤을 탭하면 화면을 확대한다 */
+    .write-root input,
+    .write-root select,
+    .write-root textarea {
+      font-size: 16px;
+    }
+    /* 작은 드롭다운·연결 메모칸은 별도 선택자라 위 규칙에 안 덮이니 명시적으로 16px */
+    .write-root select.mini,
+    .write-root .suggestions .sug-note {
+      font-size: 16px;
+    }
+
+    /* 터치 타깃 확보: 작은 드롭다운·일반 버튼도 손가락에 맞게 (화살표 여백은 유지) */
+    .write-root select.mini,
+    .write-root button {
+      min-height: 40px;
+    }
   }
 </style>
