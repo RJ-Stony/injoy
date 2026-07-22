@@ -2333,8 +2333,13 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
 
   .write-root button.primary.big {
     font-size: 0.98rem;
-    padding: 0.72em 1.8em;
-    border-radius: 12px;
+    padding: 0.8em 2em;
+    border-radius: 13px;
+    box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+
+  .write-root button.primary.big:hover {
+    box-shadow: 0 8px 22px -6px color-mix(in srgb, var(--accent) 70%, transparent);
   }
 
   .write-root button.danger {
@@ -2366,11 +2371,17 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     font-size: 0.84em;
   }
 
-  /* ---------- 카드 ---------- */
+  /* ---------- 카드 ----------
+     정제된 현 톤: 색·--surface는 그대로 두고, 테두리를 배경 쪽으로 살짝 녹여 부드럽게 +
+     아주 은은한 그림자로 배경에서 살짝 떠 보이게. 그림자·테두리 색은 light-dark()로
+     라이트/다크 각각 맞춘다(다크는 테두리를 유지해 카드가 사라지지 않게). 라운드는 14로 통일. */
   .write-root .card {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border: 1px solid light-dark(color-mix(in srgb, var(--border) 60%, #ffffff), var(--border));
+    border-radius: 14px;
     background-color: var(--surface);
+    box-shadow:
+      0 1px 2px light-dark(rgb(16 24 40 / 4%), rgb(0 0 0 / 34%)),
+      0 6px 20px -8px light-dark(rgb(16 24 40 / 10%), rgb(0 0 0 / 50%));
   }
 
   .write-root .auth-card {
@@ -2473,14 +2484,15 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
 
   /* ---------- 섹션 카드 ---------- */
   .write-root .section {
-    padding: 1.4rem 1.6rem;
-    margin-bottom: 1.1rem;
+    padding: 1.5rem 1.6rem;
+    margin-bottom: 1rem;
   }
 
   .write-root .section-title {
     margin: 0;
-    font-size: 1.02rem;
-    font-weight: 700;
+    font-size: 1.05rem;
+    font-weight: 750;
+    letter-spacing: -0.01em;
   }
 
   .write-root .section-sub {
@@ -2506,7 +2518,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   .write-root .fm-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1rem 1.4rem;
+    gap: 1.15rem 1.4rem;
   }
 
   .write-root .field {
@@ -2517,8 +2529,9 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
   }
 
   .write-root .field-name {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 600;
+    letter-spacing: 0.01em;
     color: var(--text-muted);
   }
 
@@ -2811,13 +2824,23 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     gap: 0.35rem;
   }
 
+  /* 판(툴바) 하나에 담긴 도구처럼, 낱개 테두리를 지우고 투명 배경으로 두어 툴바 바탕(surface)이
+     버튼들을 한 묶음으로 감싸게 한다. 상태는 호버 배경(accent-weak)으로만 준다. */
   .write-root .md-toolbar button {
     font-size: 0.8rem;
     font-weight: 600;
     padding: 0.35em 0.7em;
     border-radius: 8px;
-    background-color: var(--bg);
+    border-color: transparent;
+    background-color: transparent;
+    color: var(--text-muted);
     white-space: nowrap;
+  }
+
+  .write-root .md-toolbar button:hover {
+    border-color: transparent;
+    background-color: var(--accent-weak);
+    color: var(--accent);
   }
 
   /* 에디터 마운트 전 — 툴바 비활성(클릭이 텍스트영역 폴백으로 새지 않게) */
@@ -3137,7 +3160,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
 
   .write-root .injoy-md.ProseMirror {
     outline: none;
-    padding: 1.2rem 1.4rem;
+    padding: 1.5rem 1.6rem;
     min-height: 460px;
     font-family: var(--font-sans);
     font-size: 0.98rem;
@@ -3904,7 +3927,7 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     }
 
     .write-root .section {
-      padding: 1.1rem 1.2rem;
+      padding: 1.25rem 1.3rem;
     }
   }
 
