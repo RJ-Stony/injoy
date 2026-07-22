@@ -3148,6 +3148,9 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       flex-wrap: nowrap;
       overflow-x: auto;
       scrollbar-width: none;
+      /* 오른쪽 끝만 흐리게 — 더 있는 버튼을 가로 스크롤로 알린다(팝오버는 .md-toolbar 직속이라 안 잘림) */
+      -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+      mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
     }
     .write-root .md-tools::-webkit-scrollbar {
       display: none;
