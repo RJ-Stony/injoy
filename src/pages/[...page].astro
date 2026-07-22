@@ -54,25 +54,27 @@ const showSort = onFirst && page.data.length > 1;
 
 <style>
   .intro {
-    padding: 1rem 0 1.25rem;
+    padding: 0.25rem 0 1.75rem;
   }
 
   .intro-row {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
     gap: 1rem;
   }
 
   .intro h1 {
     margin: 0;
-    font-size: 2rem;
+    font-size: 2.25rem;
     font-weight: 800;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
+    line-height: 1.08;
   }
 
   .intro p {
-    margin: 0.4rem 0 0;
+    margin: 0.55rem 0 0;
+    font-size: 1.02rem;
     color: var(--text-muted);
   }
 
@@ -105,6 +107,14 @@ const showSort = onFirst && page.data.length > 1;
   /* 시리즈 폴더와 첫 글 사이 여백 */
   .post-list {
     margin-top: 0.5rem;
+  }
+
+  /* 좁은 화면: 커진 제목과 정렬 토글이 붙지 않게 세로로 쌓는다 */
+  @media (max-width: 30rem) {
+    .intro-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
   }
 </style>
 
