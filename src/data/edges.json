@@ -70,19 +70,19 @@
       "from": "polish-round-3",
       "to": "polish-round",
       "type": "supports",
-      "note": "강조한 한 줄이 판단의 전부라던 polish-round의 코드 설명 버릇을, 빠진 코드까지 메워 원칙으로 굳힌 근거"
+      "note": "polish-round의 코드 설명 버릇을, 빠진 코드까지 메워 원칙으로 굳힌 근거"
     },
     {
       "from": "polish-round-7",
       "to": "polish-round",
       "type": "extends",
-      "note": "멈추지 않던 그래프 무한 루프를 잡은 데 이어, 이번엔 점이 화면 밖으로 도망가는 문제를 줌·뷰포트 맞춤으로 잡은 그래프 시뮬레이션 발전"
+      "note": "이번엔 점이 화면 밖으로 도망가는 문제를 줌/뷰포트 맞춤으로 잡은 그래프 시뮬레이션 고도화"
     },
     {
       "from": "polish-round-2",
       "to": "polish-round",
       "type": "refines",
-      "note": "그래프 태그 점선이 거의 안 보이던 걸 회색으로 끌어올려, 무한 루프를 잡아 만든 그래프 화면을 시각적으로 더 또렷이 다듬은 과정"
+      "note": "그래프 태그 점선이 거의 안 보이던 걸 회색으로 올려, 무한 루프를 잡아 만든 그래프 화면을 시각적으로 더 또렷이 다듬은 과정"
     },
     {
       "from": "polish-round-5",
@@ -106,7 +106,7 @@
       "from": "polish-round",
       "to": "wysiwyg-editor",
       "type": "supports",
-      "note": "위지윅 방식의 직렬화가 발행 결과를 어긋내지 않는지, 새로 더한 서식 버튼도 위지윅 때처럼 왕복 검증을 거쳐 안전함을 보탠 근거"
+      "note": "새로 더한 서식 버튼도 위지윅 때처럼 왕복 검증을 거쳐 안전함을 보탠 근거"
     },
     {
       "from": "polish-round",
