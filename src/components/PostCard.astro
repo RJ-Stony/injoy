@@ -25,7 +25,7 @@ const diagram = cover ? null : firstDiagram(post);
       viewSlug={post.id}
     />
     <h2 class="title">
-      <a href={href}>{post.data.title}</a>
+      <a class="stretch" href={href}>{post.data.title}</a>
     </h2>
     <p class="description">{post.data.description}</p>
   </div>
@@ -44,15 +44,41 @@ const diagram = cover ? null : firstDiagram(post);
 
 <style>
   .post-card {
-    padding: 1.75rem 0;
-    border-bottom: 1px solid var(--border);
+    position: relative;
+    /* 좌우로 살짝 숨 쉬는 호버 배경 — 음수 margin으로 상위 main(좌우 1.25rem) 안에 머문다 */
+    padding: 1.5rem 0.85rem;
+    margin-inline: -0.85rem;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     gap: 1.5rem;
+    transition: background-color 0.15s ease;
   }
 
-  .post-card:last-of-type {
-    border-bottom: 0;
+  /* 카드 사이에만 안쪽으로 들인 구분선 — 둥근 호버 배경과 어울리게 좌우를 inset 한다 */
+  .post-card + .post-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0.85rem;
+    right: 0.85rem;
+    border-top: 1px solid var(--border);
+  }
+
+  /* 카드 전체 호버·키보드 포커스 피드백 — 썸네일 없는 카드도 반응한다 */
+  .post-card:hover,
+  .post-card:focus-within {
+    background-color: var(--surface);
+  }
+
+  .post-card:hover .title a,
+  .post-card:focus-within .title a {
+    color: var(--accent);
+  }
+
+  .post-card:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   .text {
@@ -60,8 +86,17 @@ const diagram = cover ? null : firstDiagram(post);
     min-width: 0;
   }
 
+  /* 메타의 카테고리 링크는 카드 전체 링크(stretched-link) 위에서 계속 클릭되게 띄운다 */
+  .text :global(a.category) {
+    position: relative;
+    z-index: 1;
+  }
+
   .thumb {
     flex-shrink: 0;
+    /* stretched-link 위에 올려 겹침으로 인한 클릭 영역 혼선을 피한다(목적지는 같은 글) */
+    position: relative;
+    z-index: 1;
     border-radius: 10px;
     overflow: hidden;
     line-height: 0;
@@ -153,7 +188,7 @@ const diagram = cover ? null : firstDiagram(post);
   }
 
   .title {
-    margin: 0.6rem 0 0.4rem;
+    margin: 0.5rem 0 0.45rem;
     font-size: 1.35rem;
     font-weight: 700;
     letter-spacing: -0.01em;
@@ -170,11 +205,40 @@ const diagram = cover ? null : firstDiagram(post);
     text-decoration: none;
   }
 
+  /* 카드 전체를 덮는 stretched-link — 카드 어디를 눌러도 글로 이동한다.
+     자신은 position:static이라 ::after는 position:relative인 .post-card를 기준으로 펼쳐진다.
+     z-index를 두지 않아 카테고리·썸네일(z-index:1)만 위로 뚫고 나머지 영역은 글 링크가 된다. */
+  .title a.stretch::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
   .description {
     margin: 0;
     color: var(--text-muted);
     font-size: 0.975rem;
     line-height: 1.7;
+    /* 긴 요약을 2줄에서 '…' 처리해 카드 높이를 고르게 */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* 움직임 줄이기 존중 — 색 전환만 남기고 확대/전환 애니메이션은 끈다 */
+  @media (prefers-reduced-motion: reduce) {
+    .post-card {
+      transition: none;
+    }
+
+    .thumb img {
+      transition: none;
+    }
+
+    .post-card:hover .thumb img {
+      transform: none;
+    }
   }
 </style>
 

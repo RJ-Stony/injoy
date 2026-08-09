@@ -271,13 +271,13 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
         <ul id="lint-results" class="lint"></ul>
       </section>
 
+      <p class="settings">
+        <button id="token-clear" type="button" class="linklike">이 기기에서 토큰 지우기</button>
+      </p>
       <div class="publish-bar">
         <span id="publish-status" role="status"></span>
         <button id="publish" type="button" class="primary big">발행하기</button>
       </div>
-      <p class="settings">
-        <button id="token-clear" type="button" class="linklike">이 기기에서 토큰 지우기</button>
-      </p>
     </section>
   </div>
 
@@ -3787,7 +3787,9 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     color: light-dark(#1a7f4f, #4ecb96);
   }
 
-  /* ---------- 발행 (우측 하단) ---------- */
+  /* ---------- 발행 (하단 고정) ---------- */
+  /* 긴 글에서도 스크롤 어디서든 발행하도록 화면 하단에 붙는 막대.
+     z-index는 본문 위, 삽입 툴바(40)·사이트 헤더(50)보다는 아래로 둔다. */
   .write-root .publish-bar {
     display: flex;
     align-items: center;
@@ -3795,6 +3797,19 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     gap: 1.1rem;
     flex-wrap: wrap;
     margin-top: 0.4rem;
+    position: sticky;
+    bottom: 0;
+    z-index: 35;
+    padding: 0.8rem 1rem;
+    border-top: 1px solid var(--border);
+    border-radius: 12px 12px 0 0;
+    background-color: var(--surface);
+    box-shadow: 0 -8px 24px rgb(0 0 0 / 12%);
+  }
+
+  /* 고정 막대에 마지막 콘텐츠가 가리지 않게 에디터 하단 여백 확보 */
+  .write-root #editor {
+    padding-bottom: 1.5rem;
   }
 
   .write-root #publish-status {
@@ -3906,8 +3921,9 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     }
   }
 
+  /* 발행바가 sticky로 바로 아래 붙으므로, 위(점검 섹션)·아래(발행바) 간격을 고르게 */
   .write-root .settings {
-    margin: 1.3rem 0 0;
+    margin: 0.5rem 0 0.7rem;
     text-align: right;
   }
 
@@ -3938,6 +3954,9 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
       flex-wrap: nowrap;
       overflow-x: auto;
       scrollbar-width: none;
+      /* 오른쪽 끝만 흐리게 — 더 있는 버튼을 가로 스크롤로 알린다(팝오버는 .md-toolbar 직속이라 안 잘림) */
+      -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+      mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
     }
     .write-root .md-tools::-webkit-scrollbar {
       display: none;
@@ -3990,6 +4009,24 @@ const calloutOptions = alertOptions.alerts.map((a) => ({ keyword: a.keyword, tit
     }
     .write-root .publish-bar .big {
       width: 100%;
+    }
+
+    /* 입력칸 자동 확대 방지: iOS는 16px 미만 컨트롤을 탭하면 화면을 확대한다 */
+    .write-root input,
+    .write-root select,
+    .write-root textarea {
+      font-size: 16px;
+    }
+    /* 작은 드롭다운·연결 메모칸은 별도 선택자라 위 규칙에 안 덮이니 명시적으로 16px */
+    .write-root select.mini,
+    .write-root .suggestions .sug-note {
+      font-size: 16px;
+    }
+
+    /* 터치 타깃 확보: 작은 드롭다운·일반 버튼도 손가락에 맞게 (화살표 여백은 유지) */
+    .write-root select.mini,
+    .write-root button {
+      min-height: 40px;
     }
   }
 </style>
