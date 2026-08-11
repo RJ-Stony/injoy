@@ -54,7 +54,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
       <h2>3. 용어와 표기</h2>
       <ul>
-        <li>영문 기술어와 굳어진 외래어(Astro·Milkdown·ProseMirror, 렌더링·모바일·썸네일·하이라이트)는 <strong>그대로 둔다</strong>. 토박이말로 굳이 바꾸지 않고, 영어 병기(round-trip 등)도 붙이지 않는다('왕복 검증'으로 쓴다). <strong>내가 새로 지어낸 한국어보다 굳어진 영어 기술어를 그대로</strong>(<em>바닥선</em>이 아니라 <em>Baseline·Base</em>). 음차·축약은 정식 영문으로(<em>플로차트</em>→<em>Flow Chart</em>, <em>콜러블</em>→<em>callable</em>). 순우리말로 굳이 옮기지 않고 굳어진 기술어를 산다(<em>색인</em>→<em>인덱스/인덱싱</em>, <em>잡</em>→<em>Job</em>, <em>raw</em>→대문자 <em>Raw</em>).</li>
+        <li>영문 기술어와 굳어진 외래어(Astro·Milkdown·ProseMirror, 렌더링·모바일·썸네일·하이라이트·라인·프레임)는 <strong>그대로 둔다</strong>. 코드 한 줄은 '줄'도 '라인'도 좋고, 한 프레임의 <em>칸</em>은 <em>프레임</em>으로. 토박이말로 굳이 바꾸지 않고, 영어 병기(round-trip 등)도 붙이지 않는다('왕복 검증'으로 쓴다). <strong>내가 새로 지어낸 한국어보다 굳어진 영어 기술어를 그대로</strong>(<em>바닥선</em>이 아니라 <em>Baseline·Base</em>). 음차·축약은 정식 영문으로(<em>플로차트</em>→<em>Flow Chart</em>, <em>콜러블</em>→<em>callable</em>). 순우리말로 굳이 옮기지 않고 굳어진 기술어를 산다(<em>색인</em>→<em>인덱스/인덱싱</em>, <em>잡</em>→<em>Job</em>, <em>raw</em>→대문자 <em>Raw</em>).</li>
         <li><strong>제품·모드 고유명은 영문 원형</strong> — <em>챗</em>이 아니라 <em>Chat</em>, <em>노션</em>이 아니라 <em>Notion</em>, <em>데스크톱 앱</em>이 아니라 <em>Claude Desktop App</em>, 그리고 <em>Cowork</em>·<em>Code</em>·<em>PowerPoint</em>·<em>Slack</em>. 첫 등장은 굵게 짚기도(<em>**Snowflake**</em>·<em>**Notion**</em>·<em>**Airbyte**</em>). (일반 기술어를 한국어로 두는 것과 반대 방향이니 헷갈리지 말 것.)</li>
         <li><strong>내가 지어낸 은유어·흔치 않은 음차어는 평이한 말로 편다</strong>(<em>의미 좌표</em>→<em>의미가 담긴 데이터</em>, <em>실패 모드</em>→<em>실패 케이스</em>, <em>음차</em>→<em>변환</em>, <em>프린트 스풀러</em>→<em>프린트 관리자</em>). (과장·비유 동사를 담백하게 푸는 것은 §1에 모아 두었다.)</li>
         <li>붙여 쓰던 합성어는 <strong>띄어 쓰고</strong> 축약은 정식 이름으로 편다 — <em>코드 블록</em>·<em>코드 펜스</em>·<em>위키 링크</em>·<em>해시 맵</em>·<em>웹 서버</em>·<em>운영 체제</em>·<em>파일 관리자</em>. 기기는 <strong>'PC'</strong>(컴퓨터보다), 코드 위 줄은 본문에선 <strong>'헤더'</strong>. 화면·환경은 <strong>'모바일'</strong>(휴대폰에서→모바일에서), 손에 쥔 기기 자체만 <em>'휴대폰을 들고'</em>.</li>
@@ -92,7 +92,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <li>"무엇을 했다"에 그치지 않고 <strong>근거가 되는 실제 코드</strong>를 함께 보인다(지어낸 예시가 아니라 진짜 커밋의 핵심만). 바뀐 지점은 diff(<code>// [!code ++]</code>·<code>// [!code --]</code>), 그대로 보여 줄 줄은 강조(<code>// [!code highlight]</code>).</li>
         <li>핵심 줄을 <strong>문장형 주석으로 풀지 않는다</strong> — 그 줄만 강조로 짚고, 무엇을 왜 했는지는 <strong>코드 아래 본문에</strong> 평서체로 한두 문단 푼다. 설명은 비개발자도 따라오게 쉽게, 추상어(<em>"기준선을 지난 마지막 제목"</em>) 대신 눈에 보이는 동작(<em>"스크롤하면 화면 위로 사라진 마지막 제목"</em>)으로. 비유는 꼭 필요할 때 하나만.</li>
         <li><strong>전문 용어는 첫 등장에 풀이</strong>를 곁들인다 — 한국어 용어를 굵게 짚고 괄호 안 영어 뒤 <strong>세미콜론(;)으로 풀이</strong>를 가른다(<code>**하네스**(harness; AI가 사고 치지 않게 감싸는 규칙 묶음)</code>). 약어는 첫 등장에 <strong>영문 full form</strong>으로 편다(<code>(RAG; …)</code>보다 <code>(Retrieval Augmented Generation; …)</code>). 같은 글에서 한 번 풀면 반복하지 않는다.</li>
-        <li>코드 블록에는 <strong>"이 코드가 결국 무엇을 한다"는 한 문장</strong>을 앞이나 뒤에 둔다(<em>"강조한 한 줄이 판단의 전부다"</em>처럼). 코드를 못 읽는 사람이 건너뛰어도 흐름이 끊기지 않게.</li>
+        <li>코드 블록에는 <strong>"이 코드가 결국 무엇을 한다"는 한 문장</strong>을 앞이나 뒤에 <strong>담백한 사실로</strong> 둔다(<em>"…멈추도록 코드를 짰다"</em>). 멋 부린 요약(<em>"강조한 한 줄이 판단의 전부다"</em>류)은 덜어낸다. 코드를 못 읽는 사람이 건너뛰어도 흐름이 끊기지 않게.</li>
       </ul>
 
       <p class="voice-foot">
