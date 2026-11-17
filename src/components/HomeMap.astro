@@ -117,6 +117,18 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
       </svg>
     </div>
 
+    {/* 좁은 화면: 지도 안의 책 이름표는 글자가 너무 작아져서, 지도 아래에 색 점과 이름을 따로 적는다 */}
+    <ul class="hm-legend" aria-label="책의 색">
+      {
+        map.labels.map((l) => (
+          <li>
+            <i style={`background-color: ${l.hue}`} />
+            {l.name}
+          </li>
+        ))
+      }
+    </ul>
+
     <aside class="hm-panel" aria-live="polite">
       <p class="hm-meta">{first.category} / {first.date} / {first.minutes}분</p>
       <h3><a href={postUrl(first.id)}>{first.title}</a></h3>
@@ -1404,6 +1416,81 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
   .hm.is-wait .hm-panel {
     opacity: 0;
     translate: 0 28px;
+  }
+
+  .hm-legend {
+    display: none;
+  }
+
+  @media (max-width: 860px) {
+    .hm {
+      margin-top: 1rem;
+    }
+    .hm-head h2 {
+      font-size: 1.9rem;
+    }
+    /* 지도: 화면 폭을 다 쓰고 조금 더 높게. 책 이름표는 지도 아래로 뺀다 */
+    /* (지도만 고른다. 그냥 svg라고 쓰면 확대 단추의 아이콘까지 커져서 단추가 비어 보인다) */
+    .hm-canvas > svg {
+      height: 62vw;
+    }
+    .hm-groups {
+      display: none;
+    }
+    /* 지도가 작게 줄어드는 만큼 별을 키워 손가락으로 고를 수 있게 한다 */
+    .hm-dot,
+    .hm-node.is-near .hm-dot,
+    .hm-node:hover .hm-dot {
+      transform: scale(1.7);
+    }
+    .hm-node.is-on .hm-dot {
+      transform: scale(2.3);
+    }
+    .hm-ring {
+      stroke-width: 2;
+    }
+    .hm-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem 0.9rem;
+      margin: 0.9rem 0 0;
+      padding: 0;
+      list-style: none;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .hm-legend li {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4em;
+    }
+    .hm-legend i {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+    /* 확대 단추: 왼쪽 아래에, 손가락으로 누르기 좋은 크기 */
+    .hm-zoom {
+      left: 10px;
+      top: auto;
+      bottom: 10px;
+    }
+    .hm-zoom button,
+    .hm-zoom button + button,
+    .hm-zoom button[data-z='in'],
+    .hm-zoom button[data-z='out'] {
+      width: 38px;
+      min-width: 38px;
+      height: 38px;
+    }
+    .hm-tip {
+      max-width: 86%;
+      font-size: 0.72rem;
+    }
+    .hm-panel h3 {
+      font-size: 1.3rem;
+    }
   }
 
   /* 옆 칸은 내용만큼 길어진다(칸 안에 스크롤이 생기지 않는다). 칸이 지도보다 길면 지도가 따라 내려온다 */

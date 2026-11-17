@@ -68,7 +68,8 @@ document.addEventListener('click', (e) => {
   if (link.hasAttribute('download') || (link.getAttribute('target') ?? '_self') !== '_self') return;
   if (link.closest('.shelf-hero, .write-root')) return; // 서가는 제 전환을 쓰고, 글쓰기 화면은 건드리지 않는다
   // (옆 칸 안에서는 그런 링크도 칸 안에서 넘어가므로 여기서 다룬다)
-  if (!inPane && document.querySelector('.post') && link.matches(SIDE)) return;
+  // 좁은 화면에서는 옆 칸이 열리지 않으므로 그런 링크도 여기서 넘긴다
+  if (!inPane && matchMedia('(min-width: 1100px)').matches && document.querySelector('.post') && link.matches(SIDE)) return;
   const url = new URL(href, location.href);
   if (url.origin !== location.origin || url.pathname === location.pathname) return;
   if (/\.(xml|json|md|txt|png|jpe?g|webp|pdf)$/i.test(url.pathname)) return;

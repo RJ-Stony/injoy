@@ -4,10 +4,16 @@
 import fs from 'node:fs';
 
 const API = 'https://abacus.jasoncameron.dev/get/injoy-rjstony';
+// 한 번도 세어지지 않은 글은 404다(0으로 적는다). 그 밖의 실패(요청이 몰려 거절된 경우 등)는 잠깐 쉬었다가 다시 묻고,
+// 끝내 받지 못하면 멈춘다. 실패를 0으로 적으면 그 글의 조회 수가 사라진다.
 const get = async (key) => {
-  const res = await fetch(`${API}/${key}`);
-  if (!res.ok) return 0; // 한 번도 세어지지 않은 글은 404다
-  return (await res.json()).value ?? 0;
+  for (let i = 0; i < 5; i++) {
+    const res = await fetch(`${API}/${key}`).catch(() => null);
+    if (res?.ok) return (await res.json()).value ?? 0;
+    if (res?.status === 404) return 0;
+    await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+  }
+  throw new Error(`받지 못함: ${key}`);
 };
 
 const slugs = fs
@@ -16,6 +22,7 @@ const slugs = fs
   .map((f) => f.replace(/\.md$/, ''));
 const posts = {};
 for (const slug of slugs) {
+  await new Promise((r) => setTimeout(r, 120));
   posts[slug] = await get(`post-${slug.replace(/[^a-zA-Z0-9_-]/g, '-')}`);
 }
 const out = { takenAt: new Date().toISOString().slice(0, 10), site: await get('site-visits'), posts };

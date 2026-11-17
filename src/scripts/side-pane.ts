@@ -6,6 +6,8 @@
  */
 
 const WIDTH_KEY = 'injoy:pane-w';
+/** 옆 칸을 나란히 세울 수 있는 화면(global.css의 .side-pane과 같은 기준) */
+export const WIDE = '(min-width: 1100px)';
 const LINKS = '.prose a.wiki-link, .prereq a, .connections a[href*="/posts/"]';
 
 export function initSidePane(): void {
@@ -127,6 +129,8 @@ export function initSidePane(): void {
     if (!link || !href) return;
     const url = new URL(href, location.href);
     if (url.origin !== location.origin || url.pathname === location.pathname) return;
+    // 나란히 놓을 폭이 없는 화면(휴대폰, 태블릿)에서는 칸을 열지 않는다. 링크 그대로 그 글로 넘어간다(page-turn.ts)
+    if (!matchMedia(WIDE).matches) return;
 
     e.preventDefault();
     if (!pane) build();

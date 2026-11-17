@@ -134,6 +134,7 @@ const first = data[0];
     let pos = 0; // 서가의 가운데에 오는 자리
     let anim = null;
 
+    const last = []; // 책마다 마지막으로 써 넣은 값. 같으면 다시 쓰지 않는다
     const place = () => {
       tapes.forEach((t, i) => {
         // 돌아 나온 책은 표지만큼 자리를 차지하므로 양옆의 책을 그만큼 밀어낸다
@@ -143,13 +144,18 @@ const first = data[0];
         }
         const e = turn[i];
         // 소수점 자리를 잘라 글자가 떨리지 않게 한다
-        t.style.transform = `translate3d(${x.toFixed(1)}px, ${(-e * H * 0.02).toFixed(1)}px, ${(e * (d * 0.5 + 40)).toFixed(1)}px) rotateZ(${(-2 * e).toFixed(2)}deg) rotateY(${(-80 * e).toFixed(2)}deg)`;
+        const tf = `translate3d(${x.toFixed(1)}px, ${(-e * H * 0.02).toFixed(1)}px, ${(e * (d * 0.5 + 40)).toFixed(1)}px) rotateZ(${(-2 * e).toFixed(2)}deg) rotateY(${(-80 * e).toFixed(2)}deg)`;
+        const was = last[i] || (last[i] = {});
+        if (was.tf !== tf) t.style.transform = was.tf = tf;
+        t.classList.toggle('on', i === sel);
+        const turnKey = e.toFixed(3);
+        if (was.turn === turnKey) return; // 도는 정도가 그대로면 면의 밝기도 그대로다
+        was.turn = turnKey;
         t.children[0].style.setProperty('--shade', (0.26 * e).toFixed(3));
         t.children[1].style.setProperty('--shade', '0.14');
         // 옆면(표지)은 숨기지 않고 어둡게만 둔다. 갑자기 사라지면 책이 끊겨 보인다.
         t.children[2].style.setProperty('--shade', (0.14 * (1 - e)).toFixed(3));
         t.children[2].style.setProperty('--show', Math.min(1, e * 1.6).toFixed(3));
-        t.classList.toggle('on', i === sel);
       });
     };
 
@@ -227,6 +233,7 @@ const first = data[0];
     place();
     root.classList.add('is-live');
     addEventListener('resize', () => {
+      last.length = 0;
       measure();
       if (!anim) pos = C[sel];
       place();
@@ -929,8 +936,22 @@ const first = data[0];
   }
 
   @media (max-width: 767px) {
+    /* 좁은 화면: 책을 화면 폭에 맞춰 크게 세운다. 책등의 글자도 책의 키를 따라 커진다 */
     .shelf-hero {
-      --H: min(64vw, 38svh);
+      --H: min(96vw, 46svh);
+      min-height: calc(100svh - 3.6rem - 2.5rem);
+      padding-bottom: 2rem;
+    }
+
+    /* 휴대폰에서는 면마다 종이 결을 곱해 칠하는 일이 무겁다(책을 넘길 때 버벅인다). 결을 빼고 단색으로 칠한다 */
+    .tape > div.sp,
+    .tape > div.bk {
+      background-image: none;
+      background-blend-mode: normal;
+    }
+
+    .caption {
+      margin-top: calc(var(--H) * 0.08 + 0.6rem);
     }
   }
 </style>
