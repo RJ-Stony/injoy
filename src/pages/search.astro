@@ -83,7 +83,7 @@ for (const post of posts) {
     u && u.startsWith('/') && !u.startsWith(baseNoSlash + '/') ? baseNoSlash + u : u;
 
   const input = document.getElementById('search-input') as HTMLInputElement | null;
-  // 결과를 눌러 글로 갔을 때 찾던 말이 있는 자리를 밝히도록 검색어를 주소에 실어 보낸다(src/scripts/search-flash.ts)
+  // 결과를 눌러 글로 갔을 때 찾던 말이 있는 자리를 밝히도록 검색어를 주소에 실어 보낸다(src/pages/posts/[slug].astro)
   const withTerm = (u: string) => {
     const term = input?.value.trim();
     if (!term) return fixUrl(u);

@@ -133,6 +133,51 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
     <div class="prose rise" style="--i: 4">
       <Content />
     </div>
+    {/* 검색 결과에서 넘어왔을 때(주소의 ?hl=<검색어>, src/pages/search.astro가 붙인다): 찾던 말이 있는 자리로 가서 잠깐 밝혔다가 뺀다.
+        화면이 그려진 뒤에 움직이면 글이 떴다가 자리를 다시 잡는 것처럼 보여서, 본문 바로 뒤에 인라인으로 두어 그려지기 전에 옮긴다.
+        주소에 소제목(#id)이 있으면 그 뒤에서 찾는다. ?hl은 바로 지워서 새로 고쳐도 다시 뜨지 않는다. */}
+    <script is:inline>
+      (() => {
+        const url = new URL(location.href);
+        const term = (url.searchParams.get('hl') || '').trim();
+        if (!term) return;
+        url.searchParams.delete('hl');
+        history.replaceState(history.state, '', url);
+        const prose = document.currentScript.previousElementSibling;
+        const from = location.hash ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
+        // 검색어 전체를 먼저 찾고, 없으면 낱말 하나씩 찾는다(검색은 낱말이 떨어져 있어도 잡는다)
+        const needles = [term].concat(term.split(' ')).map((t) => t.toLowerCase()).filter(Boolean);
+        const find = (needle) => {
+          const walker = document.createTreeWalker(prose, NodeFilter.SHOW_TEXT);
+          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            if (from && !(from.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) && !from.contains(node)) continue;
+            const at = (node.nodeValue || '').toLowerCase().indexOf(needle);
+            if (at < 0) continue;
+            const range = document.createRange();
+            range.setStart(node, at);
+            range.setEnd(node, at + needle.length);
+            return range;
+          }
+          return null;
+        };
+        let range = null;
+        for (const needle of needles) if ((range = find(needle))) break;
+        if (!range) return;
+        const mark = document.createElement('mark');
+        mark.className = 'search-flash is-on';
+        range.surroundContents(mark);
+        // 브라우저가 예전 스크롤 자리나 소제목 자리로 되돌리지 않게 하고, 그 말이 화면 가운데 오게 한다
+        history.scrollRestoration = 'manual';
+        const settle = () => mark.isConnected && mark.scrollIntoView({ block: 'center', behavior: 'instant' });
+        settle();
+        // 글꼴과 그림이 뒤늦게 들어와 자리가 밀리면 한 번 더 맞춘다
+        addEventListener('load', settle, { once: true });
+        setTimeout(() => {
+          mark.classList.remove('is-on');
+          setTimeout(() => mark.replaceWith(...mark.childNodes), 1400); // 빛이 다 빠지면 표시를 걷는다
+        }, 3200);
+      })();
+    </script>
 
     {
       post.data.tags.length > 0 && (
@@ -226,12 +271,10 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
   import { initHoverCards } from '../../scripts/hover-card';
   import { initGlossaryTerms } from '../../scripts/glossary-terms';
   import { initSidePane } from '../../scripts/side-pane';
-  import { flashSearchTerm } from '../../scripts/search-flash';
 
   initHoverCards();
   initGlossaryTerms();
   initSidePane();
-  flashSearchTerm();
 
   const mermaidBlocks = document.querySelectorAll<HTMLPreElement>(
     '.prose pre.astro-code[data-language="mermaid"]',

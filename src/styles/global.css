@@ -1340,7 +1340,7 @@ a:hover {
   }
 }
 
-/* 검색 결과에서 넘어온 글: 찾던 말이 있는 자리를 잠깐 밝혔다가 뺀다(src/scripts/search-flash.ts) */
+/* 검색 결과에서 넘어온 글: 찾던 말이 있는 자리를 잠깐 밝혔다가 뺀다(src/pages/posts/[slug].astro의 인라인 스크립트) */
 .search-flash {
   border-radius: 3px;
   background-color: transparent;

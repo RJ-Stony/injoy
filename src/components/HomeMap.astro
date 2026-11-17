@@ -429,49 +429,55 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     };
     let grab: { x: number; y: number; vx: number; vy: number; id?: string; nx: number; ny: number } | null = null;
     let moved = false;
-    const fingers = new Map<number, { x: number; y: number }>();
+    // 두 손가락으로 벌리고 오므려 확대한다. 시작할 때 두 손가락의 가운데 아래에 있던 자리가 지금의 가운데를 따라온다.
+    // 포인터 이벤트로는 휴대폰에서 받지 못했다(두 손가락을 대면 브라우저가 화면 확대로 가져간다). 터치 이벤트를 직접 받아
+    // 두 손가락일 때만 브라우저의 동작을 막는다. 한 손가락으로 화면을 내리는 것은 그대로 둔다.
     let pinch: { dist: number; wx: number; wy: number; w: number } | null = null;
-    const frac = (p: { x: number; y: number }) => {
+    const two = (e: TouchEvent) => {
       const r = svg.getBoundingClientRect();
-      return { x: (p.x - r.left) / r.width, y: (p.y - r.top) / r.height };
+      const [a, b] = [e.touches[0], e.touches[1]];
+      return {
+        dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1,
+        x: ((a.clientX + b.clientX) / 2 - r.left) / r.width,
+        y: ((a.clientY + b.clientY) / 2 - r.top) / r.height,
+      };
     };
-    const drop = (e: PointerEvent) => {
-      fingers.delete(e.pointerId);
-      if (fingers.size < 2) pinch = null;
-    };
-    svg.addEventListener('pointerdown', (e) => {
-      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (fingers.size === 2) {
-        const [a, b] = [...fingers.values()];
-        const mid = frac({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    svg.addEventListener(
+      'touchstart',
+      (e) => {
+        if (e.touches.length !== 2) return;
+        e.preventDefault();
+        const t = two(e);
         grab = null; // 한 손가락으로 하던 끌기는 그만둔다
         cancelAnimationFrame(zoomRaf);
-        pinch = {
-          dist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
-          wx: view.x + view.w * mid.x,
-          wy: view.y + ((view.w * FH) / FW) * mid.y,
-          w: view.w,
-        };
-        try {
-          svg.setPointerCapture(e.pointerId);
-        } catch {}
-      }
-    });
-    svg.addEventListener('pointermove', (e) => {
-      if (fingers.has(e.pointerId)) fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (!pinch || fingers.size !== 2) return;
-      const [a, b] = [...fingers.values()];
-      const mid = frac({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-      view.w = Math.min(FW, Math.max(FW / 5, (pinch.w * pinch.dist) / (Math.hypot(a.x - b.x, a.y - b.y) || 1)));
-      view.x = pinch.wx - view.w * mid.x;
-      view.y = pinch.wy - ((view.w * FH) / FW) * mid.y;
-      moved = true; // 손을 뗄 때 점이 눌린 것으로 치지 않는다
-      apply();
-    });
-    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) svg.addEventListener(type, drop);
+        pinch = { dist: t.dist, wx: view.x + view.w * t.x, wy: view.y + ((view.w * FH) / FW) * t.y, w: view.w };
+      },
+      { passive: false },
+    );
+    svg.addEventListener(
+      'touchmove',
+      (e) => {
+        if (!pinch || e.touches.length !== 2) return;
+        e.preventDefault();
+        const t = two(e);
+        view.w = Math.min(FW, Math.max(FW / 5, (pinch.w * pinch.dist) / t.dist));
+        view.x = pinch.wx - view.w * t.x;
+        view.y = pinch.wy - ((view.w * FH) / FW) * t.y;
+        moved = true; // 손을 뗄 때 점이 눌린 것으로 치지 않는다
+        apply();
+      },
+      { passive: false },
+    );
+    for (const type of ['touchend', 'touchcancel'] as const) {
+      svg.addEventListener(type, (e) => {
+        if (e.touches.length < 2) pinch = null;
+      });
+    }
+    // 사파리는 두 손가락 동작을 따로 알린다. 이것도 막아야 화면 전체가 확대되지 않는다
+    for (const type of ['gesturestart', 'gesturechange'] as const) svg.addEventListener(type, (e) => e.preventDefault());
 
     svg.addEventListener('pointerdown', (e) => {
-      if (fingers.size > 1) return;
+      if (pinch) return;
       const node = (e.target as Element).closest<SVGAElement>('.hm-node');
       if (!node && view.w >= FW - 1) return;
       const n = node ? byId.get(node.dataset.id!)! : null;
@@ -1527,12 +1533,9 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
       max-width: 86%;
       font-size: 0.72rem;
     }
-    /* 이름표: 글자 크기는 알약에 맞춘 그대로 두고(크기는 --inv가 맞춘다) 화면에서 11px쯤으로 보이게 조금 줄인다 */
-    .hm .hm-groups text {
-      font-size: 14px;
-    }
-    .hm .hm-groups g {
-      transform: scale(calc(var(--inv, 2.8) * 0.8));
+    /* 휴대폰에서는 책 이름표를 빼서 지도를 깔끔하게 둔다(색이 번진 자리로 책을 구분한다) */
+    .hm .hm-groups {
+      display: none;
     }
     .hm-panel h3 {
       font-size: 1.3rem;
