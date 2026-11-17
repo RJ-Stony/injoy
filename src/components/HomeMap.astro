@@ -343,8 +343,9 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     const frame = svg.parentElement!;
     const geo = { k: 1, offX: 0, offY: 0, w: FW, h: FH };
     const measure = () => {
-      geo.w = svg.clientWidth || FW;
-      geo.h = svg.clientHeight || FH;
+      // 칸(div)의 안쪽 크기로 잰다. svg 요소의 clientWidth는 브라우저에 따라 0이 나온다(그러면 그림이 엉뚱한 데로 밀린다)
+      geo.w = frame.clientWidth || FW;
+      geo.h = frame.clientHeight || FH;
       geo.k = Math.min(geo.w / FW, geo.h / FH);
       geo.offX = (geo.w - FW * geo.k) / 2;
       geo.offY = (geo.h - FH * geo.k) / 2;
