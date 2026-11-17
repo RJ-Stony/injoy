@@ -60,6 +60,14 @@ export function initSidePane(): void {
     frame = document.createElement('iframe');
     frame.title = '옆에 연 글';
     // 칸 안에서 다른 글로 넘어가면 제목과 '이 글로 이동'의 주소를 따라 바꾼다
+    window.addEventListener('injoy:theme-change', () => {
+      const doc = frame.contentDocument;
+      const theme = root.dataset.theme;
+      if (!doc || !theme) return;
+      doc.documentElement.dataset.theme = theme;
+      // 칸 안에서 테마를 따라야 하는 것(다이어그램 등)에도 알린다
+      frame.contentWindow?.dispatchEvent(new CustomEvent('injoy:theme-change'));
+    });
     frame.addEventListener('load', () => {
       const doc = frame.contentDocument;
       const path = frame.contentWindow?.location.pathname;

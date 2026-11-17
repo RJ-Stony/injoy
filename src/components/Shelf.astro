@@ -40,7 +40,7 @@ const first = data[0];
     <div class="stage">
       {
         data.map((b, i) => (
-          <a class="tape" href={b.url} draggable="false" data-single={b.single ? '' : undefined} style={`--cloth: ${b.cloth}; --len: ${b.len}`} aria-label={`${b.title}, ${b.sub}`}>
+          <a class="tape" href={b.url} draggable="false" data-single={b.single ? '' : undefined} style={`--cloth: ${b.cloth}; --len: ${b.len}${b.art ? `; --art: url('${b.art}')` : ''}`} data-art={b.art ? '' : undefined} aria-label={`${b.title}, ${b.sub}`}>
             <div class="sp">
               <span class="lab">
                 <span class="t">{b.title}</span>
@@ -792,6 +792,28 @@ const first = data[0];
   .tape[data-single] .cv.has-art .r {
     width: calc(var(--H) * 0.06);
     height: 2px;
+  }
+
+  /* 표지 그림은 책등까지 이어진다. 책등에는 표지의 왼쪽 끝을 뒤집어 깔아, 접힌 자리에서 그림이 끊기지 않는다.
+     (표지와 같은 폭으로 깔아야 그림의 크기가 맞는다) 글자가 묻히지 않게 책의 색을 한 겹 덮는다. */
+  .tape[data-art] .sp::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--art) left top / var(--d) auto no-repeat;
+    transform: scaleX(-1);
+  }
+
+  .tape[data-art] .sp > span {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 낱권은 제목을 그림 위에 바로 찍으므로, 제목 뒤에 책의 색 띠를 깐다 */
+  .tape[data-art][data-single] .sp .lab {
+    padding: calc(var(--H) * 0.02) calc(var(--H) * 0.008);
+    border-radius: 2px;
+    background-color: color-mix(in srgb, var(--cloth) 82%, transparent);
   }
 
   /* ---- 2026-11 개편: 책의 종류 ---- */

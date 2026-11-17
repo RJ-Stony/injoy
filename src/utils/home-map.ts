@@ -155,7 +155,8 @@ export async function getHomeMap() {
       );
     const best = spots.reduce((a, b) => (clear(b) > clear(a) ? b : a));
     taken.push({ ...best, w: half });
-    return { name: g.series, x: Math.round(best.x), y: Math.round(best.y) };
+    // half: 이름표의 반 폭, hue: 그 책의 색(이름표 앞의 색 점)
+    return { name: g.series, x: Math.round(best.x), y: Math.round(best.y), half, hue: cloth.get(g.posts[0].id)! };
   });
 
   return {
