@@ -20,7 +20,9 @@ const data = books.map((b) => {
     url: withBase(b.url),
     cloth: b.cloth,
     n,
-    sub: b.single ? '낱권' : `${n}개의 장`,
+    sub: b.single ? '낱권' : `${n}개의 글`,
+    // 책등에 세워 쓴 제목의 길이(글자 수, 띄어쓰기는 반 글자). 낱권의 글자 크기를 정한다
+    len: [...b.title].reduce((sum, ch) => sum + (ch === ' ' ? 0.55 : 1), 0),
     single: b.single,
     art: coverOf(b.url),
     cta: b.single ? '읽기' : '목차 보기',
@@ -38,7 +40,7 @@ const first = data[0];
     <div class="stage">
       {
         data.map((b, i) => (
-          <a class="tape" href={b.url} draggable="false" data-single={b.single ? '' : undefined} style={`--cloth: ${b.cloth}`} aria-label={`${b.title}, ${b.sub}`}>
+          <a class="tape" href={b.url} draggable="false" data-single={b.single ? '' : undefined} style={`--cloth: ${b.cloth}; --len: ${b.len}`} aria-label={`${b.title}, ${b.sub}`}>
             <div class="sp">
               <span class="lab">
                 <span class="t">{b.title}</span>
@@ -124,7 +126,10 @@ const first = data[0];
     };
 
     // 마지막에 펼친 책에서 다시 시작한다(글에서 서가로 돌아왔을 때 그 책이 가운데 있도록).
-    let sel = clamp(Number(sessionStorage.getItem(KEY)) || 0, 0, N - 1);
+    // 그 밖에는(처음 들어왔거나 메뉴로 돌아왔을 때) 1권부터 보여 준다.
+    const navEntry = performance.getEntriesByType('navigation')[0];
+    const returning = !!sessionStorage.getItem('injoy:opened') || (navEntry && navEntry.type === 'back_forward');
+    let sel = returning ? clamp(Number(sessionStorage.getItem(KEY)) || 0, 0, N - 1) : 0;
     const turn = B.map((_, i) => (i === sel ? 1 : 0)); // 책마다 책장에서 돌아 나온 정도(0~1)
     let pos = 0; // 서가의 가운데에 오는 자리
     let anim = null;
@@ -203,6 +208,7 @@ const first = data[0];
       if (i === sel) return;
       const dir = Math.sign(i - sel);
       sel = i;
+      sessionStorage.setItem(KEY, String(sel)); // 뒤로 가기로 돌아왔을 때 보던 책에서 이어지게
       setCaption(i, dir, false);
       if (reduce) {
         turn.fill(0);
@@ -867,6 +873,15 @@ const first = data[0];
 
   .tape[data-single] .cv .mark {
     left: 11%;
+  }
+
+  /* 낱권의 책등: 제목을 두 줄로 꺾지 않고 한 줄로 세운다. 긴 제목은 책등의 길이에 맞게 글자가 작아진다 */
+  .tape[data-single] .sp .t {
+    max-height: none;
+    white-space: nowrap;
+    /* 세워 쓴 글자 하나는 글자 크기의 1.25배쯤을 차지한다 */
+    font-size: min(calc(var(--ws) * 0.26), calc(var(--H) * 0.5 / var(--len)));
+    font-weight: 700;
   }
 
   @media (max-width: 767px) {

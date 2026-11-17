@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
-import PostCard from '../../../components/PostCard.astro';
+import Sheet from '../../../components/Sheet.astro';
+import PostRows from '../../../components/PostRows.astro';
 import Pagination from '../../../components/Pagination.astro';
 import { getPublishedPosts } from '../../../utils/post';
 
@@ -20,35 +21,12 @@ const { tag } = Astro.params;
 const { page } = Astro.props;
 ---
 
-<BaseLayout title={`#${tag}`} description={`#${tag} 태그가 달린 글 ${page.total}편`}>
-  <section class="tag-head">
-    <h1>#{tag}</h1>
-    <p>{page.total}편의 글</p>
-  </section>
-
-  <section class="post-list" aria-label={`#${tag} 태그 글 목록`}>
-    {page.data.map((post) => <PostCard post={post} />)}
-  </section>
-
-  <Pagination currentPage={page.currentPage} lastPage={page.lastPage} prefix={`/tags/${tag}/`} />
+<BaseLayout title={`#${tag}`} description={`#${tag} 태그가 달린 글 ${page.total}편`} wide>
+  <Sheet rows title={`#${tag}`} eyebrow="태그">
+    <p slot="meta">{page.total}개의 글</p>
+    <section aria-label={`#${tag} 태그 글 목록`}>
+      <PostRows posts={page.data} />
+    </section>
+    <Pagination currentPage={page.currentPage} lastPage={page.lastPage} prefix={`/tags/${tag}/`} />
+  </Sheet>
 </BaseLayout>
-
-<style>
-  .tag-head {
-    padding: 1rem 0 1.5rem;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .tag-head h1 {
-    margin: 0;
-    font-size: 2rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: var(--accent);
-  }
-
-  .tag-head p {
-    margin: 0.4rem 0 0;
-    color: var(--text-muted);
-  }
-</style>

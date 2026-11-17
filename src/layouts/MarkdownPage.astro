@@ -1,5 +1,6 @@
 ---
 import BaseLayout from './BaseLayout.astro';
+import Sheet from '../components/Sheet.astro';
 
 interface Props {
   frontmatter: {
@@ -11,28 +12,18 @@ interface Props {
 const { frontmatter } = Astro.props;
 ---
 
-<BaseLayout title={frontmatter.title} description={frontmatter.description}>
-  <article class="page">
-    <header>
-      <h1>{frontmatter.title}</h1>
-    </header>
-    <div class="prose">
+<BaseLayout title={frontmatter.title} description={frontmatter.description} wide>
+  <Sheet title={frontmatter.title}>
+    <p slot="meta">{frontmatter.description}</p>
+    <article class="prose">
       <slot />
-    </div>
-  </article>
+    </article>
+  </Sheet>
 </BaseLayout>
 
 <style>
-  .page {
-    max-width: var(--width-content);
-    margin-inline: auto;
-  }
-
-  .page h1 {
-    margin: 0.5rem 0 2rem;
-    font-size: clamp(1.7rem, 5vw, 2.2rem);
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1.35;
+  /* 제목 옆에서 바로 시작하게 첫 문단의 위 여백을 없앤다 */
+  .prose > :global(:first-child) {
+    margin-top: 0;
   }
 </style>

@@ -32,6 +32,9 @@ jobs:
         with:
           fetch-depth: 0
       # withastro/action이 설치·빌드 후 pages 아티팩트(github-pages)를 업로드한다.
+      # PUBLIC_GTM_ID: Google Tag Manager 컨테이너 ID. 저장소 변수 GTM_ID가 비어 있으면 태그를 붙이지 않는다.
       - uses: withastro/action@v6
+        env:
+          PUBLIC_GTM_ID: ${{ vars.GTM_ID }}
       - id: deployment
         uses: actions/deploy-pages@v4

@@ -93,7 +93,6 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
         <span aria-hidden="true">←</span>
         {book ? book.title : '서가'}
       </a>
-      {book && <span class="where">{book.chapters.length}개의 장 가운데 {chapterNo}장</span>}
     </nav>
     <header class="post-header">
       <div class="meta-line rise" data-pagefind-ignore>
@@ -111,7 +110,7 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
       </div>
       <h1 class="rise" style="--i: 1">{post.data.title}</h1>
       <p class="description rise" style="--i: 2">{post.data.description}</p>
-      {cover && <Image class="cover" src={cover} alt="" loading="eager" />}
+      {cover && <Image class="cover rise" style="--i: 3" src={cover} alt="" loading="eager" />}
     </header>
 
     {

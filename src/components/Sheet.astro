@@ -1,0 +1,160 @@
+---
+// 책 밖의 화면(목차, 카테고리, 태그, 검색, 용어 사전, 그래프, About)이 함께 쓰는 틀.
+// 맨 위에 구분선, 왼쪽에 제목, 오른쪽에 내용. 구분선이 글 화면과 같은 높이라서 화면을 오갈 때 줄이 이어진다.
+// stack이면 제목을 위에 두고 내용이 폭 전체를 쓴다(그래프처럼 넓어야 하는 화면).
+import Rule from './Rule.astro';
+import { withBase } from '../utils/url';
+
+interface Props {
+  title: string;
+  /** 제목 위의 작은 갈래 이름(카테고리, 태그) */
+  eyebrow?: string;
+  /** 책의 색. 넘기면 제목 아래에 색 띠가 붙고 목록의 강조색이 된다 */
+  cloth?: string;
+  stack?: boolean;
+  /** 내용이 줄마다 따로 올라오는 목록(PostRows)일 때. 아니면 내용 칸이 통째로 올라온다 */
+  rows?: boolean;
+}
+
+const { title, eyebrow, cloth, stack = false, rows = false } = Astro.props;
+---
+
+<div class:list={['sheet', 'leaf', { stack }]} style={cloth ? `--cloth: ${cloth}` : undefined}>
+  <Rule />
+  <header class="leaf-head">
+    <p class="leaf-back rise">
+      <a href={withBase('/')}><span aria-hidden="true">←</span> 서가</a>
+      {eyebrow && <span class="leaf-eyebrow">{eyebrow}</span>}
+    </p>
+    <h1 class="rise" style="--i: 1">{title}</h1>
+    {
+      Astro.slots.has('meta') && (
+        <div class="leaf-meta rise" style="--i: 2">
+          <slot name="meta" />
+        </div>
+      )
+    }
+    {cloth && <div class="leaf-swatch rise" style="--i: 3" />}
+  </header>
+  <div class:list={['leaf-body', { rise: !rows }]} style="--i: 3">
+    <slot />
+  </div>
+</div>
+
+<style>
+  .leaf {
+    --cloth: var(--accent-weak);
+    display: grid;
+    grid-template-columns: minmax(0, 0.62fr) minmax(0, 1.38fr);
+    gap: 2.4rem 4rem;
+    align-items: start;
+  }
+
+  .leaf.stack {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.4rem;
+  }
+
+  .leaf > :global(.rule) {
+    grid-column: 1 / -1;
+  }
+
+  /* 구분선 뒤의 인라인 스크립트가 칸 하나를 차지하지 않게 한다 */
+  .leaf > :global(script) {
+    display: none;
+  }
+
+  .leaf:not(.stack) .leaf-head {
+    position: sticky;
+    top: 6rem;
+  }
+
+  .leaf-back {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0 0 1.3rem;
+    font-size: 0.86rem;
+    font-weight: 700;
+  }
+
+  .leaf-back a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .leaf-back a span {
+    transition: translate 0.25s;
+  }
+
+  .leaf-back a:hover {
+    color: var(--accent);
+  }
+
+  .leaf-back a:hover span {
+    translate: -3px 0;
+  }
+
+  .leaf-eyebrow {
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(1.9rem, 3.4vw, 2.9rem);
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.04em;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+
+  .leaf-meta {
+    margin-top: 1.2rem;
+    color: var(--text-muted);
+    font-size: 1rem;
+    line-height: 1.6;
+    word-break: keep-all;
+  }
+
+  .leaf-meta :global(p) {
+    margin: 0;
+  }
+
+  .leaf-meta :global(p + p) {
+    margin-top: 0.5rem;
+  }
+
+  .leaf-swatch {
+    margin-top: 1.9rem;
+    width: 64px;
+    height: 8px;
+    border-radius: 99px;
+    background-color: var(--cloth);
+  }
+
+  .leaf-body {
+    min-width: 0;
+  }
+
+  .leaf.stack .leaf-meta {
+    max-width: 46rem;
+  }
+
+  @media (max-width: 767px) {
+    .leaf {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2.1rem;
+    }
+
+    .leaf:not(.stack) .leaf-head {
+      position: static;
+    }
+  }
+</style>

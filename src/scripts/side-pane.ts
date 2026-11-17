@@ -18,8 +18,18 @@ export function initSidePane(): void {
   let fullEl: HTMLAnchorElement;
   let opener: HTMLElement | null = null;
 
-  const close = () => {
-    if (!pane || pane.hidden) return;
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let closing = false;
+  const close = async () => {
+    if (!pane || pane.hidden || closing) return;
+    closing = true;
+    // 칸이 오른쪽으로 빠진 뒤에 읽던 글이 제 폭으로 돌아온다
+    if (!calm) {
+      await pane
+        .animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(28px)' }], { duration: 200, easing: 'ease-in' })
+        .finished.catch(() => {});
+    }
+    closing = false;
     pane.hidden = true;
     delete root.dataset.side;
     frame.src = 'about:blank';
@@ -116,6 +126,8 @@ export function initSidePane(): void {
     titleEl.textContent = link.dataset.title ?? link.textContent?.trim() ?? '';
     fullEl.href = url.pathname;
     url.searchParams.set('pane', '1');
+    // 칸 안의 글도 넘어온 화면처럼 줄이 먼저 그어지고 글이 올라오게 기록을 남긴다(Rule.astro, global.css의 sheet-rise)
+    sessionStorage.setItem('injoy:turn', JSON.stringify({ t: Date.now(), rule: null }));
     frame.src = url.href;
     // 머리말의 아랫줄과 옆 칸 막대의 아랫줄이 한 줄로 이어지게 높이를 맞춘다
     const header = document.querySelector<HTMLElement>('.site-header');

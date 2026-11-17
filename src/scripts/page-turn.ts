@@ -61,16 +61,19 @@ document.addEventListener('click', (e) => {
   if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
   const link = (e.target as Element).closest<HTMLAnchorElement>('a[href]');
   const href = link?.getAttribute('href');
-  if (!link || !href || inPane || reduce) return;
+  if (!link || !href || reduce) return;
   if (link.hasAttribute('download') || (link.getAttribute('target') ?? '_self') !== '_self') return;
   if (link.closest('.shelf-hero, .write-root')) return; // 서가는 제 전환을 쓰고, 글쓰기 화면은 건드리지 않는다
-  if (document.querySelector('.post') && link.matches(SIDE)) return;
+  // (옆 칸 안에서는 그런 링크도 칸 안에서 넘어가므로 여기서 다룬다)
+  if (!inPane && document.querySelector('.post') && link.matches(SIDE)) return;
   const url = new URL(href, location.href);
   if (url.origin !== location.origin || url.pathname === location.pathname) return;
   if (/\.(xml|json|md|txt|png|jpe?g|webp|pdf)$/i.test(url.pathname)) return;
 
   e.preventDefault();
   note(400);
+  // 책을 펼쳤다는 표시는 책 안에서만 이어진다. 다른 화면을 거쳐 홈에 가면 서가는 처음 모습으로 뜬다
+  if (!inPane && !isBook(location.pathname)) sessionStorage.removeItem('injoy:opened');
   // 책에서 서가(홈)로 나갈 때는 펼칠 때의 거꾸로다. 글이 올라왔던 자리로 다시 내려가며 사라지고,
   // 그 뒤에 홈에서 종이가 표지로 접힌다. 그 밖의 이동은 위로 빠진다.
   const home = document.querySelector<HTMLAnchorElement>('.site-header .logo');

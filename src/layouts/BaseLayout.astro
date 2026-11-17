@@ -28,6 +28,9 @@ const categories = await getCategories();
 // 이 빌드의 커밋 sha — '보러 가기'가 새 빌드가 실제로 떴는지 확인하는 표식(deploy-toast.confirmLive).
 // GitHub Actions 빌드에선 GITHUB_SHA가 곧 발행 커밋이고, 로컬 dev에선 빈 값(확인은 라이브에서만 의미).
 const buildSha = process.env.GITHUB_SHA ?? '';
+// Google Tag Manager 컨테이너 ID(GTM-XXXXXXX). 비어 있으면 태그를 붙이지 않는다.
+// 배포할 때는 저장소 변수 GTM_ID가 PUBLIC_GTM_ID로 들어온다(.github/workflows/deploy.yml). GA4는 GTM 안에서 붙인다.
+const gtmId = (import.meta.env.PUBLIC_GTM_ID ?? '').trim();
 // 지금 보고 있는 메뉴에 표시를 한다
 const here = (path: string) => (Astro.url.pathname.startsWith(withBase(path)) ? 'page' : undefined);
 ---
@@ -70,9 +73,9 @@ const here = (path: string) => (Astro.url.pathname.startsWith(withBase(path)) ? 
             if (!href || href.startsWith('#') || e.defaultPrevented) return;
             const url = new URL(href, location.href);
             if (url.origin === location.origin && url.pathname.includes('/posts/')) {
-              e.preventDefault();
+              // 주소만 칸 안의 것으로 바꿔 둔다. 글이 빠지는 효과와 이동은 page-turn.ts가 맡는다
               url.searchParams.set('pane', '1');
-              location.href = url.href;
+              a.setAttribute('href', url.href);
             } else {
               a.setAttribute('target', '_top');
             }
@@ -80,6 +83,55 @@ const here = (path: string) => (Astro.url.pathname.startsWith(withBase(path)) ? 
         }
       })();
     </script>
+
+    <!-- 날짜를 '4개월 전'처럼 바꿔 적는 함수. 날짜 바로 뒤의 인라인 스크립트가 불러서(PostMeta.astro)
+         화면이 그려지기 전에 채운다. 늦게 도는 스크립트에 두면 날짜가 먼저 보였다가 바뀐다. -->
+    <script is:inline>
+      window.injoyRel = (el) => {
+        const t = new Date(el.getAttribute('datetime') || '').getTime();
+        if (Number.isNaN(t)) return;
+        const now = Date.now();
+        const sec = Math.floor((now - t) / 1000);
+        let out;
+        // 시각이 있는 수정(24시간 안)은 지난 초로 잰다
+        if (el.dataset.fine === '1' && sec >= 0 && sec < 86400) {
+          out = sec < 5 ? '방금' : sec < 60 ? sec + '초 전' : sec < 3600 ? Math.floor(sec / 60) + '분 전' : Math.floor(sec / 3600) + '시간 전';
+        } else {
+          // 날짜 단위는 이곳 시각의 자정을 기준으로 달력 날짜의 차이를 잰다
+          const a = new Date(now);
+          a.setHours(0, 0, 0, 0);
+          const b = new Date(t);
+          b.setHours(0, 0, 0, 0);
+          const day = Math.round((a.getTime() - b.getTime()) / 86400000);
+          if (day <= 0) out = '오늘';
+          else if (day === 1) out = '어제';
+          else if (day < 7) out = day + '일 전';
+          else if (day < 30) out = Math.floor(day / 7) + '주 전';
+          else if (day < 365) out = Math.floor(day / 30) + '개월 전';
+          else {
+            const d = new Date(t);
+            out = d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
+          }
+        }
+        el.textContent = (el.dataset.prefix || '') + out;
+      };
+    </script>
+
+    {
+      gtmId && (
+        <script is:inline define:vars={{ gtmId }}>
+          // 옆 칸(iframe) 안의 글은 따로 세지 않는다. 바깥 화면이 이미 센다.
+          if (window.self === window.top) {
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
+            const tag = document.createElement('script');
+            tag.async = true;
+            tag.src = 'https://www.googletagmanager.com/gtm.js?id=' + gtmId;
+            document.head.append(tag);
+          }
+        </script>
+      )
+    }
 
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
@@ -133,6 +185,18 @@ const here = (path: string) => (Astro.url.pathname.startsWith(withBase(path)) ? 
     <slot name="head" />
   </head>
   <body>
+    {
+      gtmId && (
+        <noscript>
+          <iframe
+            src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
+            height="0"
+            width="0"
+            style="display:none;visibility:hidden"
+          />
+        </noscript>
+      )
+    }
     <a class="skip-link" href="#main">본문으로 건너뛰기</a>
 
     <header class="site-header">

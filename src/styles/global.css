@@ -1252,6 +1252,20 @@ a:hover {
   display: none;
 }
 
+/* 칸은 오른쪽에서 밀려 들어온다 */
+@keyframes pane-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .side-pane:not([hidden]) {
+    animation: pane-in 0.34s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}
+
 .side-pane-bar {
   display: flex;
   align-items: center;

@@ -4,17 +4,20 @@
  * 각 항목은 term을 슬러그화한 id를 달아, 다른 글의 용어 하버카드(C8)가 여기로 앵커 링크한다.
  */
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Sheet from '../components/Sheet.astro';
 import { getGlossary, termSlug } from '../utils/glossary';
 import { withBase } from '../utils/url';
 
 const entries = await getGlossary();
 ---
 
-<BaseLayout title="용어 사전" description="Injoy 글에 나온 전문 용어와 짧은 풀이를 한곳에 모았어요.">
-  <section class="glossary">
-    <h1>용어 사전</h1>
-    <p class="glossary-sub">글에 나오는 전문 용어들을 모아봤어요.</p>
+<BaseLayout title="용어 사전" description="Injoy 글에 나온 전문 용어와 짧은 풀이를 한곳에 모았어요." wide>
+  <Sheet title="용어 사전">
+  <Fragment slot="meta">
+    <p>글에 나오는 전문 용어들을 모아봤어요.</p>
     <p class="stats" id="glossary-stats"><span><strong>{entries.length}</strong> 용어</span></p>
+  </Fragment>
+  <section class="glossary">
 
     <div class="search-box">
       <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
@@ -50,6 +53,7 @@ const entries = await getGlossary();
       }
     </dl>
   </section>
+  </Sheet>
 </BaseLayout>
 
 <script>
@@ -81,8 +85,7 @@ const entries = await getGlossary();
 
 <style>
   .glossary {
-    max-width: var(--width-content);
-    margin: 0 auto;
+    margin: 0;
   }
   .glossary h1 {
     font-size: clamp(1.7rem, 5vw, 2.2rem);
@@ -97,7 +100,7 @@ const entries = await getGlossary();
 
   /* 그래프 페이지 헤더 스탯 라인과 같은 결 */
   .stats {
-    margin: 0 0 1.6rem;
+    margin: 0;
     display: flex;
     align-items: center;
     gap: 0.6em;

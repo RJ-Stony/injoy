@@ -9,6 +9,7 @@
  * pagefind.js 로드가 실패하면 안내 문구로 우아하게 대체한다.
  * 결과 URL은 dist 기준(/posts/..)이라 base('/injoy')를 앞에 붙여 바로잡는다.
  */
+import Sheet from '../components/Sheet.astro';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getPublishedPosts } from '../utils/post';
 
@@ -26,10 +27,10 @@ for (const post of posts) {
 }
 ---
 
-<BaseLayout title="검색" description="Injoy의 글을 제목과 본문에서 찾아보세요.">
+<BaseLayout title="검색" description="Injoy의 글을 제목과 본문에서 찾아보세요." wide>
+  <Sheet title="검색">
+  <p slot="meta">글 제목과 본문에서 찾아요.</p>
   <section class="search-page">
-    <h1>검색</h1>
-    <p class="search-sub">글 제목과 본문에서 찾아요.</p>
 
     <div class="search-box">
       <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
@@ -70,6 +71,7 @@ for (const post of posts) {
       <code>npm run build &amp;&amp; npm run preview</code>로 확인하세요.
     </p>
   </section>
+  </Sheet>
 </BaseLayout>
 
 <script>
@@ -410,8 +412,7 @@ for (const post of posts) {
 
 <style>
   .search-page {
-    max-width: var(--width-content);
-    margin: 0 auto;
+    margin: 0;
   }
 
   .search-page h1 {

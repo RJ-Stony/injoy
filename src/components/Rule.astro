@@ -12,7 +12,7 @@
     try {
       const el = document.currentScript.previousElementSibling;
       const turn = JSON.parse(sessionStorage.getItem('injoy:turn') || 'null');
-      if (!turn || Date.now() - turn.t > 6000 || window.self !== window.top) return;
+      if (!turn || Date.now() - turn.t > 6000) return;
       if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       const r = el.getBoundingClientRect();
       const from = turn.rule
