@@ -19,8 +19,10 @@ const dust = Array.from({ length: 90 }, (_, i) => ({
 }));
 // 글 하나가 별 하나: 네 갈래로 뻗는 빛살의 모양(가운데가 잘록한 네 꼭지 별)
 const ray = (r: number) => {
-  const R = (r * 2.5).toFixed(1);
-  return `M0,-${R} Q0,0 ${R},0 Q0,0 0,${R} Q0,0 -${R},0 Q0,0 0,-${R} Z`;
+  const v = (r * 3.4).toFixed(1); // 세로 빛살
+  const h = (r * 2.3).toFixed(1); // 가로 빛살
+  const w = (r * 0.13).toFixed(2); // 가운데의 굵기
+  return `M0,-${v} L${w},-${w} L${h},0 L${w},${w} L0,${v} L-${w},${w} L-${h},0 L-${w},-${w} Z`;
 };
 ---
 
@@ -88,8 +90,9 @@ const ray = (r: number) => {
                 style={`--hue: ${n.hue}`}
               >
                 <circle class="hm-hit" cx={n.x} cy={n.y} r={Math.max(n.r + 6, 13)} />
-                <g class="hm-ray-at" transform={`translate(${n.x} ${n.y})`}>
-                  <path class="hm-ray" d={ray(n.r)} style={`--dl: ${((i * 0.37) % 4).toFixed(2)}s`} />
+                <g class="hm-ray-at" transform={`translate(${n.x} ${n.y})`} style={`--dl: ${((i * 0.37) % 4).toFixed(2)}s`}>
+                  <circle class="hm-halo" r={n.r * 1.9} />
+                  <path class="hm-ray" d={ray(n.r)} />
                 </g>
                 <circle class="hm-dot" cx={n.x} cy={n.y} r={n.r} />
               </a>
@@ -385,7 +388,7 @@ const ray = (r: number) => {
       n.y = Math.min(FH - 12, Math.max(12, y));
       const el = dots.find((d) => d.dataset.id === id)!;
       el.querySelector('.hm-ray-at')?.setAttribute('transform', `translate(${n.x} ${n.y})`);
-      for (const c of el.querySelectorAll('circle')) {
+      for (const c of el.querySelectorAll('.hm-hit, .hm-dot')) {
         c.setAttribute('cx', String(n.x));
         c.setAttribute('cy', String(n.y));
       }
@@ -1172,6 +1175,107 @@ const ray = (r: number) => {
     }
     .hm-node:not(.is-on):not(:hover) .hm-ray {
       animation: hm-glint 4.2s ease-in-out var(--dl) infinite;
+    }
+  }
+
+  /* ---- 별: 테두리 두른 구슬이 아니라, 작게 빛나는 심과 번지는 빛, 가늘고 긴 빛살 ----
+     밝은 바탕에서는 심과 빛살을 책의 색보다 짙게 칠해 종이 위의 별 그림처럼, 어두운 바탕에서는 흰빛에 가깝게 칠한다. */
+  .hm {
+    --star-mix: var(--text);
+    --star-amt: 38%;
+  }
+  .hm-dot,
+  .hm-node.is-near .hm-dot,
+  .hm-node.is-on .hm-dot {
+    stroke: none;
+    fill: color-mix(in srgb, var(--star-mix) var(--star-amt), var(--hue));
+    filter: none;
+    transform: scale(0.42);
+    opacity: 1 !important;
+  }
+  .hm-node.is-near .hm-dot,
+  .hm-node:hover .hm-dot {
+    transform: scale(0.52);
+  }
+  .hm-node.is-on .hm-dot {
+    transform: scale(0.62);
+  }
+  .hm-halo {
+    fill: var(--hue);
+    opacity: 0.6;
+    filter: blur(5px);
+    transition: opacity 0.35s;
+  }
+  .hm-ray,
+  .hm-node:hover .hm-ray,
+  .hm-node.is-near .hm-ray {
+    fill: color-mix(in srgb, var(--star-mix) var(--star-amt), var(--hue));
+    opacity: 0.9;
+    transform: none;
+  }
+  .hm-ray-at {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .hm-node:hover .hm-ray,
+  .hm-node.is-near .hm-ray {
+    transform: scale(1.2);
+  }
+  .hm-node.is-on .hm-ray {
+    fill: var(--text);
+    transform: scale(1.7);
+  }
+  .hm-node.is-on .hm-halo,
+  .hm-node:hover .hm-halo {
+    opacity: 1;
+  }
+  .hm-node.is-on .hm-dot {
+    fill: var(--text);
+  }
+  .hm-edges line,
+  .hm.has-pick .hm-edges line {
+    stroke-width: 0.6;
+    opacity: 0.32;
+  }
+  .hm.has-pick .hm-edges line.is-on {
+    stroke-width: 1.4;
+  }
+  .hm-wash {
+    opacity: 0.2;
+  }
+  @keyframes hm-glint {
+    50% {
+      opacity: 0.4;
+      scale: 0.7;
+    }
+  }
+  @keyframes hm-breathe {
+    50% {
+      opacity: 0.3;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .hm-node:not(.is-on):not(:hover) .hm-ray {
+      animation: hm-glint 4.2s ease-in-out var(--dl) infinite;
+    }
+    .hm-node:not(.is-on):not(:hover) .hm-halo {
+      animation: hm-breathe 4.2s ease-in-out var(--dl) infinite;
+    }
+  }
+  :root[data-theme='dark'] .hm {
+    --star-mix: #fff;
+    --star-amt: 72%;
+  }
+  :root[data-theme='dark'] .hm-wash {
+    opacity: 0.12;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .hm {
+      --star-mix: #fff;
+      --star-amt: 72%;
+    }
+    :root:not([data-theme='light']) .hm-wash {
+      opacity: 0.12;
     }
   }
 
