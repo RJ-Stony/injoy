@@ -185,11 +185,14 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     const tip = root.querySelector<HTMLElement>('.hm-tip')!;
     const mapSvg = root.querySelector<SVGSVGElement>('.hm-canvas > svg')!;
     let tipNode: Node | null = null;
+    // 점이 지도 칸의 어디쯤(0~1)에 보이는지. 확대와 이동을 맡는 아래쪽 코드가 채운다
+    let spot: (n: Node) => { fx: number; fy: number } = (n) => {
+      const vb = mapSvg.viewBox.baseVal;
+      return { fx: n.x / vb.width, fy: n.y / vb.height };
+    };
     const placeTip = () => {
       if (!tipNode) return;
-      const vb = mapSvg.viewBox.baseVal;
-      const fx = (tipNode.x - vb.x) / vb.width;
-      const fy = (tipNode.y - vb.y) / vb.height;
+      const { fx, fy } = spot(tipNode);
       tip.textContent = tipNode.title;
       tip.hidden = fx < 0 || fx > 1 || fy < 0 || fy > 1;
       tip.style.left = `${fx * 100}%`;
@@ -332,45 +335,58 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
       const h = (view.w * FH) / FW;
       view.x = Math.min(FW - view.w, Math.max(0, view.x));
       view.y = Math.min(FH - h, Math.max(0, view.y));
-      return h;
     };
-    // 손가락이나 마우스로 옮기고 확대하는 동안에는 지도를 다시 그리지 않는다. 번지는 빛(흐림 필터)이 많아서
-    // 움직일 때마다 다시 그리면 휴대폰에서 끊긴다. 이미 그려 둔 그림을 통째로 옮기고 늘이다가(transform),
-    // 손을 떼면 그 자리에서 한 번만 새로 그린다(commit).
-    const drawn = { x: 0, y: 0, w: FW }; // 지금 그려져 있는 범위
-    let live: { k: number; offX: number; offY: number } | null = null;
-    const preview = () => {
-      clampView();
-      if (!live) {
-        const m = svg.getScreenCTM()!;
-        const box = svg.getBoundingClientRect();
-        // k: 지도 한 칸이 화면에서 몇 픽셀인지. off: 지도가 칸 안에서 가운데로 밀린 만큼
-        live = { k: m.a, offX: m.e + drawn.x * m.a - box.left, offY: m.f + drawn.y * m.d - box.top };
-        svg.style.transformOrigin = '0 0';
-        svg.style.willChange = 'transform';
-        tip.hidden = true;
-      }
-      const s = drawn.w / view.w;
-      const tx = (drawn.x - view.x) * live.k * s + live.offX * (1 - s);
-      const ty = (drawn.y - view.y) * live.k * s + live.offY * (1 - s);
-      svg.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${s.toFixed(4)})`;
+    // 지도는 전체를 한 번만 그려 둔다. 옮기고 확대하는 것은 그 그림을 옮기고 늘이는 것(transform)으로만 한다.
+    // 번지는 빛(흐림 필터)이 많아서 보이는 범위를 바꿀 때마다 새로 그리면 휴대폰에서 끊기고,
+    // 보이는 범위만 그려 두면 옮길 때 가장자리가 비어 보인다. 전체가 그려져 있으니 어디로 옮겨도 빈 데가 없다.
+    // geo: 그림이 칸 안에 놓인 모양. k는 지도 한 칸이 화면에서 몇 픽셀인지, off는 가운데로 밀린 만큼
+    const frame = svg.parentElement!;
+    const geo = { k: 1, offX: 0, offY: 0, w: FW, h: FH };
+    const measure = () => {
+      geo.w = svg.clientWidth || FW;
+      geo.h = svg.clientHeight || FH;
+      geo.k = Math.min(geo.w / FW, geo.h / FH);
+      geo.offX = (geo.w - FW * geo.k) / 2;
+      geo.offY = (geo.h - FH * geo.k) / 2;
     };
-    const commit = () => {
-      if (!live) return;
-      live = null;
-      svg.style.transform = '';
+    /** 화면의 한 점이 지금 보이는 범위의 어디쯤(0~1)인지 */
+    const frac = (clientX: number, clientY: number) => {
+      const box = frame.getBoundingClientRect();
+      return [
+        (clientX - box.left - frame.clientLeft - geo.offX) / (geo.k * FW),
+        (clientY - box.top - frame.clientTop - geo.offY) / (geo.k * FH),
+      ] as const;
+    };
+    /** 화면의 픽셀 거리 → 지도의 거리 */
+    const unit = () => view.w / (geo.k * FW);
+    spot = (n) => {
+      const z = FW / view.w;
+      return {
+        fx: (geo.offX + (n.x - view.x) * geo.k * z) / geo.w,
+        fy: (geo.offY + (n.y - view.y) * geo.k * z) / geo.h,
+      };
+    };
+    svg.style.transformOrigin = '0 0';
+    let settleTimer = 0;
+    // 움직임이 멎으면: 늘인 그림을 그 배율로 또렷하게 다시 그리게 하고(will-change를 떼면 브라우저가 다시 그린다),
+    // 책 이름표의 크기를 맞춘다. 이 일들은 그림을 다시 그리게 만들므로 움직이는 동안에는 하지 않는다.
+    const settle = () => {
       svg.style.willChange = '';
-      apply();
+      // 지도 한 칸이 화면에서 몇 픽셀인지의 역수. 책 이름표가 이만큼 커져서 화면에서는 늘 같은 크기로 보인다
+      svg.style.setProperty('--inv', unit().toFixed(3));
+      fitLabels();
     };
     const apply = () => {
-      const h = clampView();
-      Object.assign(drawn, view);
-      svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${h}`);
+      clampView();
+      const z = FW / view.w;
+      const tx = -view.x * geo.k * z + geo.offX * (1 - z);
+      const ty = -view.y * geo.k * z + geo.offY * (1 - z);
+      svg.style.willChange = 'transform';
+      svg.style.transform = z > 1.0005 ? `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${z.toFixed(4)})` : '';
       svg.classList.toggle('is-zoomed', view.w < FW - 1);
-      // 지도 한 칸이 화면에서 몇 픽셀인지의 역수. 책 이름표가 이만큼 커져서 화면에서는 늘 같은 크기로 보인다
-      svg.style.setProperty('--inv', (view.w / (svg.clientWidth || FW)).toFixed(3));
-      fitLabels();
       placeTip();
+      clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(settle, 220);
     };
     // 화면의 한 점(cx, cy: 0~1)을 그대로 둔 채 배율을 바꾼다
     const zoomAt = (factor: number, cx = 0.5, cy = 0.5) => {
@@ -408,13 +424,14 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
       const w = Math.min(FW, Math.max(FW / 5, view.w * factor));
       glideTo({ w, x: view.x + view.w * cx - w * cx, y: view.y + h * cy - ((w * FH) / FW) * cy });
     };
-    const at = (e: MouseEvent) => {
-      const r = svg.getBoundingClientRect();
-      return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height] as const;
-    };
+    const at = (e: MouseEvent) => frac(e.clientX, e.clientY);
     zoomBox.hidden = false;
+    measure();
     apply();
-    addEventListener('resize', apply);
+    addEventListener('resize', () => {
+      measure();
+      apply();
+    });
     zoomBox.addEventListener('click', (e) => {
       const z = (e.target as HTMLElement).closest<HTMLElement>('button')?.dataset.z;
       if (z === 'in') glideZoom(0.7);
@@ -466,23 +483,16 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     // 포인터 이벤트로는 휴대폰에서 받지 못했다(두 손가락을 대면 브라우저가 화면 확대로 가져간다). 터치 이벤트를 직접 받아
     // 두 손가락일 때만 브라우저의 동작을 막는다. 한 손가락으로 화면을 내리는 것은 그대로 둔다.
     let pinch: { dist: number; wx: number; wy: number; w: number } | null = null;
-    let pinchBox: DOMRect | null = null; // 두 손가락을 댄 순간의 지도 칸(늘이기 전)
     const two = (e: TouchEvent) => {
-      const r = pinchBox ?? svg.getBoundingClientRect();
       const [a, b] = [e.touches[0], e.touches[1]];
-      return {
-        dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1,
-        x: ((a.clientX + b.clientX) / 2 - r.left) / r.width,
-        y: ((a.clientY + b.clientY) / 2 - r.top) / r.height,
-      };
+      const [x, y] = frac((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+      return { dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1, x, y };
     };
     svg.addEventListener(
       'touchstart',
       (e) => {
         if (e.touches.length !== 2) return;
         e.preventDefault();
-        commit();
-        pinchBox = svg.getBoundingClientRect();
         const t = two(e);
         grab = null; // 한 손가락으로 하던 끌기는 그만둔다
         cancelAnimationFrame(zoomRaf);
@@ -500,16 +510,13 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
         view.x = pinch.wx - view.w * t.x;
         view.y = pinch.wy - ((view.w * FH) / FW) * t.y;
         moved = true; // 손을 뗄 때 점이 눌린 것으로 치지 않는다
-        preview();
+        apply();
       },
       { passive: false },
     );
     for (const type of ['touchend', 'touchcancel'] as const) {
       svg.addEventListener(type, (e) => {
-        if (e.touches.length >= 2) return;
-        pinch = null;
-        pinchBox = null;
-        commit();
+        if (e.touches.length < 2) pinch = null;
       });
     }
     // 사파리는 두 손가락 동작을 따로 알린다. 이것도 막아야 화면 전체가 확대되지 않는다
@@ -525,9 +532,8 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     });
     window.addEventListener('pointermove', (e) => {
       if (!grab || pinch) return;
-      const r = svg.getBoundingClientRect();
-      const dx = ((e.clientX - grab.x) / r.width) * view.w;
-      const dy = ((e.clientY - grab.y) / r.height) * ((view.w * FH) / FW);
+      const dx = (e.clientX - grab.x) * unit();
+      const dy = (e.clientY - grab.y) * unit();
       if (Math.abs(e.clientX - grab.x) + Math.abs(e.clientY - grab.y) > 5) moved = true;
       if (!moved) return;
       if (grab.id) {
@@ -536,12 +542,11 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
       } else {
         view.x = grab.vx - dx;
         view.y = grab.vy - dy;
-        preview();
+        apply();
       }
     });
     window.addEventListener('pointerup', () => {
       if (grab?.id && moved) paint(selected);
-      if (grab && !grab.id) commit();
       grab = null;
     });
     // 끌고 난 끝의 클릭 한 번은 버린다(끌었는데 글이 바뀌지 않게)
