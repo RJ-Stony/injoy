@@ -10,7 +10,9 @@ const books = await getBooks();
 // 표지 그림: public/covers/<열쇠>.webp가 있으면 쓴다(scripts/make-covers.mjs가 만든다). 없으면 단색 표지와 꼬리표.
 const coverOf = (url: string) => {
   const key = url.split('/').filter(Boolean).pop()!;
-  return fs.existsSync(`public/covers/${key}.webp`) ? withBase(`/covers/${key}.webp`) : null;
+  if (!fs.existsSync(`public/covers/${key}.webp`)) return null;
+  const small = fs.existsSync(`public/covers/${key}-s.webp`) ? `/covers/${key}-s.webp` : `/covers/${key}.webp`;
+  return { large: withBase(`/covers/${key}.webp`), small: withBase(small) };
 };
 const data = books.map((b) => {
   const n = b.chapters.length;
@@ -35,12 +37,24 @@ const data = books.map((b) => {
 const first = data[0];
 ---
 
+{/* 표지 그림은 CSS 배경이라 그냥 두면 스타일을 다 읽은 뒤에야 받기 시작한다. 미리 받아 책이 뜰 때 그림도 함께 뜨게 한다 */}
+{
+  data.map(
+    (b, i) =>
+      b.art && (
+        <Fragment>
+          <link rel="preload" as="image" href={b.art.large} media="(min-width: 768px)" fetchpriority={i === 0 ? 'high' : undefined} />
+          <link rel="preload" as="image" href={b.art.small} media="(max-width: 767px)" fetchpriority={i === 0 ? 'high' : undefined} />
+        </Fragment>
+      ),
+  )
+}
 <section class="shelf-hero" aria-label="책장">
   <div class="shelf">
     <div class="stage">
       {
         data.map((b, i) => (
-          <a class="tape" href={b.url} draggable="false" data-single={b.single ? '' : undefined} style={`--cloth: ${b.cloth}; --len: ${b.len}${b.art ? `; --art: url('${b.art}')` : ''}`} data-art={b.art ? '' : undefined} aria-label={`${b.title}, ${b.sub}`}>
+          <a class="tape" href={b.url} draggable="false" data-single={b.single ? '' : undefined} style={`--cloth: ${b.cloth}; --len: ${b.len}${b.art ? `; --art-l: url('${b.art.large}'); --art-s: url('${b.art.small}')` : ''}`} data-art={b.art ? '' : undefined} aria-label={`${b.title}, ${b.sub}`}>
             <div class="sp">
               <span class="lab">
                 <span class="t">{b.title}</span>
@@ -48,7 +62,7 @@ const first = data[0];
               <span class="no">{String(i + 1).padStart(2, '0')}</span>
             </div>
             <div class="bk" />
-            <div class:list={['cv', { 'has-art': !!b.art }]} style={b.art ? `--art: url('${b.art}')` : undefined}>
+            <div class:list={['cv', { 'has-art': !!b.art }]}>
               <span class="label">
                 <span class="k">Injoy / {String(i + 1).padStart(2, '0')}</span>
                 <span class="t">{b.title}</span>
@@ -805,6 +819,7 @@ const first = data[0];
 
   .tape[data-art] {
     /* 그림(정사각형)의 한 변. 표지의 폭(0.68H)과 가장 두꺼운 책등(0.365H)을 합친 것보다 조금 크다 */
+    --art: var(--art-l);
     --art-h: calc(var(--bh, var(--H)) * 1.06);
   }
 
@@ -941,6 +956,10 @@ const first = data[0];
       --H: min(96vw, 46svh);
       min-height: calc(100svh - 3.6rem - 2.5rem);
       padding-bottom: 2rem;
+    }
+
+    .tape[data-art] {
+      --art: var(--art-s);
     }
 
     /* 휴대폰에서는 면마다 종이 결을 곱해 칠하는 일이 무겁다(책을 넘길 때 버벅인다). 결을 빼고 단색으로 칠한다 */

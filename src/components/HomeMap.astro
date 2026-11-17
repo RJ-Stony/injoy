@@ -117,18 +117,6 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
       </svg>
     </div>
 
-    {/* 좁은 화면: 지도 안의 책 이름표는 글자가 너무 작아져서, 지도 아래에 색 점과 이름을 따로 적는다 */}
-    <ul class="hm-legend" aria-label="책의 색">
-      {
-        map.labels.map((l) => (
-          <li>
-            <i style={`background-color: ${l.hue}`} />
-            {l.name}
-          </li>
-        ))
-      }
-    </ul>
-
     <aside class="hm-panel" aria-live="polite">
       <p class="hm-meta">{first.category} / {first.date} / {first.minutes}분</p>
       <h3><a href={postUrl(first.id)}>{first.title}</a></h3>
@@ -326,6 +314,19 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     const zoomBox = root.querySelector<HTMLElement>('.hm-zoom')!;
     const [FW, FH] = svg.getAttribute('viewBox')!.split(' ').slice(2).map(Number);
     const view = { x: 0, y: 0, w: FW };
+    // 지도가 작은 화면에서는 이름표가 화면에서 같은 크기를 지키느라 지도 밖으로 삐져나갈 수 있다.
+    // 전체를 보고 있을 때는 지도 안으로 밀어 넣는다(확대했을 때는 화면 밖에 있는 것이 맞으므로 그대로 둔다).
+    const groupTags = [...root.querySelectorAll<SVGGElement>('.hm-groups g')];
+    const fitLabels = () => {
+      const box = svg.getBoundingClientRect();
+      for (const g of groupTags) {
+        g.style.translate = '';
+        if (view.w < FW - 1 || box.width === 0) continue;
+        const r = g.getBoundingClientRect();
+        const dx = r.left < box.left + 6 ? box.left + 6 - r.left : r.right > box.right - 6 ? box.right - 6 - r.right : 0;
+        if (dx) g.style.translate = `${((dx * view.w) / box.width).toFixed(1)}px 0`;
+      }
+    };
     const apply = () => {
       view.w = Math.min(FW, Math.max(FW / 5, view.w));
       const h = (view.w * FH) / FW;
@@ -333,6 +334,9 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
       view.y = Math.min(FH - h, Math.max(0, view.y));
       svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${h}`);
       svg.classList.toggle('is-zoomed', view.w < FW - 1);
+      // 지도 한 칸이 화면에서 몇 픽셀인지의 역수. 책 이름표가 이만큼 커져서 화면에서는 늘 같은 크기로 보인다
+      svg.style.setProperty('--inv', (view.w / (svg.clientWidth || FW)).toFixed(3));
+      fitLabels();
       placeTip();
     };
     // 화면의 한 점(cx, cy: 0~1)을 그대로 둔 채 배율을 바꾼다
@@ -376,6 +380,8 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
       return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height] as const;
     };
     zoomBox.hidden = false;
+    apply();
+    addEventListener('resize', apply);
     zoomBox.addEventListener('click', (e) => {
       const z = (e.target as HTMLElement).closest<HTMLElement>('button')?.dataset.z;
       if (z === 'in') glideZoom(0.7);
@@ -423,7 +429,49 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     };
     let grab: { x: number; y: number; vx: number; vy: number; id?: string; nx: number; ny: number } | null = null;
     let moved = false;
+    const fingers = new Map<number, { x: number; y: number }>();
+    let pinch: { dist: number; wx: number; wy: number; w: number } | null = null;
+    const frac = (p: { x: number; y: number }) => {
+      const r = svg.getBoundingClientRect();
+      return { x: (p.x - r.left) / r.width, y: (p.y - r.top) / r.height };
+    };
+    const drop = (e: PointerEvent) => {
+      fingers.delete(e.pointerId);
+      if (fingers.size < 2) pinch = null;
+    };
     svg.addEventListener('pointerdown', (e) => {
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (fingers.size === 2) {
+        const [a, b] = [...fingers.values()];
+        const mid = frac({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+        grab = null; // 한 손가락으로 하던 끌기는 그만둔다
+        cancelAnimationFrame(zoomRaf);
+        pinch = {
+          dist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+          wx: view.x + view.w * mid.x,
+          wy: view.y + ((view.w * FH) / FW) * mid.y,
+          w: view.w,
+        };
+        try {
+          svg.setPointerCapture(e.pointerId);
+        } catch {}
+      }
+    });
+    svg.addEventListener('pointermove', (e) => {
+      if (fingers.has(e.pointerId)) fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (!pinch || fingers.size !== 2) return;
+      const [a, b] = [...fingers.values()];
+      const mid = frac({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+      view.w = Math.min(FW, Math.max(FW / 5, (pinch.w * pinch.dist) / (Math.hypot(a.x - b.x, a.y - b.y) || 1)));
+      view.x = pinch.wx - view.w * mid.x;
+      view.y = pinch.wy - ((view.w * FH) / FW) * mid.y;
+      moved = true; // 손을 뗄 때 점이 눌린 것으로 치지 않는다
+      apply();
+    });
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) svg.addEventListener(type, drop);
+
+    svg.addEventListener('pointerdown', (e) => {
+      if (fingers.size > 1) return;
       const node = (e.target as Element).closest<SVGAElement>('.hm-node');
       if (!node && view.w >= FW - 1) return;
       const n = node ? byId.get(node.dataset.id!)! : null;
@@ -431,7 +479,7 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
       moved = false;
     });
     window.addEventListener('pointermove', (e) => {
-      if (!grab) return;
+      if (!grab || pinch) return;
       const r = svg.getBoundingClientRect();
       const dx = ((e.clientX - grab.x) / r.width) * view.w;
       const dy = ((e.clientY - grab.y) / r.height) * ((view.w * FH) / FW);
@@ -1418,8 +1466,23 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     translate: 0 28px;
   }
 
-  .hm-legend {
-    display: none;
+  /* 책 이름표는 지도가 줄거나 커져도 화면에서 같은 크기다(--inv는 스크립트가 넣는다). 글자는 13px쯤으로 보인다 */
+  .hm-groups g {
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scale(calc(var(--inv, 1.1) * 0.92));
+  }
+  .hm-groups text,
+  .hm-groups rect,
+  .hm-groups circle {
+    vector-effect: non-scaling-stroke;
+  }
+  /* 한 손가락으로는 화면을 내리고, 두 손가락으로는 지도를 확대한다. 확대한 뒤에는 한 손가락으로 지도를 옮긴다 */
+  .hm-canvas > svg {
+    touch-action: pan-y;
+  }
+  .hm-canvas > svg.is-zoomed {
+    touch-action: none;
   }
 
   @media (max-width: 860px) {
@@ -1432,10 +1495,7 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     /* 지도: 화면 폭을 다 쓰고 조금 더 높게. 책 이름표는 지도 아래로 뺀다 */
     /* (지도만 고른다. 그냥 svg라고 쓰면 확대 단추의 아이콘까지 커져서 단추가 비어 보인다) */
     .hm-canvas > svg {
-      height: 62vw;
-    }
-    .hm-groups {
-      display: none;
+      height: max(62vw, 240px);
     }
     /* 지도가 작게 줄어드는 만큼 별을 키워 손가락으로 고를 수 있게 한다 */
     .hm-dot,
@@ -1448,27 +1508,6 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     }
     .hm-ring {
       stroke-width: 2;
-    }
-    .hm-legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem 0.9rem;
-      margin: 0.9rem 0 0;
-      padding: 0;
-      list-style: none;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-    .hm-legend li {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4em;
-    }
-    .hm-legend i {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
     }
     /* 확대 단추: 왼쪽 아래에, 손가락으로 누르기 좋은 크기 */
     .hm-zoom {
@@ -1487,6 +1526,13 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     .hm-tip {
       max-width: 86%;
       font-size: 0.72rem;
+    }
+    /* 이름표: 글자 크기는 알약에 맞춘 그대로 두고(크기는 --inv가 맞춘다) 화면에서 11px쯤으로 보이게 조금 줄인다 */
+    .hm .hm-groups text {
+      font-size: 14px;
+    }
+    .hm .hm-groups g {
+      transform: scale(calc(var(--inv, 2.8) * 0.8));
     }
     .hm-panel h3 {
       font-size: 1.3rem;

@@ -83,6 +83,14 @@ for (const post of posts) {
     u && u.startsWith('/') && !u.startsWith(baseNoSlash + '/') ? baseNoSlash + u : u;
 
   const input = document.getElementById('search-input') as HTMLInputElement | null;
+  // 결과를 눌러 글로 갔을 때 찾던 말이 있는 자리를 밝히도록 검색어를 주소에 실어 보낸다(src/scripts/search-flash.ts)
+  const withTerm = (u: string) => {
+    const term = input?.value.trim();
+    if (!term) return fixUrl(u);
+    const url = new URL(fixUrl(u), location.href);
+    url.searchParams.set('hl', term);
+    return url.pathname + url.search + url.hash;
+  };
   const countEl = document.getElementById('search-count');
   const resultsEl = document.getElementById('search-results');
   const moreBtn = document.getElementById('search-more') as HTMLButtonElement | null;
@@ -266,7 +274,7 @@ for (const post of posts) {
 
       const title = document.createElement('a');
       title.className = 'sr-title';
-      title.href = fixUrl(d.url);
+      title.href = withTerm(d.url);
       title.textContent = d.meta?.title || d.url;
       card.appendChild(title);
 
@@ -293,7 +301,7 @@ for (const post of posts) {
           sub.className = 'sr-sub';
           const st = document.createElement('a');
           st.className = 'sr-sub-title';
-          st.href = fixUrl(sr.url);
+          st.href = withTerm(sr.url);
           st.textContent = sr.title;
           const se = document.createElement('div');
           se.className = 'sr-sub-ex';

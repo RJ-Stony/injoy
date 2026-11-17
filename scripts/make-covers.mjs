@@ -21,5 +21,7 @@ for (const [i, book] of data.entries()) {
   // 열쇠: 책 주소의 마지막 마디(시리즈는 /series/<이름>/, 낱권은 /posts/<슬러그>/)
   const key = decodeURIComponent(book.url.replace(/\/$/, '').split('/').pop());
   await sharp(file).resize(1200, 1200, { fit: 'cover', position: 'right top' }).webp({ quality: 82 }).toFile(`public/covers/${key}.webp`);
+  // 휴대폰용 작은 그림. 책이 작게 그려지는 화면에서 큰 그림을 받아 줄여 그리지 않게 한다
+  await sharp(file).resize(640, 640, { fit: 'cover', position: 'right top' }).webp({ quality: 78 }).toFile(`public/covers/${key}-s.webp`);
   console.log('만듦', `public/covers/${key}.webp`, '←', book.title);
 }

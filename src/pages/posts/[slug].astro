@@ -226,10 +226,12 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
   import { initHoverCards } from '../../scripts/hover-card';
   import { initGlossaryTerms } from '../../scripts/glossary-terms';
   import { initSidePane } from '../../scripts/side-pane';
+  import { flashSearchTerm } from '../../scripts/search-flash';
 
   initHoverCards();
   initGlossaryTerms();
   initSidePane();
+  flashSearchTerm();
 
   const mermaidBlocks = document.querySelectorAll<HTMLPreElement>(
     '.prose pre.astro-code[data-language="mermaid"]',
