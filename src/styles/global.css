@@ -1,6 +1,6 @@
 /* ==========================================================================
    Injoy — 전역 디자인 토큰 & 기본 스타일
-   스펙 4장의 토큰을 그대로 사용한다. 임의 변경 금지.
+   2026-11 개편: 종이색 바탕과 먹색 글자. 책의 표지 색은 src/utils/books.ts에 있다.
    ========================================================================== */
 
 /*
@@ -12,14 +12,14 @@
  */
 :root {
   /* Light (기본) */
-  --bg: #ffffff;
-  --surface: #f6f7f9;
-  --text: #1a1b1e;
-  --text-muted: #6b7178;
-  --border: #e8eaed;
-  --accent: #2f6fed;
-  --accent-weak: #eaf1fe;
-  --code-bg: #f4f5f7;
+  --bg: #faf8f4;
+  --surface: #fffdf9;
+  --text: #1c1d21;
+  --text-muted: #6f737b;
+  --border: #e9e4db;
+  --accent: #3c5488;
+  --accent-weak: #e8ecf3;
+  --code-bg: #f3efe8;
 
   /* 엣지(연결) 타입별 색 — graph 캔버스·범례·연결 칩이 공유하는 단일 출처 */
   --edge-extends: #2f6fed;
@@ -50,14 +50,14 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #16181c;
-  --surface: #1e2127;
-  --text: #e8eaed;
+  --bg: #1b1b1d;
+  --surface: #242427;
+  --text: #ebe8e2;
   --text-muted: #9aa0a6;
-  --border: #2a2d34;
-  --accent: #5b8def;
-  --accent-weak: #1e2a44;
-  --code-bg: #1b1e24;
+  --border: #35353a;
+  --accent: #a9bde6;
+  --accent-weak: #2a3040;
+  --code-bg: #202023;
   --edge-extends: #5b8def;
   --edge-supports: #3fc08a;
   --edge-refines: #38c0d6;
@@ -70,14 +70,14 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #16181c;
-    --surface: #1e2127;
-    --text: #e8eaed;
+    --bg: #1b1b1d;
+    --surface: #242427;
+    --text: #ebe8e2;
     --text-muted: #9aa0a6;
-    --border: #2a2d34;
-    --accent: #5b8def;
-    --accent-weak: #1e2a44;
-    --code-bg: #1b1e24;
+    --border: #35353a;
+    --accent: #a9bde6;
+    --accent-weak: #2a3040;
+    --code-bg: #202023;
     --edge-extends: #5b8def;
     --edge-supports: #3fc08a;
     --edge-refines: #38c0d6;
@@ -125,13 +125,63 @@ html {
    지원 브라우저(Chromium 126+)에서만 동작하고 나머지는 평소처럼 즉시 전환된다.
    -------------------------------------------------------------------------- */
 
+/* 2026-11 개편: 브라우저의 화면 전환은 끈다. 화면 사이의 움직임은 직접 그린다
+   (src/scripts/page-turn.ts, src/components/Shelf.astro, src/components/Rule.astro).
+   둘을 함께 켜면 효과가 겹쳐 화면이 튀어 보인다. */
 @view-transition {
-  navigation: auto;
+  navigation: none;
 }
 
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 0.16s;
+  animation-duration: 0.32s;
+}
+
+/* 서가에서 책을 펼칠 때 화면을 덮는 종이(src/components/Shelf.astro가 만든다). 머리말(z-index 50)은 그대로 보인다. */
+.page-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background-color: var(--bg);
+  pointer-events: none;
+}
+
+/* 화면과 화면을 잇는 구분선(src/scripts/page-turn.ts가 앞 화면의 자리에서 미끄러져 오게 한다) */
+.rule {
+  display: block;
+  height: 1px;
+  background-color: var(--text);
+}
+
+/* 사이트 안의 다른 화면에서 넘어왔을 때(html[data-arrive], BaseLayout의 인라인 스크립트가 붙인다)
+   글이 한 줄씩 올라온다. 목차에서 글로, 글에서 목차로 갈 때도 같다. */
+@keyframes sheet-rise {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* 책(목차와 글): 구분선이 제자리에 온 뒤에 글줄이 한 줄씩 올라온다 */
+  html[data-arrive] .sheet .rise {
+    animation: sheet-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: calc(0.44s + var(--i, 0) * 50ms);
+  }
+
+  /* 글 화면에서 따로 떠 있던 것들(읽는 시간과 조회수, 본문 아래의 묶음, 오른쪽 목차)도 줄이 자리 잡은 뒤에 올라온다 */
+  html[data-arrive] .sheet .meta-stats,
+  html[data-arrive] .post > :not(.rule):not(.post-header):not(.rise):not(script),
+  html[data-arrive] .toc-aside {
+    animation: sheet-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.6s both;
+  }
+
+  /* 그 밖의 화면(검색, 그래프, 용어 사전, 카테고리, About, 홈의 그래프): 내용이 한 번에 올라온다 */
+  html[data-arrive] main > :not(.sheet):not(.post-grid):not(.shelf-hero):not(.hm) {
+    animation: sheet-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) 0.06s both;
+  }
+
+
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -139,6 +189,15 @@ html {
     navigation: none;
   }
 }
+
+/* 홈의 서가는 화면 전체 폭(100vw)을 써서 세로 스크롤 막대만큼 넘친다. 가로 스크롤이 생기지 않게 자른다. */
+html {
+  overflow-x: clip;
+  /* 스크롤 막대의 자리를 늘 비워 둔다. 긴 화면과 짧은 화면을 오가도 머리말과 내용이 옆으로 밀리지 않는다 */
+  scrollbar-gutter: stable;
+}
+
+
 
 body {
   margin: 0;
@@ -216,8 +275,15 @@ a:hover {
    -------------------------------------------------------------------------- */
 
 .prose {
-  font-size: inherit;
-  line-height: 1.8;
+  font-size: 1.03em;
+  line-height: 1.9;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 굵은 글씨는 형광펜으로 그은 것처럼 옅게 밑칠한다(표와 코드 안은 제외) */
+.prose :is(p, li) > strong {
+  box-shadow: inset 0 -0.5em 0 color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .prose > * + * {
@@ -233,8 +299,9 @@ a:hover {
 
 .prose h2 {
   font-size: 1.5em;
-  font-weight: 700;
-  margin-block-start: 2.6em;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-block-start: 2.8em;
   padding-block-start: 0.2em;
 }
 
@@ -1159,4 +1226,115 @@ a:hover {
   .injoy-toast.out {
     transform: translateX(-50%);
   }
+}
+
+/* --------------------------------------------------------------------------
+   나란히 읽기 — 글에서 다른 글로 가는 링크를 누르면 옆 칸(.side-pane)에 연다.
+   칸은 스크립트가 만들기 때문에(src/scripts/side-pane.ts) 전역 스타일로 둔다.
+   html[data-side]: 옆 칸이 열린 바깥 화면 / html[data-pane]: 옆 칸 안에 뜬 글.
+   -------------------------------------------------------------------------- */
+
+:root {
+  --pane-w: clamp(420px, 46vw, 760px);
+}
+
+/* 좁은 화면: 읽던 글 위에 전체 화면으로 쌓는다 */
+.side-pane {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg);
+}
+
+.side-pane[hidden] {
+  display: none;
+}
+
+.side-pane-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-sizing: border-box;
+  height: var(--bar-h, 3.8rem);
+  padding: 0 1.25rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+
+.side-pane-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.side-pane-full {
+  flex-shrink: 0;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.side-pane-close {
+  flex-shrink: 0;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.side-pane iframe {
+  flex: 1;
+  width: 100%;
+  border: 0;
+}
+
+/* 넓은 화면: 오른쪽에 칸을 세우고, 읽던 글은 남은 왼쪽 폭에 다시 놓는다 */
+@media (min-width: 1100px) {
+  .side-pane {
+    inset: 0 0 0 auto;
+    width: var(--pane-w);
+    border-left: 1px solid var(--border);
+  }
+
+  html[data-side] body {
+    padding-right: var(--pane-w);
+  }
+
+  html[data-side] main.wide {
+    max-width: none;
+  }
+
+  html[data-side] .post-grid {
+    grid-template-columns: minmax(0, var(--width-content));
+  }
+
+  html[data-side] .toc-aside {
+    display: none;
+  }
+
+  /* 화면 오른쪽 끝에 붙는 읽기 도구가 칸 밑에 깔리지 않게 칸 왼쪽으로 옮긴다 */
+  html[data-side] .reading-dial {
+    right: calc(var(--pane-w) + 1.25rem);
+  }
+}
+
+html[data-pane] .site-header,
+html[data-pane] .site-footer,
+html[data-pane] .post-nav,
+html[data-pane] .comments,
+html[data-pane] .reading-dial,
+html[data-pane] .reading-progress {
+  display: none;
+}
+
+html[data-pane] main {
+  padding-top: 1.5rem;
 }

@@ -1,0 +1,876 @@
+---
+// 홈의 서가 — 시리즈 하나가 책 한 권. 가운데 책은 책장에서 뽑혀 나와 3D로 돌아 표지를 보여 준다.
+// 스크립트가 없으면 책은 그냥 링크다. 책을 펼치면 표지가 다음 화면(.sheet)으로 이어지는 화면 전환을 쓴다.
+import fs from 'node:fs';
+import { getBooks } from '../utils/books';
+import { formatDateShort } from '../utils/post';
+import { withBase } from '../utils/url';
+
+const books = await getBooks();
+// 표지 그림: public/covers/<열쇠>.webp가 있으면 쓴다(scripts/make-covers.mjs가 만든다). 없으면 단색 표지와 꼬리표.
+const coverOf = (url: string) => {
+  const key = url.split('/').filter(Boolean).pop()!;
+  return fs.existsSync(`public/covers/${key}.webp`) ? withBase(`/covers/${key}.webp`) : null;
+};
+const data = books.map((b) => {
+  const n = b.chapters.length;
+  const latest = b.chapters[n - 1];
+  return {
+    title: b.title,
+    url: withBase(b.url),
+    cloth: b.cloth,
+    n,
+    sub: b.single ? '낱권' : `${n}개의 장`,
+    single: b.single,
+    art: coverOf(b.url),
+    cta: b.single ? '읽기' : '목차 보기',
+    desc: latest.data.description,
+    latest: latest.data.title,
+    latestUrl: withBase(`/posts/${latest.id}/`),
+    year: formatDateShort(latest.data.pubDate).slice(0, 4),
+  };
+});
+const first = data[0];
+---
+
+<section class="shelf-hero" aria-label="서가">
+  <div class="shelf">
+    <div class="stage">
+      {
+        data.map((b, i) => (
+          <a class="tape" href={b.url} draggable="false" data-single={b.single ? '' : undefined} style={`--cloth: ${b.cloth}`} aria-label={`${b.title}, ${b.sub}`}>
+            <div class="sp">
+              <span class="lab">
+                <span class="t">{b.title}</span>
+              </span>
+              <span class="no">{String(i + 1).padStart(2, '0')}</span>
+            </div>
+            <div class="bk" />
+            <div class:list={['cv', { 'has-art': !!b.art }]} style={b.art ? `--art: url('${b.art}')` : undefined}>
+              <span class="label">
+                <span class="k">Injoy / {String(i + 1).padStart(2, '0')}</span>
+                <span class="t">{b.title}</span>
+                <span class="r" />
+                <span class="m">
+                  {b.sub} / {b.year}
+                </span>
+              </span>
+              <span class="mark">Injoy</span>
+            </div>
+            <div class="tp" />
+          </a>
+        ))
+      }
+    </div>
+  </div>
+
+  <div class="caption">
+    <h1 class="mask"><span>{first.title}</span></h1>
+    <p class="desc mask">
+      <span>
+        {first.single ? first.desc : <Fragment>최근에 작성한 글 - <a href={first.latestUrl}>{first.latest}</a></Fragment>}
+      </span>
+    </p>
+    <div class="actions">
+      <button type="button" class="arrow prev" aria-label="앞의 책">←</button>
+      <a class="open" href={first.url}>{first.cta}</a>
+      <button type="button" class="arrow next" aria-label="다음 책">→</button>
+    </div>
+  </div>
+
+  <noscript>
+    <ul class="shelf-plain">
+      {data.map((b) => <li><a href={b.url}>{b.title}</a> ({b.sub})</li>)}
+    </ul>
+  </noscript>
+
+  <script type="application/json" id="shelf-data" set:html={JSON.stringify(data).replace(/</g, '\\u003c')} />
+</section>
+
+<!-- 첫 화면이 그려지기 전에 책의 자리를 잡아야(뒤로 왔을 때 표지에서 이어지는 전환도) 해서 인라인으로 둔다. -->
+<script is:inline>
+  (() => {
+    const B = JSON.parse(document.getElementById('shelf-data').textContent);
+    const N = B.length;
+    const root = document.querySelector('.shelf-hero');
+    const shelf = root.querySelector('.shelf');
+    const stage = root.querySelector('.stage');
+    const tapes = [...root.querySelectorAll('.tape')];
+    const openLink = root.querySelector('.open');
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+    const KEY = 'injoy:book';
+    // 책을 바꾸는 데 걸리는 시간. 옆 책이든 여러 권 건너뛰든, 마우스든 화살표든 같다.
+    const DUR = 760;
+    const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+    // 책의 두께는 장의 수를 따른다. 책마다 두께가 달라서 자리는 누적해서 잰다.
+    let H, d, gap;
+    const W = [];
+    const C = [];
+    const measure = () => {
+      H = shelf.offsetHeight - 64;
+      d = H * 0.68;
+      gap = H * 0.022;
+      stage.style.setProperty('--d', d + 'px');
+      let x = 0;
+      B.forEach((b, i) => {
+        W[i] = H * (0.14 + 0.0125 * Math.min(b.n, 18));
+        C[i] = x + W[i] / 2;
+        x += W[i] + gap;
+        tapes[i].style.setProperty('--ws', W[i] + 'px');
+        tapes[i].style.setProperty('--fs', clamp(W[i] * 0.24, 10.5, H * 0.042) + 'px');
+      });
+    };
+
+    // 마지막에 펼친 책에서 다시 시작한다(글에서 서가로 돌아왔을 때 그 책이 가운데 있도록).
+    let sel = clamp(Number(sessionStorage.getItem(KEY)) || 0, 0, N - 1);
+    const turn = B.map((_, i) => (i === sel ? 1 : 0)); // 책마다 책장에서 돌아 나온 정도(0~1)
+    let pos = 0; // 서가의 가운데에 오는 자리
+    let anim = null;
+
+    const place = () => {
+      tapes.forEach((t, i) => {
+        // 돌아 나온 책은 표지만큼 자리를 차지하므로 양옆의 책을 그만큼 밀어낸다
+        let x = C[i] - pos;
+        for (let j = 0; j < N; j++) {
+          if (j !== i && turn[j] > 0) x += turn[j] * Math.sign(i - j) * (d / 2 - W[j] / 2 + gap * 3);
+        }
+        const e = turn[i];
+        // 소수점 자리를 잘라 글자가 떨리지 않게 한다
+        t.style.transform = `translate3d(${x.toFixed(1)}px, ${(-e * H * 0.02).toFixed(1)}px, ${(e * (d * 0.5 + 40)).toFixed(1)}px) rotateZ(${(-2 * e).toFixed(2)}deg) rotateY(${(-80 * e).toFixed(2)}deg)`;
+        t.children[0].style.setProperty('--shade', (0.26 * e).toFixed(3));
+        t.children[1].style.setProperty('--shade', '0.14');
+        // 옆면(표지)은 숨기지 않고 어둡게만 둔다. 갑자기 사라지면 책이 끊겨 보인다.
+        t.children[2].style.setProperty('--shade', (0.14 * (1 - e)).toFixed(3));
+        t.children[2].style.setProperty('--show', Math.min(1, e * 1.6).toFixed(3));
+        t.classList.toggle('on', i === sel);
+      });
+    };
+
+    const setCaption = (i, dir, instant) => {
+      const b = B[i];
+      openLink.href = b.url;
+      openLink.textContent = b.cta;
+      // 시리즈는 '최근에 작성한 글 - 제목(링크)', 낱권은 그 글의 설명
+      const fill = (el, text) => {
+        if (el !== descEl || b.single) return void (el.textContent = text);
+        const a = document.createElement('a');
+        a.href = b.latestUrl;
+        a.textContent = b.latest;
+        el.replaceChildren('최근에 작성한 글 - ', a);
+      };
+      const descEl = root.querySelector('.desc span');
+      const lines = [
+        [root.querySelector('h1 span'), b.title],
+        [descEl, b.desc],
+      ];
+      lines.forEach(([el, text], k) => {
+        el.getAnimations().forEach((a) => a.cancel());
+        if (reduce || instant) return void fill(el, text);
+        el.animate([{ transform: 'translateY(0)' }, { transform: `translateY(${-110 * dir}%)` }], {
+          duration: 240,
+          easing: 'ease-in',
+          fill: 'forwards',
+        })
+          .finished.then(() => {
+            fill(el, text);
+            el.animate([{ transform: `translateY(${110 * dir}%)` }, { transform: 'translateY(0)' }], {
+              duration: 560,
+              delay: k * 50,
+              easing: 'cubic-bezier(.2,.8,.2,1)',
+              fill: 'both',
+            });
+          })
+          .catch(() => {});
+      });
+    };
+
+    const frame = (now) => {
+      if (!anim) return;
+      const p = Math.min(1, (now - anim.t0) / DUR);
+      const k = ease(p);
+      for (let i = 0; i < N; i++) turn[i] = anim.from[i] + ((i === sel ? 1 : 0) - anim.from[i]) * k;
+      pos = anim.pos + (C[sel] - anim.pos) * k;
+      place();
+      if (p < 1) requestAnimationFrame(frame);
+      else anim = null;
+    };
+
+    // 책을 고른다. 고르기만 하고 펼치지는 않는다.
+    const select = (i) => {
+      i = clamp(i, 0, N - 1);
+      if (i === sel) return;
+      const dir = Math.sign(i - sel);
+      sel = i;
+      setCaption(i, dir, false);
+      if (reduce) {
+        turn.fill(0);
+        turn[sel] = 1;
+        pos = C[sel];
+        return place();
+      }
+      const idle = !anim;
+      anim = { t0: performance.now(), from: turn.slice(), pos };
+      if (idle) requestAnimationFrame(frame);
+    };
+
+    measure();
+    pos = C[sel];
+    setCaption(sel, 1, true);
+    place();
+    root.classList.add('is-live');
+    addEventListener('resize', () => {
+      measure();
+      if (!anim) pos = C[sel];
+      place();
+    });
+
+    // 펼치기: 표지와 같은 크기, 같은 색의 판이 기울기를 펴면서 종이색으로 바뀌어 화면을 덮은 뒤에 이동한다.
+    // 다음 화면도 같은 종이색으로 시작하므로 넘어가는 순간이 보이지 않는다. 돌아오면 거꾸로 표지로 접힌다.
+    const SHEET = 'cubic-bezier(.76,0,.18,1)';
+    const paper = () => getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    const insetOf = (r) => `inset(${r.top}px ${innerWidth - r.right}px ${innerHeight - r.bottom}px ${r.left}px round 3px)`;
+    let sheet = null;
+    const sheetAt = (r) => {
+      if (!sheet) {
+        sheet = document.createElement('div');
+        sheet.className = 'page-sheet';
+        document.body.append(sheet);
+      }
+      sheet.getAnimations().forEach((a) => a.cancel());
+      sheet.style.transformOrigin = `${r.left + r.width / 2}px ${r.top + r.height / 2}px`;
+      return sheet;
+    };
+    const open = (e, to) => {
+      const b = B[sel];
+      const url = typeof to === 'string' ? to : b.url; // '최근에 작성한 글' 링크는 그 글로 바로 간다
+      const cv = tapes[sel].children[2];
+      // 넘어간다는 기록을 남긴다. 다음 화면의 구분선이 왼쪽에서 그어지고 글이 올라온다(src/components/Rule.astro)
+      const note = (wait) =>
+        sessionStorage.setItem('injoy:turn', JSON.stringify({ t: Date.now() + wait, rule: null }));
+      sessionStorage.setItem(KEY, String(sel));
+      sessionStorage.setItem('injoy:opened', '1');
+      note(0);
+      if (reduce || e.ctrlKey || e.metaKey || e.shiftKey) return; // 링크 그대로 이동
+      e.preventDefault();
+      note(900);
+      const pre = document.createElement('link');
+      pre.rel = 'prefetch';
+      pre.href = url;
+      document.head.append(pre);
+      const r = cv.getBoundingClientRect();
+      sheetAt(r)
+        .animate(
+          [
+            { clipPath: insetOf(r), transform: 'rotate(-2deg)', backgroundColor: b.cloth, opacity: 0 },
+            { opacity: 1, offset: 0.12 },
+            { backgroundColor: paper(), offset: 0.7 },
+            { clipPath: 'inset(0 0 0 0 round 0)', transform: 'rotate(0)', backgroundColor: paper(), opacity: 1 },
+          ],
+          { duration: 820, easing: SHEET, fill: 'both' },
+        )
+        .finished.then(() => (location.href = url));
+    };
+    const close = () => {
+      sessionStorage.removeItem('injoy:opened');
+      if (reduce) {
+        if (sheet) sheet.remove();
+        sheet = null;
+        return;
+      }
+      const b = B[sel];
+      const r = tapes[sel].children[2].getBoundingClientRect();
+      sheetAt(r)
+        .animate(
+          [
+            { clipPath: 'inset(0 0 0 0 round 0)', transform: 'rotate(0)', backgroundColor: paper(), opacity: 1 },
+            { backgroundColor: b.cloth, offset: 0.55 },
+            { opacity: 1, offset: 0.86 },
+            { clipPath: insetOf(r), transform: 'rotate(-2deg)', backgroundColor: b.cloth, opacity: 0 },
+          ],
+          { duration: 780, easing: SHEET, fill: 'both' },
+        )
+        .finished.then(() => {
+          if (sheet) sheet.remove();
+          sheet = null;
+        })
+        .catch(() => {});
+    };
+    // 처음 뜰 때의 등장: 책이 한 권씩 아래에서 올라와 꽂히고, 그 뒤에 제목과 단추가 올라온다.
+    // (책 전체에 투명도를 주면 입체가 납작해지므로, 움직임은 책에, 투명도는 면에 준다)
+    const enter = () => {
+      if (reduce) return;
+      const out = 'cubic-bezier(.2,.8,.2,1)';
+      tapes.forEach((t, i) => {
+        const delay = 80 + Math.abs(i - sel) * 70;
+        t.animate([{ translate: '0 54px' }, { translate: '0 0' }], { duration: 820, delay, easing: out, fill: 'backwards' });
+        for (const face of t.children) {
+          face.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 520, delay, easing: 'ease-out', fill: 'backwards' });
+        }
+      });
+      [...root.querySelectorAll('.caption > *')].forEach((el, k) =>
+        el.animate([{ opacity: 0, transform: 'translateY(22px)' }, { opacity: 1, transform: 'none' }], {
+          duration: 700,
+          delay: 420 + k * 70,
+          easing: out,
+          fill: 'backwards',
+        }),
+      );
+    };
+
+    // 책을 펼쳤다가 돌아왔을 때는 종이가 표지로 접히고(새로 뜬 화면이면 여기서, 저장된 화면이 다시 뜨면 pageshow에서),
+    // 그 밖에는 책이 올라와 꽂히는 등장을 보여 준다.
+    if (sessionStorage.getItem('injoy:opened')) close();
+    else enter();
+    addEventListener('pageshow', (e) => {
+      if (e.persisted && sheet) close();
+    });
+    let pressedSel = null; // 누르기 시작한 순간에 뽑혀 있던 책
+    let pointer = false;
+    let drag = null;
+    let dragged = false;
+    tapes.forEach((t, i) => {
+      t.addEventListener('pointerdown', () => {
+        pressedSel = sel;
+        pointer = true;
+      });
+      t.addEventListener('click', (e) => {
+        const was = pressedSel === null ? sel : pressedSel;
+        pressedSel = null;
+        if (dragged) return void e.preventDefault();
+        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+        // 이미 뽑혀 있던 책을 눌렀을 때만 펼친다. 꽂혀 있던 책은 먼저 고르기만 한다.
+        if (i === was && i === sel && !anim) return open(e);
+        e.preventDefault();
+        select(i);
+      });
+      // 키보드(Tab)로 옮겨 온 책은 고른다. 마우스로 누를 때의 포커스는 위의 click이 맡는다.
+      t.addEventListener('focus', () => {
+        if (!pointer) select(i);
+      });
+    });
+    openLink.addEventListener('click', open);
+    root.querySelector('.desc').addEventListener('click', (e) => {
+      const a = e.target.closest('a');
+      if (a) open(e, a.href);
+    });
+
+    root.querySelector('.prev').addEventListener('click', () => select(sel - 1));
+    root.querySelector('.next').addEventListener('click', () => select(sel + 1));
+    addEventListener('keydown', (e) => {
+      if (e.target.closest && e.target.closest('input, textarea, [contenteditable]')) return;
+      if (e.key === 'ArrowLeft') select(sel - 1);
+      if (e.key === 'ArrowRight') select(sel + 1);
+    });
+    // 끌기: 책 한 권 폭만큼 끌 때마다 한 권씩 넘어간다
+    shelf.addEventListener('pointerdown', (e) => {
+      drag = { x: e.clientX, sel };
+      dragged = false;
+    });
+    addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x;
+      if (Math.abs(dx) > 8) dragged = true;
+      if (dragged) select(drag.sel - Math.round(dx / (H * 0.3)));
+    });
+    addEventListener('pointerup', () => {
+      drag = null;
+      setTimeout(() => {
+        dragged = false;
+        pointer = false;
+      });
+    });
+    let wheelSum = 0;
+    shelf.addEventListener(
+      'wheel',
+      (e) => {
+        if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return; // 세로 스크롤은 페이지에 맡긴다
+        e.preventDefault();
+        wheelSum += e.deltaX;
+        if (Math.abs(wheelSum) > 90) {
+          select(sel + Math.sign(wheelSum));
+          wheelSum = 0;
+        }
+      },
+      { passive: false },
+    );
+  })();
+</script>
+
+<style>
+  .shelf-hero {
+    --H: min(44vh, 30vw);
+    /* 본문 폭을 벗어나 화면 전체 폭을 쓴다. 화면 밖으로 나간 책이 페이지의 폭을 넓히지 않게 여기서 자른다. */
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    overflow: hidden;
+    display: grid;
+    justify-items: center;
+    padding-bottom: 1rem;
+  }
+
+  .shelf {
+    position: relative;
+    width: 100%;
+    height: calc(var(--H) + 64px);
+    perspective: 2200px;
+    /* 살짝 위에서 내려다본다. 책의 윗면(종이)이 보여서 색판이 아니라 책으로 읽힌다 */
+    perspective-origin: 50% -6%;
+    touch-action: pan-y;
+  }
+
+  .stage {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform-style: preserve-3d;
+  }
+
+  .tape {
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+
+  .shelf-plain {
+    margin: 0;
+    padding: 0 1.25rem 1rem;
+    list-style: none;
+    text-align: center;
+    line-height: 2;
+  }
+
+  /* 스크립트가 자리를 잡기 전에는 책을 감춰, 겹쳐 있다가 펼쳐지는 모습이 보이지 않게 한다 */
+  .shelf-hero:not(.is-live) .tape {
+    visibility: hidden;
+  }
+
+  .tape {
+    position: absolute;
+    transform-style: preserve-3d;
+    will-change: transform;
+    text-decoration: none;
+    outline: none;
+    /* 장정: 책등과 표지의 책등 쪽 한 줄은 표지보다 한 톤 짙은 천, 제목은 붙인 종이 꼬리표에 적는다 */
+    --bind: color-mix(in srgb, var(--cloth) 80%, #7d7366);
+    --label: #fdfaf3;
+    --ink: #26272b;
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .3 0 0 0 0 .28 0 0 0 0 .26 0 0 0 .1 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* 면은 단색에 고운 종이 결만 얹는다(밝기가 서서히 변하는 그라데이션이 있으면 코팅한 것처럼 광이 난다) */
+  .tape > div {
+    position: absolute;
+    top: calc(var(--H) / -2);
+    height: var(--H);
+    backface-visibility: hidden;
+    border-radius: 2px;
+    background-color: var(--cloth);
+    background-image: var(--grain);
+    background-blend-mode: multiply;
+    color: var(--ink);
+    overflow: hidden;
+    transition: translate 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .tape > div::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #000;
+    opacity: var(--shade, 0);
+    pointer-events: none;
+  }
+
+  /* 책이 올라가도 마우스가 책 밖으로 빠지지 않게 아래로 보이지 않는 받침을 둔다(떨림 방지) */
+  .tape::before {
+    content: '';
+    position: absolute;
+    left: calc(var(--ws) / -2);
+    top: calc(var(--H) / -2);
+    width: var(--ws);
+    height: calc(var(--H) * 1.04);
+    transform: translateZ(calc(var(--d) / 2));
+  }
+
+  /* 꽂혀 있는 책만 책 전체가 살짝 올라온다. 뽑혀 나온 책은 그대로 둔다 */
+  .tape:not(.on):hover > div,
+  .tape:not(.on):focus-visible > div {
+    translate: 0 calc(var(--H) * -0.025);
+  }
+
+  /* 책등: 짙은 천, 위쪽에 세로 꼬리표, 아래에 권 번호 */
+  .sp {
+    width: var(--ws);
+    left: calc(var(--ws) / -2);
+    transform: translateZ(calc(var(--d) / 2));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: calc(var(--H) * 0.085) 0 calc(var(--H) * 0.055);
+    background-color: var(--bind) !important;
+  }
+
+  .sp .lab {
+    flex: 0 0 auto;
+    max-width: 86%;
+    padding: calc(var(--H) * 0.034) calc(var(--H) * 0.016);
+    display: flex;
+    justify-content: center;
+    background-color: var(--label);
+    box-shadow: inset 0 0 0 1px rgba(38, 39, 43, 0.16);
+  }
+
+  /* 세로쓰기에서 높이를 정해 두면 넘치는 제목이 옆줄로 넘어간다(낱말 단위로) */
+  .sp .t {
+    writing-mode: vertical-rl;
+    max-height: calc(var(--H) * 0.68);
+    font-weight: 700;
+    font-size: var(--fs);
+    line-height: 1.3;
+    letter-spacing: 0.02em;
+    word-break: keep-all;
+    text-wrap: balance;
+    overflow: hidden;
+  }
+
+  .sp .no {
+    margin-top: auto;
+    font-weight: 700;
+    font-size: calc(var(--H) * 0.028);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: color-mix(in srgb, var(--bind) 45%, #26272b);
+  }
+
+  /* 뒤표지: 가운데보다 오른쪽에 꽂힌 책의 왼쪽 옆면 */
+  .bk {
+    width: var(--d);
+    left: calc(var(--d) / -2);
+    transform: rotateY(-90deg) translateZ(calc(var(--ws) / 2));
+  }
+
+  /* 표지: 책등 쪽 한 줄은 짙은 천(경계가 또렷한 띠라서 광이 나지 않는다), 가운데에 종이 꼬리표.
+     꼬리표와 그림자는 책이 도는 만큼만(--show) 나타난다. 면 자체는 늘 있어서 꽂힌 책의 옆면으로 보인다. */
+  .cv {
+    width: var(--d);
+    left: calc(var(--d) / -2);
+    transform: rotateY(90deg) translateZ(calc(var(--ws) / 2));
+    box-shadow: 0 26px 44px -26px rgba(40, 36, 30, calc(0.3 * var(--show, 0)));
+    background-image:
+      var(--grain),
+      linear-gradient(90deg, var(--bind) 0 13%, rgba(38, 39, 43, 0.22) 13% calc(13% + 1px), transparent calc(13% + 1px)) !important;
+    background-blend-mode: multiply, normal !important;
+  }
+
+  .cv > span {
+    opacity: var(--show, 0);
+  }
+
+  .cv .label {
+    position: absolute;
+    left: 25%;
+    right: 12%;
+    top: 13%;
+    display: flex;
+    flex-direction: column;
+    padding: calc(var(--H) * 0.05) calc(var(--H) * 0.045) calc(var(--H) * 0.042);
+    background-color: var(--label);
+    /* 꼬리표 안쪽의 가는 테두리 */
+    outline: 1px solid rgba(38, 39, 43, 0.5);
+    outline-offset: calc(var(--H) * -0.014);
+  }
+
+  .cv .k,
+  .cv .m {
+    font-size: calc(var(--H) * 0.0235);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: rgba(38, 39, 43, 0.62);
+  }
+
+  .cv .t {
+    margin-top: calc(var(--H) * 0.04);
+    font-weight: 800;
+    font-size: calc(var(--H) * 0.063);
+    line-height: 1.26;
+    letter-spacing: -0.035em;
+    word-break: keep-all;
+    text-wrap: balance;
+  }
+
+  .cv .r {
+    width: calc(var(--H) * 0.06);
+    height: 2px;
+    margin: calc(var(--H) * 0.04) 0 calc(var(--H) * 0.026);
+    background-color: var(--ink);
+  }
+
+  .cv .mark {
+    position: absolute;
+    left: 25%;
+    bottom: 7.5%;
+    font-size: calc(var(--H) * 0.026);
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: color-mix(in srgb, var(--cloth) 55%, #26272b);
+  }
+
+  /* 책 아래 설명: 줄마다 높이를 고정해 책을 바꿔도 화면이 위아래로 움직이지 않는다 */
+  .caption {
+    width: min(720px, 88vw);
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+    text-align: center;
+  }
+
+  .mask {
+    display: block;
+    overflow: hidden;
+    margin: 0;
+    max-width: 100%;
+  }
+
+  .mask > span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+
+  .caption h1 {
+    height: 46px;
+    font-size: clamp(1.55rem, 2.6vw, 2.25rem);
+    font-weight: 800;
+    line-height: 46px;
+    letter-spacing: -0.03em;
+  }
+
+  .caption .desc {
+    height: 24px;
+    font-size: 0.97rem;
+    line-height: 24px;
+    color: var(--text-muted);
+  }
+
+  .caption .desc :global(a) {
+    color: var(--text);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--text) 30%, transparent);
+    text-underline-offset: 0.22em;
+  }
+
+  .caption .desc :global(a:hover) {
+    text-decoration-color: var(--text);
+  }
+
+  /* 뽑혀 나온 책은 앞으로 나오면서 아래로도 커진다. 그만큼 제목을 내려 겹치지 않게 한다 */
+  .caption {
+    margin-top: calc(var(--H) * 0.1 + 1rem);
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .open {
+    display: inline-flex;
+    align-items: center;
+    height: 40px;
+    padding: 0 22px;
+    border-radius: 999px;
+    background-color: var(--text);
+    color: var(--bg);
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background-color 0.25s;
+  }
+
+  .open:hover {
+    background-color: var(--accent);
+    color: #fff;
+  }
+
+  .arrow {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--text);
+    border-radius: 50%;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+    transition:
+      background-color 0.25s,
+      color 0.25s;
+  }
+
+  .arrow:hover {
+    background-color: var(--text);
+    color: var(--bg);
+  }
+
+  /* 꼬리표에 이미 이름이 있어서 표지 아래의 작은 이름은 뺀다 */
+  .cv .mark {
+    display: none;
+  }
+
+  /* ---- 책의 윗면: 종이 묶음 ----
+     무늬 없이 책처럼 보이게 하는 것은 종이다. 윗면에 종이 결(가는 줄)과 양쪽 표지 판, 책등 쪽 천의 두께가 보인다. */
+  .tape > div.tp {
+    --top-y: calc(var(--H) / 2 - var(--bh, var(--H)));
+    left: calc(var(--ws) / -2);
+    top: calc(var(--d) / -2);
+    width: var(--ws);
+    height: var(--d);
+    box-sizing: border-box;
+    transform: translateY(var(--top-y)) rotateX(90deg);
+    border-radius: 0;
+    border: solid var(--cloth);
+    border-width: 0 calc(var(--H) * 0.012) calc(var(--H) * 0.014);
+    border-bottom-color: var(--bind);
+    background-color: #f6f0e2;
+    background-image: repeating-linear-gradient(90deg, transparent 0 5px, rgba(120, 104, 78, 0.16) 5px 6px);
+    background-blend-mode: normal;
+  }
+
+  .tape[data-single] > div.tp {
+    border-bottom-color: var(--cloth);
+  }
+
+  /* ---- 표지 그림이 있는 책 ----
+     그림이 표지를 가득 채우고, 제목은 꼬리표 없이 그림 위쪽의 빈 자리에 바로 얹는다.
+     양장본은 책등 쪽에 천을 댄 자리가 옅은 띠로 보인다. */
+  .cv.has-art {
+    background-image:
+      linear-gradient(90deg, rgba(38, 39, 43, 0.14) 0 11%, rgba(38, 39, 43, 0.22) 11% calc(11% + 1px), transparent calc(11% + 1px)),
+      var(--art) !important;
+    background-size: auto, cover !important;
+    background-position: center top !important;
+    background-blend-mode: normal !important;
+  }
+
+  .tape[data-single] .cv.has-art {
+    background-image: var(--art) !important;
+    background-size: cover !important;
+  }
+
+  .cv.has-art .label,
+  .tape[data-single] .cv.has-art .label {
+    left: 19%;
+    right: 9%;
+    top: 7.5%;
+    padding: 0;
+    background: none;
+    outline: none;
+  }
+
+  .tape[data-single] .cv.has-art .label {
+    left: 10%;
+  }
+
+  .cv.has-art .t {
+    margin-top: calc(var(--H) * 0.03);
+    font-size: calc(var(--H) * 0.07);
+  }
+
+  .cv.has-art .r,
+  .tape[data-single] .cv.has-art .r {
+    width: calc(var(--H) * 0.06);
+    height: 2px;
+  }
+
+  /* ---- 2026-11 개편: 책의 종류 ---- */
+
+  /* 책등의 글자: 영문과 숫자도 한글처럼 세워서, 고개를 돌리지 않고 읽게 한다 */
+  .sp .t {
+    text-orientation: upright;
+    letter-spacing: 0;
+    line-height: 1.25;
+    /* 세워 쓰면 낱말 사이가 한 글자만큼 벌어진다. 반 글자쯤으로 좁힌다 */
+    word-spacing: -0.45em;
+  }
+
+  /* 책마다 키가 다르다(--bh). 바닥을 맞춰 세운다 */
+  .tape > div,
+  .tape::before {
+    top: calc(var(--H) / 2 - var(--bh, var(--H)));
+    height: var(--bh, var(--H));
+  }
+
+  /* 두꺼운 책(시리즈) = 양장본: 짙은 천 책등에 종이 꼬리표, 위아래에 띠.
+     띠는 경계가 또렷한 단색 줄이라 광이 나지 않는다 */
+  .tape:not([data-single]) .sp {
+    --band: color-mix(in srgb, var(--bind) 76%, #26272b);
+    box-shadow:
+      inset 0 calc(var(--H) * 0.03) 0 var(--bind),
+      inset 0 calc(var(--H) * 0.038) 0 var(--band),
+      inset 0 calc(var(--H) * -0.03) 0 var(--bind),
+      inset 0 calc(var(--H) * -0.038) 0 var(--band);
+  }
+
+  /* 얇은 책(낱권) = 소책자: 키가 조금 작고, 천을 덧대지 않은 한 가지 색 표지에 제목을 바로 찍는다 */
+  .tape[data-single] {
+    --bh: calc(var(--H) * 0.9);
+  }
+
+  .tape[data-single] .sp {
+    background-color: var(--cloth) !important;
+    padding-top: calc(var(--H) * 0.06);
+  }
+
+  .tape[data-single] .sp .lab {
+    max-width: 100%;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .tape[data-single] .sp .t {
+    max-height: calc(var(--H) * 0.62);
+  }
+
+  .tape[data-single] .sp .no {
+    color: color-mix(in srgb, var(--cloth) 50%, #26272b);
+  }
+
+  .tape[data-single] .cv {
+    background-image: var(--grain) !important;
+    background-blend-mode: multiply !important;
+  }
+
+  .tape[data-single] .cv .label {
+    left: 11%;
+    right: 11%;
+    top: 9%;
+    padding: 0;
+    background: none;
+    outline: none;
+  }
+
+  .tape[data-single] .cv .t {
+    font-size: calc(var(--H) * 0.074);
+  }
+
+  .tape[data-single] .cv .r {
+    width: 100%;
+    height: 1px;
+  }
+
+  .tape[data-single] .cv .mark {
+    left: 11%;
+  }
+
+  @media (max-width: 767px) {
+    .shelf-hero {
+      --H: min(64vw, 38svh);
+    }
+  }
+</style>

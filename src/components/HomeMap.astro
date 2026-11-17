@@ -1,0 +1,816 @@
+---
+// 홈의 그래프 — 글(점)과 연결(선)을 빌드할 때 계산한 자리에 그린다. 점의 색은 그 글이 든 책의 표지 색이다.
+// 점을 고르면 옆 칸에 그 글의 요약과 이어진 글이 나온다. 스크립트가 없으면 점은 그냥 글 링크다.
+import { getHomeMap, MAP_W, MAP_H } from '../utils/home-map';
+import { withBase } from '../utils/url';
+
+const map = await getHomeMap();
+const at = new Map(map.nodes.map((n) => [n.id, n]));
+const first = map.nodes[0]; // 최신 글
+const postUrl = (id: string) => withBase(`/posts/${id}/`);
+---
+
+<section class="hm" id="graph" aria-label="그래프">
+  <div class="hm-head">
+    <h2>그래프</h2>
+    <a class="hm-more" href={withBase('/graph/')}>전체 그래프 →</a>
+  </div>
+
+  <div class="hm-body">
+    <div class="hm-canvas">
+      <div class="hm-tip" hidden></div>
+      <div class="hm-zoom" hidden>
+        <button type="button" data-z="in" aria-label="확대" title="확대">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+        </button>
+        <button type="button" data-z="out" aria-label="축소" title="축소">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10" /></svg>
+        </button>
+        <button type="button" data-z="fit" aria-label="처음 크기로" title="처음 크기로">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.2 8a4.8 4.8 0 1 0 1.5-3.5M3 2.6v2.6h2.6" /></svg>
+        </button>
+      </div>
+      <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} role="group" aria-label="글과 글의 연결">
+        <g class="hm-edges" aria-hidden="true">
+          {
+            map.edges.map((e) => (
+              <line
+                x1={at.get(e.from)!.x}
+                y1={at.get(e.from)!.y}
+                x2={at.get(e.to)!.x}
+                y2={at.get(e.to)!.y}
+                data-a={e.from}
+                data-b={e.to}
+                style={`--c: var(--edge-${e.type}, var(--edge-related))`}
+              />
+            ))
+          }
+        </g>
+        <g class="hm-nodes">
+          {
+            map.nodes.map((n) => (
+              <a
+                class="hm-node"
+                href={postUrl(n.id)}
+                data-id={n.id}
+                aria-label={n.title}
+                style={`--hue: ${n.hue}`}
+              >
+                <circle class="hm-hit" cx={n.x} cy={n.y} r={Math.max(n.r + 6, 13)} />
+                <circle class="hm-dot" cx={n.x} cy={n.y} r={n.r} />
+              </a>
+            ))
+          }
+        </g>
+        <g class="hm-groups" aria-hidden="true">
+          {
+            map.labels.map((l) => (
+              <text x={l.x} y={l.y} text-anchor="middle">
+                {l.name}
+              </text>
+            ))
+          }
+        </g>
+        <text class="hm-label" aria-hidden="true"></text>
+      </svg>
+    </div>
+
+    <aside class="hm-panel" aria-live="polite">
+      <p class="hm-meta">{first.category} / {first.date} / {first.minutes}분</p>
+      <h3><a href={postUrl(first.id)}>{first.title}</a></h3>
+      <p class="hm-desc">{first.description}</p>
+      <a class="hm-read" href={postUrl(first.id)}>읽기 →</a>
+    </aside>
+  </div>
+
+  <script
+    type="application/json"
+    id="hm-data"
+    set:html={JSON.stringify({ base: withBase('/posts/'), nodes: map.nodes }).replace(/</g, '\\u003c')}
+  />
+</section>
+
+<script>
+  interface Conn {
+    id: string;
+    phrase: string;
+    type: string;
+    note?: string;
+  }
+  interface Node {
+    id: string;
+    x: number;
+    y: number;
+    r: number;
+    title: string;
+    description: string;
+    category: string;
+    date: string;
+    minutes: number;
+    conns: Conn[];
+  }
+
+  const root = document.querySelector<HTMLElement>('.hm');
+  const raw = document.getElementById('hm-data')?.textContent;
+  if (root && raw) {
+    const { base, nodes } = JSON.parse(raw) as { base: string; nodes: Node[] };
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const panel = root.querySelector<HTMLElement>('.hm-panel')!;
+    const label = root.querySelector<SVGTextElement>('.hm-label')!;
+    const dots = [...root.querySelectorAll<SVGAElement>('.hm-node')];
+    const lines = [...root.querySelectorAll<SVGLineElement>('.hm-edges line')];
+    const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string) => {
+      const node = document.createElement(tag);
+      node.className = cls;
+      if (text) node.textContent = text;
+      return node;
+    };
+    let selected = nodes[0].id;
+
+    // 점의 이름표: 지도 위에 따로 띄우는 알약 모양 표지. 점이나 선과 겹쳐도 글자가 묻히지 않는다.
+    const tip = root.querySelector<HTMLElement>('.hm-tip')!;
+    const mapSvg = root.querySelector<SVGSVGElement>('.hm-canvas > svg')!;
+    let tipNode: Node | null = null;
+    const placeTip = () => {
+      if (!tipNode) return;
+      const vb = mapSvg.viewBox.baseVal;
+      const fx = (tipNode.x - vb.x) / vb.width;
+      const fy = (tipNode.y - vb.y) / vb.height;
+      tip.textContent = tipNode.title;
+      tip.hidden = fx < 0 || fx > 1 || fy < 0 || fy > 1;
+      tip.style.left = `${fx * 100}%`;
+      tip.style.top = `${fy * 100}%`;
+      // 가장자리에서는 지도 밖으로 나가지 않게 안쪽으로 붙인다
+      tip.dataset.side = fx < 0.2 ? 'l' : fx > 0.8 ? 'r' : '';
+      tip.dataset.below = fy < 0.16 ? '1' : '';
+    };
+
+    const paint = (id: string) => {
+      const n = byId.get(id);
+      if (!n) return;
+      const near = new Set(n.conns.map((c) => c.id));
+      for (const d of dots) {
+        const did = d.dataset.id!;
+        d.classList.toggle('is-on', did === id);
+        d.classList.toggle('is-near', near.has(did));
+      }
+      for (const l of lines) l.classList.toggle('is-on', l.dataset.a === id || l.dataset.b === id);
+      root.classList.add('has-pick');
+
+      tipNode = n;
+      placeTip();
+
+      const url = `${base}${n.id}/`;
+      const title = el('h3', '');
+      const titleLink = el('a', '', n.title);
+      titleLink.href = url;
+      title.append(titleLink);
+      const read = el('a', 'hm-read', '읽기 →');
+      read.href = url;
+      const parts: HTMLElement[] = [
+        el('p', 'hm-meta', `${n.category} / ${n.date} / ${n.minutes}분`),
+        title,
+        el('p', 'hm-desc', n.description),
+        read,
+      ];
+      if (n.conns.length > 0) {
+        const list = el('ul', 'hm-conns');
+        for (const c of n.conns) {
+          const item = el('li', '');
+          const chip = el('span', 'hm-chip', c.phrase);
+          item.style.setProperty('--c', `var(--edge-${c.type}, var(--edge-related))`);
+          const go = el('button', 'hm-go', byId.get(c.id)?.title ?? c.id);
+          go.type = 'button';
+          go.dataset.id = c.id;
+          item.append(chip, go);
+          if (c.note) item.title = c.note; // 관계의 설명은 마우스를 올리면 보인다(칸을 글로 채우지 않는다)
+          list.append(item);
+        }
+        parts.push(el('p', 'hm-conns-head', `이어진 글 ${n.conns.length}편`), list);
+      }
+      panel.replaceChildren(...parts);
+    };
+
+    const pick = (id: string) => {
+      selected = id;
+      paint(id);
+    };
+
+    for (const d of dots) {
+      d.setAttribute('role', 'button');
+      d.addEventListener('click', (e) => {
+        // 새 탭으로 여는 클릭은 링크 그대로 둔다
+        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+        e.preventDefault();
+        pick(d.dataset.id!);
+      });
+      d.addEventListener('mouseenter', () => paint(d.dataset.id!));
+      d.addEventListener('mouseleave', () => paint(selected));
+      d.addEventListener('focus', () => paint(d.dataset.id!));
+    }
+    panel.addEventListener('click', (e) => {
+      const go = (e.target as HTMLElement).closest<HTMLElement>('.hm-go');
+      if (go) pick(go.dataset.id!);
+    });
+    pick(selected);
+
+    // 확대와 이동: 단추, Ctrl(⌘)+휠과 트랙패드 벌리기, 두 번 누르기로 확대하고 끌어서 옮긴다.
+    // 그냥 휠은 페이지를 내리는 데 쓰도록 건드리지 않는다.
+    const svg = root.querySelector<SVGSVGElement>('.hm-canvas > svg')!;
+    const zoomBox = root.querySelector<HTMLElement>('.hm-zoom')!;
+    const [FW, FH] = svg.getAttribute('viewBox')!.split(' ').slice(2).map(Number);
+    const view = { x: 0, y: 0, w: FW };
+    const apply = () => {
+      view.w = Math.min(FW, Math.max(FW / 5, view.w));
+      const h = (view.w * FH) / FW;
+      view.x = Math.min(FW - view.w, Math.max(0, view.x));
+      view.y = Math.min(FH - h, Math.max(0, view.y));
+      svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${h}`);
+      svg.classList.toggle('is-zoomed', view.w < FW - 1);
+      placeTip();
+    };
+    // 화면의 한 점(cx, cy: 0~1)을 그대로 둔 채 배율을 바꾼다
+    const zoomAt = (factor: number, cx = 0.5, cy = 0.5) => {
+      const h = (view.w * FH) / FW;
+      const px = view.x + view.w * cx;
+      const py = view.y + h * cy;
+      view.w = Math.min(FW, Math.max(FW / 5, view.w * factor));
+      view.x = px - view.w * cx;
+      view.y = py - ((view.w * FH) / FW) * cy;
+      apply();
+    };
+    const at = (e: MouseEvent) => {
+      const r = svg.getBoundingClientRect();
+      return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height] as const;
+    };
+    zoomBox.hidden = false;
+    zoomBox.addEventListener('click', (e) => {
+      const z = (e.target as HTMLElement).closest<HTMLElement>('button')?.dataset.z;
+      if (z === 'in') zoomAt(0.7);
+      if (z === 'out') zoomAt(1 / 0.7);
+      if (z === 'fit') {
+        view.x = view.y = 0;
+        view.w = FW;
+        apply();
+      }
+    });
+    svg.addEventListener(
+      'wheel',
+      (e) => {
+        if (!e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+        zoomAt(Math.exp(e.deltaY * 0.01), ...at(e));
+      },
+      { passive: false },
+    );
+    svg.addEventListener('dblclick', (e) => {
+      if ((e.target as Element).closest('.hm-node')) return;
+      zoomAt(0.6, ...at(e));
+    });
+    // 끌기: 점을 잡으면 그 점이 따라오고(선도 함께), 빈 곳을 잡으면 확대한 지도가 움직인다.
+    const linesOf = new Map<string, { line: SVGLineElement; end: 1 | 2 }[]>();
+    for (const l of lines) {
+      for (const [id, end] of [[l.dataset.a!, 1], [l.dataset.b!, 2]] as const) {
+        if (!linesOf.has(id)) linesOf.set(id, []);
+        linesOf.get(id)!.push({ line: l, end });
+      }
+    }
+    const moveNode = (id: string, x: number, y: number) => {
+      const n = byId.get(id)!;
+      n.x = Math.min(FW - 12, Math.max(12, x));
+      n.y = Math.min(FH - 12, Math.max(12, y));
+      const el = dots.find((d) => d.dataset.id === id)!;
+      for (const c of el.querySelectorAll('circle')) {
+        c.setAttribute('cx', String(n.x));
+        c.setAttribute('cy', String(n.y));
+      }
+      for (const { line, end } of linesOf.get(id) ?? []) {
+        line.setAttribute(`x${end}`, String(n.x));
+        line.setAttribute(`y${end}`, String(n.y));
+      }
+    };
+    let grab: { x: number; y: number; vx: number; vy: number; id?: string; nx: number; ny: number } | null = null;
+    let moved = false;
+    svg.addEventListener('pointerdown', (e) => {
+      const node = (e.target as Element).closest<SVGAElement>('.hm-node');
+      if (!node && view.w >= FW - 1) return;
+      const n = node ? byId.get(node.dataset.id!)! : null;
+      grab = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, id: n?.id, nx: n?.x ?? 0, ny: n?.y ?? 0 };
+      moved = false;
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!grab) return;
+      const r = svg.getBoundingClientRect();
+      const dx = ((e.clientX - grab.x) / r.width) * view.w;
+      const dy = ((e.clientY - grab.y) / r.height) * ((view.w * FH) / FW);
+      if (Math.abs(e.clientX - grab.x) + Math.abs(e.clientY - grab.y) > 5) moved = true;
+      if (!moved) return;
+      if (grab.id) {
+        moveNode(grab.id, grab.nx + dx, grab.ny + dy);
+        paint(grab.id);
+      } else {
+        view.x = grab.vx - dx;
+        view.y = grab.vy - dy;
+        apply();
+      }
+    });
+    window.addEventListener('pointerup', () => {
+      if (grab?.id && moved) paint(selected);
+      grab = null;
+    });
+    // 끌고 난 끝의 클릭 한 번은 버린다(끌었는데 글이 바뀌지 않게)
+    svg.addEventListener(
+      'click',
+      (e) => {
+        if (!moved) return;
+        e.preventDefault();
+        e.stopPropagation();
+        moved = false;
+      },
+      true,
+    );
+    for (const d of dots) d.setAttribute('draggable', 'false');
+  }
+</script>
+
+<style is:global>
+  /* 칸 안의 내용은 스크립트가 만들기 때문에 전역 스타일로 두고 .hm- 접두어로 가둔다. */
+  .hm {
+    margin: 5rem 0 2rem;
+    scroll-margin-top: 5rem;
+  }
+  .hm-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.9rem;
+    margin-bottom: 0.9rem;
+  }
+  .hm-head h2 {
+    margin: 0;
+    font-size: 1.7rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .hm-head p {
+    margin: 0;
+    flex: 1;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .hm-more {
+    flex-shrink: 0;
+    font-size: 0.88rem;
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .hm-more:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .hm-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    background-color: var(--surface);
+  }
+  .hm-canvas {
+    position: relative;
+  }
+  .hm-canvas svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    touch-action: pan-y;
+  }
+  .hm-canvas svg.is-zoomed {
+    cursor: grab;
+    touch-action: none;
+  }
+  .hm-zoom {
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    z-index: 1;
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+    background-color: var(--bg);
+  }
+  .hm-zoom button {
+    min-width: 34px;
+    height: 30px;
+    padding: 0 10px;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .hm-zoom button + button {
+    border-left: 1px solid var(--border);
+  }
+  .hm-zoom button:hover {
+    background-color: var(--text);
+    color: var(--bg);
+  }
+  /* 시리즈 이름이 점이나 선과 겹쳐도 읽히게 글자 둘레를 바탕색으로 두른다 */
+  .hm-groups text {
+    paint-order: stroke;
+    stroke: var(--surface);
+    stroke-width: 5px;
+    stroke-linejoin: round;
+  }
+
+  .hm-edges line {
+    stroke: var(--c);
+    stroke-width: 1.2;
+    opacity: 0.28;
+    transition: opacity 0.15s ease;
+  }
+  .hm.has-pick .hm-edges line {
+    opacity: 0.1;
+  }
+  .hm.has-pick .hm-edges line.is-on {
+    opacity: 0.95;
+    stroke-width: 1.8;
+  }
+
+  .hm-groups text {
+    fill: var(--text);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+
+  .hm-node {
+    cursor: grab;
+    outline: none;
+    -webkit-user-drag: none;
+  }
+  .hm-canvas svg {
+    user-select: none;
+  }
+  .hm-hit {
+    fill: transparent;
+  }
+  .hm-dot {
+    fill: var(--hue);
+    stroke: var(--text);
+    stroke-width: 1.2;
+    transition:
+      opacity 0.15s ease,
+      r 0.15s ease;
+  }
+  .hm.has-pick .hm-node:not(.is-on):not(.is-near) .hm-dot {
+    opacity: 0.55;
+  }
+  .hm-node.is-on .hm-dot {
+    stroke: var(--text);
+    stroke-width: 2.5;
+  }
+  .hm-node:focus-visible .hm-dot {
+    stroke: var(--accent);
+    stroke-width: 3;
+  }
+  .hm-label {
+    fill: var(--text);
+    font-size: 15px;
+    font-weight: 700;
+    paint-order: stroke;
+    stroke: var(--surface);
+    stroke-width: 5px;
+    stroke-linejoin: round;
+    pointer-events: none;
+  }
+
+  .hm-panel {
+    padding: 1.25rem 1.25rem 1.4rem;
+    border-left: 1px solid var(--border);
+    background-color: var(--bg);
+    /* 칸의 높이는 지도를 따르고, 내용이 넘치면 칸 안에서만 스크롤한다 */
+    contain: size;
+    overflow-y: auto;
+  }
+  .hm-meta {
+    margin: 0 0 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  .hm-panel h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 800;
+    line-height: 1.35;
+    letter-spacing: -0.02em;
+    word-break: keep-all;
+  }
+  .hm-panel h3 a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .hm-panel h3 a:hover {
+    color: var(--accent);
+  }
+  .hm-desc {
+    margin: 0.55rem 0 0.9rem;
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+    word-break: keep-all;
+  }
+  .hm-read {
+    display: inline-block;
+    padding: 0.4rem 0.95rem;
+    border-radius: 999px;
+    background-color: var(--accent);
+    color: #fff;
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .hm-conns-head {
+    margin: 1.4rem 0 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+  .hm-conns {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.85rem;
+  }
+  .hm-chip {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--c);
+  }
+  .hm-go {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.45;
+    text-align: left;
+    word-break: keep-all;
+    cursor: pointer;
+  }
+  .hm-go:hover {
+    color: var(--accent);
+  }
+  .hm-note {
+    margin: 0.15rem 0 0;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+    word-break: keep-all;
+  }
+
+  /* 좁은 화면: 지도는 옆으로 밀어 보고, 고른 글은 그 아래에 쌓는다 */
+  @media (max-width: 860px) {
+    .hm-head {
+      flex-wrap: wrap;
+      gap: 0.3rem 0.9rem;
+    }
+    .hm-head p {
+      flex-basis: 100%;
+      order: 3;
+    }
+    .hm-body {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .hm-canvas {
+      overflow-x: auto;
+    }
+    .hm-canvas svg {
+      min-width: 640px;
+    }
+    .hm-panel {
+      contain: none;
+      border-left: 0;
+      border-top: 1px solid var(--border);
+    }
+  }
+
+  .hm-label {
+    display: none;
+  }
+  .hm-tip {
+    position: absolute;
+    z-index: 1;
+    max-width: 62%;
+    padding: 5px 11px;
+    border-radius: 999px;
+    background-color: var(--text);
+    color: var(--bg);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    translate: -50% calc(-100% - 16px);
+  }
+  .hm-tip[data-below='1'] {
+    translate: -50% 16px;
+  }
+  .hm-tip[data-side='l'] {
+    translate: -12px calc(-100% - 16px);
+  }
+  .hm-tip[data-side='r'] {
+    translate: calc(-100% + 12px) calc(-100% - 16px);
+  }
+  .hm-tip[data-side='l'][data-below='1'] {
+    translate: -12px 16px;
+  }
+  .hm-tip[data-side='r'][data-below='1'] {
+    translate: calc(-100% + 12px) 16px;
+  }
+
+  /* 옆 칸: 설명은 두 줄까지, 이어진 글은 관계와 제목만 */
+  .hm-desc {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ---- 2026-11 개편: 옆 칸을 읽기 좋게. 관계는 색 띠로만 구분하고 글자는 차분하게 둔다 ---- */
+  .hm-panel {
+    padding: 1.6rem 1.5rem 1.8rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .hm-panel h3 {
+    font-size: 1.28rem;
+  }
+  .hm-read {
+    background-color: var(--text);
+    color: var(--bg);
+    transition: background-color 0.25s;
+  }
+  .hm-read:hover {
+    background-color: var(--accent);
+    color: #fff;
+  }
+  .hm-conns-head {
+    margin: 1.6rem 0 0.9rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+  }
+  .hm-conns {
+    gap: 0.5rem;
+  }
+  .hm-go {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .hm-conns li {
+    padding: 0.55rem 0.8rem 0.6rem 0.9rem;
+    border-left: 3px solid var(--c);
+    border-radius: 0 10px 10px 0;
+    background-color: var(--surface);
+  }
+  .hm-chip {
+    margin-bottom: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .hm-go {
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+  .hm-note {
+    margin-top: 0.3rem;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ---- 그래프는 본문 폭(1080px)보다 넓게 쓴다. 지도가 넓어야 점과 이름이 덜 겹친다 ---- */
+  .hm {
+    --hm-w: min(1360px, calc(100vw - 4rem));
+    width: var(--hm-w);
+    margin-inline: calc((100% - var(--hm-w)) / 2);
+  }
+  .hm-body {
+    grid-template-columns: minmax(0, 1fr) 430px;
+  }
+  .hm-groups {
+    pointer-events: none;
+  }
+
+  /* 확대 단추: 세 칸의 높이와 가운데 정렬을 맞춘다 */
+  .hm-zoom {
+    padding: 3px;
+    gap: 2px;
+    border-radius: 12px;
+  }
+  .hm-zoom button,
+  .hm-zoom button + button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 30px;
+    padding: 0 9px;
+    border: 0;
+    border-radius: 9px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .hm-zoom button[data-z='in'],
+  .hm-zoom button[data-z='out'] {
+    width: 32px;
+    padding: 0;
+    font-size: 1rem;
+  }
+
+  /* 좁은 화면: 지도를 화면 폭에 맞추고(옆으로 밀지 않는다) 단추와 두 손가락으로 확대한다. 고른 글은 지도 아래에 */
+  @media (max-width: 860px) {
+    .hm {
+      --hm-w: 100%;
+      margin-top: 3.5rem;
+    }
+    .hm-body {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .hm-canvas {
+      overflow: hidden;
+    }
+    .hm-canvas svg {
+      min-width: 0;
+    }
+    .hm-groups text {
+      font-size: 22px;
+    }
+    .hm-tip {
+      max-width: 80%;
+      font-size: 0.74rem;
+    }
+    .hm-panel {
+      padding: 1.25rem 1.1rem 1.4rem;
+    }
+    .hm-zoom button {
+      min-width: 40px;
+      height: 36px;
+    }
+    /* 단추가 위쪽의 점과 이름표를 가리지 않게 아래로 내린다 */
+    .hm-zoom {
+      top: auto;
+      bottom: 10px;
+    }
+  }
+
+  /* 확대 단추: 같은 크기의 네모 칸 세 개에 아이콘을 가운데로 */
+  .hm-zoom button,
+  .hm-zoom button + button,
+  .hm-zoom button[data-z='in'],
+  .hm-zoom button[data-z='out'] {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    padding: 0;
+  }
+  .hm-zoom svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* 읽기 단추는 요약의 오른쪽 아래에 */
+  .hm-read {
+    display: flex;
+    width: fit-content;
+    margin-left: auto;
+  }
+</style>

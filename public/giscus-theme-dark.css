@@ -38,7 +38,7 @@ main {
   --color-fg-default: #e8eaed;
   --color-fg-muted: #9aa0a6;
   --color-fg-subtle: #9aa0a6;
-  --color-canvas-default: #16181c;
+  --color-canvas-default: #1b1b1d;
   --color-canvas-overlay: #1e2127;
   --color-canvas-inset: #1e2127;
   --color-canvas-subtle: #1e2127;
@@ -91,7 +91,7 @@ main {
   --color-btn-primary-disabled-border: transparent;
 
   /* 정렬 세그먼트 컨트롤 */
-  --color-segmented-control-bg: #16181c;
+  --color-segmented-control-bg: #1b1b1d;
   --color-segmented-control-button-bg: #2a2d34;
   --color-segmented-control-button-selected-border: #3a3d44;
 

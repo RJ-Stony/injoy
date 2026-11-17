@@ -1,0 +1,223 @@
+---
+// 책의 목차 — 시리즈 하나가 책 한 권이고, 글은 그 책의 장이다. 홈 서가에서 책을 펼치면 여기로 온다.
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Rule from '../../components/Rule.astro';
+import { getBooks, seriesSlug } from '../../utils/books';
+import { formatDateShort, isoDate, readingMinutes } from '../../utils/post';
+import { withBase } from '../../utils/url';
+
+export async function getStaticPaths() {
+  const books = await getBooks();
+  return books
+    .filter((b) => !b.single)
+    .map((book) => ({
+      params: { series: seriesSlug(book.title) },
+      props: { book, no: books.indexOf(book) + 1, total: books.length },
+    }));
+}
+
+const { book, no, total } = Astro.props;
+const n = book.chapters.length;
+const from = formatDateShort(book.chapters[0].data.pubDate);
+const to = formatDateShort(book.chapters[n - 1].data.pubDate);
+---
+
+<BaseLayout title={book.title} description={`${book.title}: ${n}개의 장으로 묶은 글`} wide>
+  <div class="sheet toc" style={`--cloth: ${book.cloth}`}>
+    <Rule />
+    <div class="toc-head">
+      <p class="sub rise">
+        <a href={withBase('/')}><span aria-hidden="true">←</span> 서가</a>
+      </p>
+      <h1 class="rise" style="--i: 1">{book.title}</h1>
+      <p class="meta rise" style="--i: 2">
+        {total}권 가운데 {no}권 / {n}개의 장<br />{from}부터 {to}까지
+      </p>
+      <div class="swatch rise" style="--i: 3"></div>
+    </div>
+    <div class="toc-body">
+      <ol class="toc-list">
+      {
+        book.chapters.map((p, i) => (
+          <li class="rise" style={`--i: ${Math.min(i, 12) + 2}`}>
+            <a href={withBase(`/posts/${p.id}/`)}>
+              <span class="n">{String(i + 1).padStart(2, '0')}</span>
+              <span class="tt">
+                {p.data.title}
+                <small>{p.data.description}</small>
+              </span>
+              <span class="dt">
+                <time datetime={isoDate(p.data.pubDate)}>{formatDateShort(p.data.pubDate).slice(2)}</time>
+                <span>{readingMinutes(p)}분</span>
+              </span>
+            </a>
+          </li>
+        ))
+      }
+      </ol>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .toc {
+    display: grid;
+    grid-template-columns: minmax(0, 0.62fr) minmax(0, 1.38fr);
+    gap: 2.4rem 4rem;
+    align-items: start;
+  }
+
+  /* 맨 위의 구분선: 글 화면의 구분선과 같은 높이라서 오갈 때 가로로만 움직인다 */
+  .toc > :global(.rule) {
+    grid-column: 1 / -1;
+  }
+
+  /* 구분선 뒤의 인라인 스크립트가 칸 하나를 차지하지 않게 한다 */
+  .toc > :global(script) {
+    display: none;
+  }
+
+  .toc-head {
+    position: sticky;
+    top: 6rem;
+  }
+
+  .sub {
+    margin: 0 0 1.3rem;
+    font-size: 0.86rem;
+    font-weight: 700;
+  }
+
+  .sub a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .sub a span {
+    transition: translate 0.25s;
+  }
+
+  .sub a:hover {
+    color: var(--accent);
+  }
+
+  .sub a:hover span {
+    translate: -3px 0;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(1.9rem, 3.4vw, 2.9rem);
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.04em;
+    word-break: keep-all;
+    text-wrap: balance;
+  }
+
+  .meta {
+    margin: 1.2rem 0 0;
+    color: var(--text-muted);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  .swatch {
+    margin-top: 1.9rem;
+    width: 64px;
+    height: 8px;
+    border-radius: 99px;
+    background-color: var(--cloth);
+  }
+
+  ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  li a {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) 82px;
+    gap: 1rem;
+    align-items: baseline;
+    padding: 1.1rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    text-decoration: none;
+    transition:
+      background-color 0.25s,
+      padding 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  li a:hover,
+  li a:focus-visible {
+    background-color: color-mix(in srgb, var(--cloth) 40%, transparent);
+    padding-left: 1.1rem;
+  }
+
+  .n {
+    font-size: 0.88rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tt {
+    font-size: 1.12rem;
+    font-weight: 700;
+    line-height: 1.45;
+    letter-spacing: -0.02em;
+    word-break: keep-all;
+    text-wrap: balance;
+  }
+
+  .tt small {
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 0.9rem;
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0;
+    color: var(--text-muted);
+    text-wrap: pretty;
+  }
+
+  /* 날짜와 읽는 시간은 폭을 고정해 줄이 바뀌지 않게 한다 */
+  .dt {
+    display: grid;
+    gap: 0.2rem;
+    justify-items: end;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 767px) {
+    .toc {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2.1rem;
+      padding-top: 0;
+    }
+
+    .toc-head {
+      position: static;
+    }
+
+    li a {
+      grid-template-columns: 28px minmax(0, 1fr);
+      gap: 0.75rem;
+    }
+
+    .dt {
+      grid-column: 2;
+      display: flex;
+      gap: 0.6rem;
+      justify-items: start;
+    }
+  }
+</style>

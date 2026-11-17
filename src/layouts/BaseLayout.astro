@@ -49,6 +49,33 @@ const buildSha = process.env.GITHUB_SHA ?? '';
         if (isArticle && localStorage.getItem('focus-read') === '1') {
           document.documentElement.dataset.focus = 'true';
         }
+        // 책장을 넘기듯 넘어온 화면(떠나기 직전에 injoy:turn 기록을 남긴다)과 뒤로/앞으로 이동에서는
+        // 글이 한 줄씩 올라오게 표시를 남긴다(global.css의 sheet-rise, src/scripts/page-turn.ts).
+        try {
+          const turn = JSON.parse(sessionStorage.getItem('injoy:turn') || 'null');
+          const nav = performance.getEntriesByType('navigation')[0];
+          if ((turn && Date.now() - turn.t < 6000) || (nav && nav.type === 'back_forward')) {
+            document.documentElement.dataset.arrive = 'page';
+          }
+        } catch {}
+        // 나란히 읽기의 옆 칸(iframe, ?pane=1)으로 열렸을 때: 머리말과 꼬리말을 숨기고(global.css),
+        // 다른 글로 가는 링크는 칸 안에서 열고, 그 밖의 링크는 바깥 창에서 연다.
+        if (window.self !== window.top && new URLSearchParams(location.search).has('pane')) {
+          document.documentElement.dataset.pane = 'true';
+          document.addEventListener('click', (e) => {
+            const a = e.target.closest && e.target.closest('a[href]');
+            const href = a && a.getAttribute('href');
+            if (!href || href.startsWith('#') || e.defaultPrevented) return;
+            const url = new URL(href, location.href);
+            if (url.origin === location.origin && url.pathname.includes('/posts/')) {
+              e.preventDefault();
+              url.searchParams.set('pane', '1');
+              location.href = url.href;
+            } else {
+              a.setAttribute('target', '_top');
+            }
+          });
+        }
       })();
     </script>
 
@@ -110,7 +137,10 @@ const buildSha = process.env.GITHUB_SHA ?? '';
       <div class:list={['site-header-inner', { wide }]}>
         <a class="logo" href={withBase('/')}>
           <Image class="logo-avatar" src={profile} alt="" width={64} height={64} loading="eager" />
-          <span>Injoy</span>
+          <span class="logo-text">
+            <b>Injoy</b>
+            <small>즐거움 안에서</small>
+          </span>
         </a>
         <div class="header-actions">
           <nav class="nav-desktop" aria-label="주 메뉴">
@@ -192,6 +222,8 @@ const buildSha = process.env.GITHUB_SHA ?? '';
     </script>
 
     <script>
+      import '../scripts/page-turn';
+
       // 헤더 메뉴 토글: 카테고리 드롭다운(데스크톱) + 햄버거(모바일).
       // 바깥 클릭·Esc·패널 내부 링크 클릭 시 닫는다.
       function wire(btn: HTMLElement | null, panel: HTMLElement | null) {
@@ -274,7 +306,7 @@ const buildSha = process.env.GITHUB_SHA ?? '';
   import { enhanceSmoothDetails } from '../scripts/smooth-details';
   import { watchPendingDeploy } from '../scripts/deploy-toast';
   // 접이식 요소(시리즈 폴더·시리즈 내비·만듦새 패널·연결 목록)를 데스크톱·모바일 어디서나 부드럽게 펼친다
-  enhanceSmoothDetails('.series-folder, details.series, .makeup, .connections-fold');
+  enhanceSmoothDetails('details.series, .makeup, .connections-fold');
   // 발행 후 페이지를 떠나도 배포가 끝나면 완료 토스트를 띄운다(작성자 브라우저 한정).
   watchPendingDeploy();
 
@@ -569,6 +601,114 @@ const buildSha = process.env.GITHUB_SHA ?? '';
   @media (min-width: 641px) {
     .site-header .mobile-menu {
       display: none !important;
+    }
+  }
+
+  /* ---------- 2026-11 개편: 머리말은 왼쪽 메뉴 / 가운데 로고 / 오른쪽 테마 단추 ---------- */
+  .site-header-inner,
+  .site-header-inner.wide {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    max-width: none;
+    padding: 0.85rem 2rem;
+  }
+
+  .header-actions {
+    display: contents;
+  }
+
+  .logo {
+    grid-column: 2;
+    grid-row: 1;
+    gap: 0.6rem;
+  }
+
+  /* 가운데 로고: 사진, 이름, 그 아래 작은 한 줄 */
+  .logo-text {
+    display: grid;
+    line-height: 1;
+  }
+
+  .logo-text b {
+    font-size: 1.32rem;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+  }
+
+  .logo-text small {
+    margin-top: 0.28rem;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    color: var(--text-muted);
+  }
+
+  .logo-avatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  @media (max-width: 640px) {
+    .logo-text small {
+      display: none;
+    }
+  }
+
+  .site-header .nav-desktop {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .site-header .nav-desktop > a,
+  .site-header .nav-desktop > :global(a.write-link),
+  .site-header .cat-dd-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--text);
+    border-radius: 999px;
+    color: var(--text);
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition:
+      background-color 0.25s,
+      color 0.25s;
+  }
+
+  .site-header .nav-desktop > a[hidden],
+  .site-header .nav-desktop > :global(a.write-link[hidden]) {
+    display: none;
+  }
+
+  .site-header .nav-desktop > a:hover,
+  .site-header .nav-desktop > :global(a.write-link:hover),
+  .site-header .cat-dd-btn:hover,
+  .site-header .cat-dd-btn[aria-expanded='true'] {
+    background-color: var(--text);
+    color: var(--bg);
+    text-decoration: none;
+  }
+
+  .site-header .nav-toggle {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+  }
+
+  .site-header :global(.theme-toggle) {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  @media (max-width: 640px) {
+    .site-header-inner,
+    .site-header-inner.wide {
+      padding: 0.7rem 1rem;
     }
   }
 

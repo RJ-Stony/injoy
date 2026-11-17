@@ -1,0 +1,30 @@
+---
+// 화면과 화면을 잇는 구분선 — 목차와 글의 맨 위, 같은 높이에 놓인다.
+// 넘어온 화면이면 줄이 먼저 움직이고(앞 화면의 줄 길이에서 지금 길이로, 서가에서 왔으면 왼쪽에서 그어진다)
+// 그 뒤에 글이 올라온다(global.css의 sheet-rise). 떠날 때의 기록은 src/scripts/page-turn.ts와 Shelf.astro가 남긴다.
+---
+
+<span class="rule" data-rule></span>
+<!-- 화면이 처음 그려지기 전에 줄의 출발 자리를 잡아야 한다. 늦게 도는 스크립트에 두면
+     화면이 다 뜬 뒤에 줄이 튀었다가 움직인다. 그래서 줄 바로 뒤에 인라인으로 둔다. -->
+<script is:inline>
+  (() => {
+    try {
+      const el = document.currentScript.previousElementSibling;
+      const turn = JSON.parse(sessionStorage.getItem('injoy:turn') || 'null');
+      if (!turn || Date.now() - turn.t > 6000 || window.self !== window.top) return;
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const r = el.getBoundingClientRect();
+      const from = turn.rule
+        ? `translate(${turn.rule.x - r.left}px, ${turn.rule.y - r.top}px) scaleX(${turn.rule.w / r.width})`
+        : 'scaleX(0)';
+      el.animate(
+        [
+          { transformOrigin: '0 0', transform: from },
+          { transformOrigin: '0 0', transform: 'none' },
+        ],
+        { duration: 480, easing: 'cubic-bezier(.76,0,.18,1)', fill: 'backwards' },
+      );
+    } catch {}
+  })();
+</script>
