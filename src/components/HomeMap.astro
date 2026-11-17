@@ -1327,6 +1327,39 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     }
   }
 
+  /* 밝은 바탕의 별: 먹색 점이 아니라 책의 색을 조금 짙게 한 점. 가운데에 밝은 심을 두어 빛나 보이게 한다.
+     고른 별도 검게 칠하지 않고 고리와 크기로만 구분한다. */
+  .hm {
+    --star-amt: 16%;
+  }
+  .hm-dot,
+  .hm-node.is-near .hm-dot,
+  .hm-node.is-on .hm-dot {
+    fill: color-mix(in srgb, var(--star-mix) var(--star-amt), var(--hue));
+    stroke: color-mix(in srgb, #fff 70%, var(--hue));
+    stroke-width: 0.9;
+    paint-order: stroke;
+  }
+  .hm-halo {
+    opacity: 0.95;
+  }
+  :root[data-theme='dark'] .hm-dot {
+    stroke: none;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .hm-dot {
+      stroke: none;
+    }
+  }
+  :root[data-theme='dark'] .hm {
+    --star-amt: 72%;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .hm {
+      --star-amt: 72%;
+    }
+  }
+
   /* 옆 칸은 내용만큼 길어진다(칸 안에 스크롤이 생기지 않는다). 칸이 지도보다 길면 지도가 따라 내려온다 */
   .hm-body {
     align-items: start;

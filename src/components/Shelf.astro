@@ -759,14 +759,16 @@ const first = data[0];
     background-image:
       linear-gradient(90deg, rgba(38, 39, 43, 0.14) 0 11%, rgba(38, 39, 43, 0.22) 11% calc(11% + 1px), transparent calc(11% + 1px)),
       var(--art) !important;
-    background-size: auto, cover !important;
-    background-position: center top !important;
+    background-size: auto, var(--art-h) var(--art-h) !important;
+    background-position: 0 0, right top !important;
+    background-repeat: no-repeat !important;
     background-blend-mode: normal !important;
   }
 
   .tape[data-single] .cv.has-art {
     background-image: var(--art) !important;
-    background-size: cover !important;
+    background-size: var(--art-h) var(--art-h) !important;
+    background-position: right top !important;
   }
 
   .cv.has-art .label,
@@ -794,18 +796,20 @@ const first = data[0];
     height: 2px;
   }
 
-  /* 표지 그림은 책등까지 이어진다. 책등에는 표지의 왼쪽 끝을 뒤집어 깔아, 접힌 자리에서 그림이 끊기지 않는다.
-     (표지와 같은 폭으로 깔아야 그림의 크기가 맞는다) 글자가 묻히지 않게 책의 색을 한 겹 덮는다. */
+  .tape[data-art] {
+    /* 그림(정사각형)의 한 변. 표지의 폭(0.68H)과 가장 두꺼운 책등(0.365H)을 합친 것보다 조금 크다 */
+    --art-h: calc(var(--bh, var(--H)) * 1.06);
+  }
+
   .tape[data-art] .sp::before {
     content: '';
     position: absolute;
     inset: 0;
-    /* 표지의 왼쪽 끝에 걸친 것(선반, 종이, 바탕색)이 접힌 자리를 넘어 책등으로 길게 이어진다.
-       그대로 뒤집어 깔면 표지가 거울에 비친 것처럼 같은 그림이 두 번 보여서, 가로로 늘여 붓으로 끌어온 자국처럼 만든다. */
-    inset: 0 -2px;
-    background: var(--art) left top / calc(var(--d) * 3.2) calc(var(--d) * 1.5) no-repeat;
-    transform: scaleX(-1);
-    filter: blur(calc(var(--H) * 0.004));
+    /* 그림 한 장을 표지와 책등이 나눠 쓴다. 표지가 그림의 오른쪽 끝을, 책등이 그 바로 왼쪽을 보여 줘서
+       접힌 자리에서 그림이 그대로 이어진다(--art-h: 그림의 높이이자 폭, 정사각형이다). */
+    background: var(--art) no-repeat;
+    background-size: var(--art-h) var(--art-h);
+    background-position: calc(var(--ws) + var(--d) - var(--art-h)) 0;
   }
 
   .tape[data-art] .sp > span {
