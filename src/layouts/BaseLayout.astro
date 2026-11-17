@@ -173,6 +173,19 @@ const here = (path: string) => (Astro.url.pathname.startsWith(withBase(path)) ? 
 
     <!-- 본문·제목 : Wanted Sans (Variable) -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    {
+      /* 머리말의 글자(메뉴와 로고)가 든 글꼴 조각 6개를 미리 받는다. 늦게 오면 시스템 글꼴로 먼저 그려졌다가
+         바뀌면서 메뉴의 너비가 줄어 튄다. 메뉴의 글자를 바꾸면 조각 번호를 다시 찾는다(글꼴 CSS의 unicode-range) */
+      [5, 85, 86, 87, 88, 90].map((n) => (
+        <link
+          rel="preload"
+          as="font"
+          type="font/woff2"
+          crossorigin
+          href={`https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/woff2/WantedSansVariable.split.${n}.woff2`}
+        />
+      ))
+    }
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css"
