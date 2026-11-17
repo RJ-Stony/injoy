@@ -327,11 +327,44 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
         if (dx) g.style.translate = `${((dx * view.w) / box.width).toFixed(1)}px 0`;
       }
     };
-    const apply = () => {
+    const clampView = () => {
       view.w = Math.min(FW, Math.max(FW / 5, view.w));
       const h = (view.w * FH) / FW;
       view.x = Math.min(FW - view.w, Math.max(0, view.x));
       view.y = Math.min(FH - h, Math.max(0, view.y));
+      return h;
+    };
+    // 손가락이나 마우스로 옮기고 확대하는 동안에는 지도를 다시 그리지 않는다. 번지는 빛(흐림 필터)이 많아서
+    // 움직일 때마다 다시 그리면 휴대폰에서 끊긴다. 이미 그려 둔 그림을 통째로 옮기고 늘이다가(transform),
+    // 손을 떼면 그 자리에서 한 번만 새로 그린다(commit).
+    const drawn = { x: 0, y: 0, w: FW }; // 지금 그려져 있는 범위
+    let live: { k: number; offX: number; offY: number } | null = null;
+    const preview = () => {
+      clampView();
+      if (!live) {
+        const m = svg.getScreenCTM()!;
+        const box = svg.getBoundingClientRect();
+        // k: 지도 한 칸이 화면에서 몇 픽셀인지. off: 지도가 칸 안에서 가운데로 밀린 만큼
+        live = { k: m.a, offX: m.e + drawn.x * m.a - box.left, offY: m.f + drawn.y * m.d - box.top };
+        svg.style.transformOrigin = '0 0';
+        svg.style.willChange = 'transform';
+        tip.hidden = true;
+      }
+      const s = drawn.w / view.w;
+      const tx = (drawn.x - view.x) * live.k * s + live.offX * (1 - s);
+      const ty = (drawn.y - view.y) * live.k * s + live.offY * (1 - s);
+      svg.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${s.toFixed(4)})`;
+    };
+    const commit = () => {
+      if (!live) return;
+      live = null;
+      svg.style.transform = '';
+      svg.style.willChange = '';
+      apply();
+    };
+    const apply = () => {
+      const h = clampView();
+      Object.assign(drawn, view);
       svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${h}`);
       svg.classList.toggle('is-zoomed', view.w < FW - 1);
       // 지도 한 칸이 화면에서 몇 픽셀인지의 역수. 책 이름표가 이만큼 커져서 화면에서는 늘 같은 크기로 보인다
@@ -433,8 +466,9 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     // 포인터 이벤트로는 휴대폰에서 받지 못했다(두 손가락을 대면 브라우저가 화면 확대로 가져간다). 터치 이벤트를 직접 받아
     // 두 손가락일 때만 브라우저의 동작을 막는다. 한 손가락으로 화면을 내리는 것은 그대로 둔다.
     let pinch: { dist: number; wx: number; wy: number; w: number } | null = null;
+    let pinchBox: DOMRect | null = null; // 두 손가락을 댄 순간의 지도 칸(늘이기 전)
     const two = (e: TouchEvent) => {
-      const r = svg.getBoundingClientRect();
+      const r = pinchBox ?? svg.getBoundingClientRect();
       const [a, b] = [e.touches[0], e.touches[1]];
       return {
         dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1,
@@ -447,6 +481,8 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
       (e) => {
         if (e.touches.length !== 2) return;
         e.preventDefault();
+        commit();
+        pinchBox = svg.getBoundingClientRect();
         const t = two(e);
         grab = null; // 한 손가락으로 하던 끌기는 그만둔다
         cancelAnimationFrame(zoomRaf);
@@ -464,13 +500,16 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
         view.x = pinch.wx - view.w * t.x;
         view.y = pinch.wy - ((view.w * FH) / FW) * t.y;
         moved = true; // 손을 뗄 때 점이 눌린 것으로 치지 않는다
-        apply();
+        preview();
       },
       { passive: false },
     );
     for (const type of ['touchend', 'touchcancel'] as const) {
       svg.addEventListener(type, (e) => {
-        if (e.touches.length < 2) pinch = null;
+        if (e.touches.length >= 2) return;
+        pinch = null;
+        pinchBox = null;
+        commit();
       });
     }
     // 사파리는 두 손가락 동작을 따로 알린다. 이것도 막아야 화면 전체가 확대되지 않는다
@@ -497,11 +536,12 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
       } else {
         view.x = grab.vx - dx;
         view.y = grab.vy - dy;
-        apply();
+        preview();
       }
     });
     window.addEventListener('pointerup', () => {
       if (grab?.id && moved) paint(selected);
+      if (grab && !grab.id) commit();
       grab = null;
     });
     // 끌고 난 끝의 클릭 한 번은 버린다(끌었는데 글이 바뀌지 않게)

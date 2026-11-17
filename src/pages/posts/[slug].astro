@@ -133,8 +133,8 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
     <div class="prose rise" style="--i: 4">
       <Content />
     </div>
-    {/* 검색 결과에서 넘어왔을 때(주소의 ?hl=<검색어>, src/pages/search.astro가 붙인다): 찾던 말이 있는 자리로 가서 잠깐 밝혔다가 뺀다.
-        화면이 그려진 뒤에 움직이면 글이 떴다가 자리를 다시 잡는 것처럼 보여서, 본문 바로 뒤에 인라인으로 두어 그려지기 전에 옮긴다.
+    {/* 검색 결과에서 넘어왔을 때(주소의 ?hl=<검색어>, src/pages/search.astro가 붙인다): 글이 뜨자마자 찾던 말이 있는 자리로
+        부드럽게 내려가서 잠깐 밝혔다가 뺀다. 늦게 도는 스크립트에 두면 글이 다 뜬 뒤에 한참 있다가 움직이므로 본문 바로 뒤에 인라인으로 둔다.
         주소에 소제목(#id)이 있으면 그 뒤에서 찾는다. ?hl은 바로 지워서 새로 고쳐도 다시 뜨지 않는다. */}
     <script is:inline>
       (() => {
@@ -166,16 +166,25 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
         const mark = document.createElement('mark');
         mark.className = 'search-flash is-on';
         range.surroundContents(mark);
-        // 브라우저가 예전 스크롤 자리나 소제목 자리로 되돌리지 않게 하고, 그 말이 화면 가운데 오게 한다
+        // 브라우저가 예전에 읽던 자리로 되돌려 놓으면 내려가는 움직임과 싸운다
         history.scrollRestoration = 'manual';
-        const settle = () => mark.isConnected && mark.scrollIntoView({ block: 'center', behavior: 'instant' });
-        settle();
-        // 글꼴과 그림이 뒤늦게 들어와 자리가 밀리면 한 번 더 맞춘다
-        addEventListener('load', settle, { once: true });
+        const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        // 그 말이 화면 가운데 오는 자리. scrollIntoView의 옵션은 브라우저마다 받는 값이 달라서 자리를 직접 계산한다
+        const target = () => Math.max(0, mark.getBoundingClientRect().top + scrollY - innerHeight / 2);
+        const go = (smooth) => mark.isConnected && scrollTo({ top: target(), behavior: smooth && !calm ? 'smooth' : 'auto' });
+        const inView = () => {
+          const r = mark.getBoundingClientRect();
+          return r.top > 80 && r.bottom < innerHeight - 40;
+        };
+        // 글이 올라오기 시작할 때 함께 내려간다
+        setTimeout(() => go(true), 280);
+        // 다른 것(소제목으로 가는 브라우저의 이동, 뒤늦게 들어온 그림)에 밀려 그 자리에 닿지 못했으면 다시 맞춘다
+        setTimeout(() => inView() || go(true), 1500);
+        addEventListener('load', () => setTimeout(() => inView() || go(false), 400), { once: true });
         setTimeout(() => {
           mark.classList.remove('is-on');
           setTimeout(() => mark.replaceWith(...mark.childNodes), 1400); // 빛이 다 빠지면 표시를 걷는다
-        }, 3200);
+        }, 3600);
       })();
     </script>
 
@@ -275,6 +284,26 @@ const pagefindSort = `${post.data.pubDate.toISOString().slice(0, 10)}/${post.id}
   initHoverCards();
   initGlossaryTerms();
   initSidePane();
+
+  // 오른쪽 아래에 떠 있는 읽기 단추는 꼬리말까지 내려가지 않는다. 꼬리말이 화면에 올라온 만큼 단추도 올라가서 그 위에 멈춘다.
+  const dial = document.querySelector<HTMLElement>('.reading-dial');
+  const footer = document.querySelector<HTMLElement>('.site-footer');
+  if (dial && footer) {
+    let queued = false;
+    const lift = () => {
+      queued = false;
+      const up = window.innerHeight - footer.getBoundingClientRect().top;
+      dial.style.translate = up > 0 ? `0 ${-Math.round(up)}px` : '';
+    };
+    const ask = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(lift);
+    };
+    addEventListener('scroll', ask, { passive: true });
+    addEventListener('resize', ask);
+    lift();
+  }
 
   const mermaidBlocks = document.querySelectorAll<HTMLPreElement>(
     '.prose pre.astro-code[data-language="mermaid"]',
