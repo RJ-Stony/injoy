@@ -360,7 +360,7 @@ const here = (path: string) => (Astro.url.pathname.startsWith(withBase(path)) ? 
       <slot />
     </main>
 
-    <footer class="site-footer">
+    <footer class:list={['site-footer', { 'beside-dial': ogType === 'article' }]}>
       <div class:list={['site-footer-inner', { wide }]}>
         <p>© {new Date().getFullYear()} <span class="write-key">Injoy</span>.</p>
         <p class="footer-links">
@@ -920,6 +920,11 @@ const here = (path: string) => (Astro.url.pathname.startsWith(withBase(path)) ? 
     .site-footer-inner.wide {
       padding: 1.2rem 1rem;
     }
+  }
+
+  /* 글 화면: 오른쪽 아래에 떠 있는 읽기 단추가 꼬리말의 링크를 가리지 않게 그만큼 자리를 비운다 */
+  .site-footer.beside-dial .site-footer-inner {
+    padding-right: 6rem;
   }
 
   .site-footer p {
