@@ -824,6 +824,13 @@ const first = data[0];
     background-color: color-mix(in srgb, var(--cloth) 82%, transparent);
   }
 
+  /* 두꺼운 책의 책등도 흰 꼬리표 대신 책의 색 띠 위에 제목을 찍는다(낱권과 같은 결) */
+  .tape[data-art]:not([data-single]) .sp .lab {
+    border-radius: 2px;
+    background-color: color-mix(in srgb, var(--cloth) 82%, transparent);
+    box-shadow: none;
+  }
+
   /* ---- 2026-11 개편: 책의 종류 ---- */
 
   /* 책등의 글자: 영문과 숫자도 한글처럼 세워서, 고개를 돌리지 않고 읽게 한다 */

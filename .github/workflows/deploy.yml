@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # 통계 화면의 방문 수치(GA4)는 빌드할 때 받아 온다. 글을 올리지 않은 날에도 갱신되게 하루에 한 번 다시 빌드한다(한국 시간 새벽 5시).
+  schedule:
+    - cron: '0 20 * * *'
 
 permissions:
   contents: read
@@ -36,5 +39,7 @@ jobs:
       - uses: withastro/action@v6
         env:
           PUBLIC_GTM_ID: ${{ vars.GTM_ID }}
+          # 통계 화면이 GA4에서 방문 수치를 읽는 열쇠(서비스 계정 키). 없으면 그 구역만 숨긴다.
+          GA4_SA_KEY: ${{ secrets.GA4_SA_KEY }}
       - id: deployment
         uses: actions/deploy-pages@v4
