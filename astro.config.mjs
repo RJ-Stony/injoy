@@ -113,7 +113,8 @@ export default defineConfig({
   integrations: [
     mdx(),
     // /voice(말투 노트)는 미게시 페이지 — 사이트맵에서 제외(noindex와 함께 검색 노출 차단)
-    sitemap({ filter: (page) => !page.includes('/voice') }),
+    // 검색에 올리지 않을 화면(말투 노트, 글쓰기, 검색)은 사이트맵에서 뺀다
+    sitemap({ filter: (page) => !['/voice', '/write', '/search'].some((path) => page.includes(path)) }),
     stripAdmin,
   ],
   markdown: {

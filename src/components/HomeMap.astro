@@ -369,21 +369,34 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     };
     svg.style.transformOrigin = '0 0';
     let settleTimer = 0;
+    // drawnZ: 지금 그림이 몇 배 크기로 그려져 있는지. 움직이는 동안에는 그 그림을 늘이기만 하고(흐릿해도 빠르다),
+    // 멎으면 그림 자체를 그 배율의 크기로 키워 다시 그리게 한다. 늘이기만 하고 두면 확대한 만큼 화질이 떨어진다
+    // (특히 사파리는 늘인 그림을 다시 그려 주지 않는다).
+    let drawnZ = 1;
     // 움직임이 멎으면: 늘인 그림을 그 배율로 또렷하게 다시 그리게 하고(will-change를 떼면 브라우저가 다시 그린다),
     // 책 이름표의 크기를 맞춘다. 이 일들은 그림을 다시 그리게 만들므로 움직이는 동안에는 하지 않는다.
     const settle = () => {
       svg.style.willChange = '';
+      drawnZ = FW / view.w;
+      svg.style.width = drawnZ > 1.0005 ? `${(geo.w * drawnZ).toFixed(1)}px` : '';
+      svg.style.height = drawnZ > 1.0005 ? `${(geo.h * drawnZ).toFixed(1)}px` : '';
+      place();
       // 지도 한 칸이 화면에서 몇 픽셀인지의 역수. 책 이름표가 이만큼 커져서 화면에서는 늘 같은 크기로 보인다
       svg.style.setProperty('--inv', unit().toFixed(3));
       fitLabels();
     };
-    const apply = () => {
-      clampView();
+    // 그림을 지금 보이는 범위에 맞게 놓는다. 그림은 drawnZ배 크기로 그려져 있으므로 모자란 만큼만 늘인다
+    const place = () => {
       const z = FW / view.w;
       const tx = -view.x * geo.k * z + geo.offX * (1 - z);
       const ty = -view.y * geo.k * z + geo.offY * (1 - z);
+      const still = z <= 1.0005 && drawnZ <= 1.0005;
+      svg.style.transform = still ? '' : `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${(z / drawnZ).toFixed(4)})`;
+    };
+    const apply = () => {
+      clampView();
       svg.style.willChange = 'transform';
-      svg.style.transform = z > 1.0005 ? `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${z.toFixed(4)})` : '';
+      place();
       svg.classList.toggle('is-zoomed', view.w < FW - 1);
       placeTip();
       clearTimeout(settleTimer);
@@ -432,6 +445,7 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     addEventListener('resize', () => {
       measure();
       apply();
+      settle();
     });
     zoomBox.addEventListener('click', (e) => {
       const z = (e.target as HTMLElement).closest<HTMLElement>('button')?.dataset.z;
@@ -1585,6 +1599,26 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     }
     .hm-panel h3 {
       font-size: 1.3rem;
+    }
+  }
+
+  /* 지도 칸의 크기는 칸이 정하고(가로 5에 세로 3), 그림은 그 안에 겹쳐 놓는다.
+     확대하면 그림이 칸보다 커지므로(스크립트가 크기를 키운다) 그림이 칸의 높이를 정하면 안 된다 */
+  .hm-canvas {
+    aspect-ratio: 5 / 3;
+  }
+  .hm .hm-canvas > svg {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+  }
+  @media (max-width: 860px) {
+    .hm-canvas {
+      aspect-ratio: auto;
+      height: max(62vw, 240px);
     }
   }
 
