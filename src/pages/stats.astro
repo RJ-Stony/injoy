@@ -9,6 +9,7 @@ import { getPublishedPosts, getCategories, getSeriesGroups, postStats } from '..
 import { getGraph } from '../utils/graph';
 import { getGitActivity } from '../utils/git-activity';
 import { getTraffic } from '../utils/ga';
+import { getViews } from '../utils/views';
 import { withBase } from '../utils/url';
 import Sheet from '../components/Sheet.astro';
 
@@ -25,6 +26,7 @@ const topPosts = (traffic?.pages ?? [])
   .slice(0, 8);
 const sourceName = (name: string) => (name === '(direct)' ? '주소를 직접 입력' : name === '(not set)' ? '알 수 없음' : name);
 const fmt = (n: number) => n.toLocaleString('ko-KR');
+const totalVisits = (await getViews()).site;
 const graph = await getGraph();
 const categories = await getCategories();
 const seriesGroups = await getSeriesGroups();
@@ -183,9 +185,7 @@ const colsHalf = Math.ceil(columns.length / 2);
         <span class="tile-label">{heroTiles[0].label}</span>
       </div>
       <div class="tile tile-hero" id="visits-tile">
-        <span class="tile-value" id="visits-value"
-          ><span class="stat-skeleton" aria-hidden="true"></span></span
-        >
+        <span class="tile-value" id="visits-value">{fmt(totalVisits)}</span>
         <span class="tile-label">전체 방문자 수</span>
       </div>
       <div class="tile tile-hero">
@@ -308,22 +308,6 @@ const colsHalf = Math.ceil(columns.length / 2);
 </BaseLayout>
 
 <script>
-  // 전체 방문 수 — 통계 페이지는 절대 hit 하지 않고 get만(BaseLayout이 세션당 hit 담당).
-  const visitsValue = document.getElementById('visits-value');
-  const visitsTile = document.getElementById('visits-tile');
-  if (visitsValue && visitsTile) {
-    fetch('https://abacus.jasoncameron.dev/get/injoy-rjstony/site-visits')
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
-      .then((data: { value: number }) => {
-        if (typeof data.value !== 'number') throw new Error('no value');
-        visitsValue.textContent = data.value.toLocaleString('ko-KR');
-      })
-      .catch(() => {
-        // 카운터 불가 시 그 타일만 조용히 숨긴다
-        visitsTile.hidden = true;
-      });
-  }
-
   // 기록 격자 미니 툴팁 — 셀의 data 속성(date/pub/mod)을 읽어 아주 작게 띄운다.
   // 데스크톱은 hover, 모바일은 탭. 위치는 컨테이너(.grass) 기준 문서 좌표로 계산해 클램프한다.
   const grass = document.querySelector<HTMLElement>('.grass');

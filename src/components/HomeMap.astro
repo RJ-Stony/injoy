@@ -154,6 +154,18 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
 
   const root = document.querySelector<HTMLElement>('.hm');
   const raw = document.getElementById('hm-data')?.textContent;
+  // 내려와서 그래프가 화면에 들어올 때 나타나게 한다. 스크립트가 없으면 처음부터 보인다.
+  if (root && 'IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    root.classList.add('is-wait');
+    new IntersectionObserver(
+      (entries, io) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        root.classList.remove('is-wait');
+        io.disconnect();
+      },
+      { rootMargin: '0px 0px -18% 0px' },
+    ).observe(root);
+  }
   if (root && raw) {
     const { base, nodes } = JSON.parse(raw) as { base: string; nodes: Node[] };
     const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -1358,6 +1370,40 @@ const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3
     :root:not([data-theme='light']) .hm {
       --star-amt: 72%;
     }
+  }
+
+  /* 화면에 들어올 때: 맨 위의 줄이 왼쪽에서 그어지고, 제목과 지도, 옆 칸이 차례로 올라온다 */
+  .hm {
+    margin-top: 2rem;
+  }
+  .hm > .rule {
+    transform-origin: 0 0;
+    transition: transform 0.7s cubic-bezier(0.76, 0, 0.18, 1);
+  }
+  .hm-head,
+  .hm-canvas,
+  .hm-panel {
+    transition:
+      opacity 0.7s ease,
+      translate 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .hm-head {
+    transition-delay: 0.25s;
+  }
+  .hm-canvas {
+    transition-delay: 0.38s;
+  }
+  .hm-panel {
+    transition-delay: 0.5s;
+  }
+  .hm.is-wait > .rule {
+    transform: scaleX(0);
+  }
+  .hm.is-wait .hm-head,
+  .hm.is-wait .hm-canvas,
+  .hm.is-wait .hm-panel {
+    opacity: 0;
+    translate: 0 28px;
   }
 
   /* 옆 칸은 내용만큼 길어진다(칸 안에 스크롤이 생기지 않는다). 칸이 지도보다 길면 지도가 따라 내려온다 */

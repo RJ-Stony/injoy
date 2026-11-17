@@ -5,6 +5,7 @@ import ThemeToggle from '../components/ThemeToggle.astro';
 import { withBase } from '../utils/url';
 import { getCategories } from '../utils/post';
 import profile from '../assets/profile.jpg';
+import { getViews } from '../utils/views';
 
 interface Props {
   title: string;
@@ -28,6 +29,8 @@ const categories = await getCategories();
 // 이 빌드의 커밋 sha — '보러 가기'가 새 빌드가 실제로 떴는지 확인하는 표식(deploy-toast.confirmLive).
 // GitHub Actions 빌드에선 GITHUB_SHA가 곧 발행 커밋이고, 로컬 dev에선 빈 값(확인은 라이브에서만 의미).
 const buildSha = process.env.GITHUB_SHA ?? '';
+// 꼬리말의 방문 수(예전 계수기의 값 + GA4가 센 값). 빌드할 때 박는다
+const siteVisits = (await getViews()).site.toLocaleString('ko-KR');
 // Google Tag Manager 컨테이너 ID(GTM-XXXXXXX). 비어 있으면 태그를 붙이지 않는다.
 // 배포할 때는 저장소 변수 GTM_ID가 PUBLIC_GTM_ID로 들어온다(.github/workflows/deploy.yml). GA4는 GTM 안에서 붙인다.
 const gtmId = (import.meta.env.PUBLIC_GTM_ID ?? '').trim();
@@ -361,7 +364,7 @@ const here = (path: string) => (Astro.url.pathname.startsWith(withBase(path)) ? 
       <div class:list={['site-footer-inner', { wide }]}>
         <p>© {new Date().getFullYear()} <span class="write-key">Injoy</span>.</p>
         <p class="footer-links">
-          <span id="site-visits" hidden></span>
+          <span id="site-visits">방문 {siteVisits}</span>
           <a href={withBase('/stats/')}>통계</a>
           <a href={withBase('/rss.xml')}>RSS</a>
         </p>
@@ -378,24 +381,6 @@ const here = (path: string) => (Astro.url.pathname.startsWith(withBase(path)) ? 
   // 발행 후 페이지를 떠나도 배포가 끝나면 완료 토스트를 띄운다(작성자 브라우저 한정).
   watchPendingDeploy();
 
-  // 전체 방문 수 — 세션당 1회만 카운트하고(Abacus), 실패하면 조용히 숨긴다
-  const visits = document.getElementById('site-visits');
-  if (visits) {
-    const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
-    const counted = sessionStorage.getItem('injoy-visited') === '1';
-    const mode = isLocal || counted ? 'get' : 'hit';
-    fetch(`https://abacus.jasoncameron.dev/${mode}/injoy-rjstony/site-visits`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
-      .then((data: { value: number }) => {
-        if (typeof data.value !== 'number') return;
-        if (!isLocal) sessionStorage.setItem('injoy-visited', '1');
-        visits.textContent = `방문 ${data.value.toLocaleString('ko-KR')}`;
-        visits.hidden = false;
-      })
-      .catch(() => {
-        /* 카운터 불가 시 표시 생략 */
-      });
-  }
 </script>
 
 <style is:global>
@@ -922,6 +907,19 @@ const here = (path: string) => (Astro.url.pathname.startsWith(withBase(path)) ? 
     justify-content: space-between;
     gap: 1rem;
     flex-wrap: wrap;
+  }
+
+  .site-footer-inner,
+  .site-footer-inner.wide {
+    max-width: none;
+    padding: 1.4rem 2rem;
+  }
+
+  @media (max-width: 640px) {
+    .site-footer-inner,
+    .site-footer-inner.wide {
+      padding: 1.2rem 1rem;
+    }
   }
 
   .site-footer p {

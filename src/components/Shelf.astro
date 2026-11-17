@@ -921,6 +921,13 @@ const first = data[0];
     font-weight: 700;
   }
 
+  /* 첫 화면에는 책만 보인다. 머리말과 본문의 위 여백을 뺀 화면 높이를 채우고 책을 가운데 둔다 */
+  .shelf-hero {
+    min-height: calc(100svh - 4.2rem - 2.5rem);
+    align-content: center;
+    padding-bottom: 3.5rem;
+  }
+
   @media (max-width: 767px) {
     .shelf-hero {
       --H: min(64vw, 38svh);

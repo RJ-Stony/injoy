@@ -1,59 +1,28 @@
 ---
 /**
- * 글 조회수 — Abacus(무가입 카운터 API)로 집계해 눈 아이콘 칩으로 보여 준다.
- * 칸을 처음부터 잡아 두고(자리표시) 응답이 오면 숫자로 바꾼다 — 늦게 끼어들며 줄이 밀리지 않게.
- * 글 상세는 카운트를 올리고(hit, 로컬 미리보기는 get), 홈 목록은 올리지 않고 조회만 한다(increment=false → get).
- * API가 응답하지 않으면 그 칩만 조용히 사라져 본문 읽기에 영향을 주지 않는다.
+ * 글 조회수 — 눈 아이콘 칩. 숫자는 빌드할 때 계산해 박아 둔다(src/utils/views.ts: 예전 계수기의 값 + GA4가 센 값).
+ * 화면이 뜬 뒤에 받아 오지 않으므로 자리표시가 반짝이다가 숫자로 바뀌는 일이 없다. 하루에 한 번 갱신된다.
  * PostMeta의 통계 칩(.meta-stat)과 같은 모습으로 메타 줄에 자연스럽게 합류한다.
  */
+import { getViews } from '../utils/views';
+
 interface Props {
   slug: string;
-  /** false면 카운트를 올리지 않고 조회만 — 홈 목록처럼 여러 글이 한 화면에 뜰 때 */
+  /** 예전 계수기 때의 속성. 지금은 쓰지 않는다(방문은 GA4가 센다) */
   increment?: boolean;
 }
 
-const { slug, increment = true } = Astro.props;
-const safeKey = `post-${slug.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+const { slug } = Astro.props;
+const count = (await getViews()).post(slug).toLocaleString('ko-KR');
 ---
 
-<span
-  class="meta-stat view-count"
-  data-key={safeKey}
-  data-increment={increment ? '1' : '0'}
-  aria-label="조회수"
->
+<span class="meta-stat view-count" aria-label={`조회수 ${count}`}>
   <svg class="ic" viewBox="0 0 24 24" fill="none" aria-hidden="true">
     <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"></path>
     <circle cx="12" cy="12" r="3"></circle>
   </svg>
-  <span class="value"><span class="vc-skeleton" aria-hidden="true"></span></span>
+  <span class="value">{count}</span>
 </span>
-
-<script>
-  const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
-  document.querySelectorAll<HTMLElement>('.view-count').forEach((el) => {
-    const key = el.dataset.key;
-    if (!key) return;
-    // 홈 목록(increment=0)은 올리지 않고 조회만(get). 글 상세는 hit(로컬 미리보기는 get).
-    const mode = el.dataset.increment === '0' || isLocal ? 'get' : 'hit';
-    fetch(`https://abacus.jasoncameron.dev/${mode}/injoy-rjstony/${key}`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
-      .then((data: { value: number }) => {
-        const value = el.querySelector('.value');
-        if (value && typeof data.value === 'number') {
-          const n = data.value.toLocaleString('ko-KR');
-          value.textContent = n;
-          el.setAttribute('aria-label', `조회수 ${n}`);
-          // 홈 인기순 정렬이 늦게 도착한 조회수에도 다시 줄 세우도록 알린다
-          document.dispatchEvent(new CustomEvent('injoy:viewcount'));
-        }
-      })
-      .catch(() => {
-        // 카운터 불가 시 그 칩만 감춘다(자리표시가 영원히 남지 않게)
-        el.hidden = true;
-      });
-  });
-</script>
 
 <style>
   /* PostMeta의 통계 칩과 동일한 모습(아이콘 + 숫자) */
