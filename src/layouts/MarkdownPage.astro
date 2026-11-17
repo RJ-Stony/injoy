@@ -12,9 +12,9 @@ interface Props {
 const { frontmatter } = Astro.props;
 ---
 
-<BaseLayout title={frontmatter.title} description={frontmatter.description} wide>
+<BaseLayout title={frontmatter.title} description={frontmatter.description.replace(/\s*\n\s*/g, ' ')} wide>
   <Sheet title={frontmatter.title}>
-    <p slot="meta">{frontmatter.description}</p>
+    <p slot="meta" class="lead">{frontmatter.description}</p>
     <article class="prose">
       <slot />
     </article>
@@ -22,6 +22,11 @@ const { frontmatter } = Astro.props;
 </BaseLayout>
 
 <style>
+  /* 설명에 적은 줄바꿈을 그대로 보여 준다 */
+  .lead {
+    white-space: pre-line;
+  }
+
   /* 제목 옆에서 바로 시작하게 첫 문단의 위 여백을 없앤다 */
   .prose > :global(:first-child) {
     margin-top: 0;

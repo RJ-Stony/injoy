@@ -1,7 +1,7 @@
 ---
 layout: ../layouts/MarkdownPage.astro
 title: About
-description: Injoy를 만들고 운영하는 사람, 그리고 이 블로그가 다루는 이야기.
+description: "Injoy를 만들고 운영하는 사람,\n그리고 이 블로그가 다루는 이야기."
 ---
 
 안녕하세요. **Injoy**에 오신 걸 환영합니다.
