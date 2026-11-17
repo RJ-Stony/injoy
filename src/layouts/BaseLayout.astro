@@ -45,9 +45,8 @@ const here = (path: string) => (Astro.url.pathname.startsWith(withBase(path)) ? 
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
     <meta name="injoy:build" content={buildSha} />
-    <!-- 검색 엔진에 이 사이트의 주인임을 확인해 주는 값(구글 서치 콘솔, 네이버 서치어드바이저). 비밀이 아니다 -->
+    <!-- 구글 서치 콘솔에 이 사이트의 주인임을 확인해 주는 값. 비밀이 아니다 -->
     <meta name="google-site-verification" content="bDW2lsK9fclXlaqvSBYlXz5Oq1fxbDj7UV_TXDQ2fIg" />
-    <meta name="naver-site-verification" content="f79066d98dc3c6d1bddfc61824ca1797fda3c724" />
 
     <!-- FOUC 방지: 저장된 테마 + 집중 읽기 모드를 첫 페인트 전에 적용.
          집중모드는 글 상세(article)에서만 복원한다(목록·그래프에서 헤더가 사라지면 안 됨). -->
