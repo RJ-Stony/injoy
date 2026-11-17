@@ -28,7 +28,10 @@ const ruleRect = () => {
   // 스크롤해서 줄이 화면 밖에 있으면 적지 않는다(다음 화면의 줄은 왼쪽에서 새로 그어진다)
   return r && r.bottom > 0 && r.top < innerHeight ? { x: r.left, y: r.top, w: r.width } : null;
 };
-const note = (wait: number) => sessionStorage.setItem(KEY, JSON.stringify({ t: Date.now() + wait, rule: ruleRect() }));
+// keep: 구분선이 남아서 다음 화면의 줄로 이어질 때만 자리를 적는다. 줄이 줄어들어 사라지는 이동이면 적지 않아서,
+// 다음 화면의 줄이 왼쪽에서 새로 그어진다(자리를 적으면 같은 자리에서 시작해 줄이 갑자기 나타난 것처럼 보인다).
+const note = (wait: number, keep = true) =>
+  sessionStorage.setItem(KEY, JSON.stringify({ t: Date.now() + wait, rule: keep ? ruleRect() : null }));
 const read = (): Turn | null => {
   try {
     return JSON.parse(sessionStorage.getItem(KEY) || 'null');
@@ -71,7 +74,7 @@ document.addEventListener('click', (e) => {
   if (/\.(xml|json|md|txt|png|jpe?g|webp|pdf)$/i.test(url.pathname)) return;
 
   e.preventDefault();
-  note(400);
+  note(400, isBook(url.pathname));
   // 책을 펼쳤다는 표시는 책 안에서만 이어진다. 다른 화면을 거쳐 홈에 가면 서가는 처음 모습으로 뜬다
   if (!inPane && !isBook(location.pathname)) sessionStorage.removeItem('injoy:opened');
   // 책에서 서가(홈)로 나갈 때는 펼칠 때의 거꾸로다. 글이 올라왔던 자리로 다시 내려가며 사라지고,

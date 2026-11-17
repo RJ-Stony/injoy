@@ -17,13 +17,10 @@ const dust = Array.from({ length: 90 }, (_, i) => ({
   twinkle: i % 4 === 0,
   delay: (frac(Math.sin(i * 5.1) * 331.7) * 5).toFixed(1),
 }));
-// 글 하나가 별 하나: 네 갈래로 뻗는 빛살의 모양(가운데가 잘록한 네 꼭지 별)
-const ray = (r: number) => {
-  const v = (r * 3.4).toFixed(1); // 세로 빛살
-  const h = (r * 2.3).toFixed(1); // 가로 빛살
-  const w = (r * 0.13).toFixed(2); // 가운데의 굵기
-  return `M0,-${v} L${w},-${w} L${h},0 L${w},${w} L0,${v} L-${w},${w} L-${h},0 L-${w},-${w} Z`;
-};
+// 글 하나가 별 하나. 별자리 지도의 관례대로 빛살 없이 점으로 그리고, 밝은 별(연결이 많은 글)일수록 점이 크다.
+const rs = map.nodes.map((n) => n.r);
+const [rMin, rMax] = [Math.min(...rs), Math.max(...rs)];
+const starR = (r: number) => +(1.9 + ((r - rMin) / Math.max(1, rMax - rMin)) * 3.9).toFixed(2);
 ---
 
 <section class="hm" id="graph" aria-label="그래프">
@@ -91,10 +88,10 @@ const ray = (r: number) => {
               >
                 <circle class="hm-hit" cx={n.x} cy={n.y} r={Math.max(n.r + 6, 13)} />
                 <g class="hm-ray-at" transform={`translate(${n.x} ${n.y})`} style={`--dl: ${((i * 0.37) % 4).toFixed(2)}s`}>
-                  <circle class="hm-halo" r={n.r * 1.9} />
-                  <path class="hm-ray" d={ray(n.r)} />
+                  <circle class="hm-halo" r={starR(n.r) * 3.4} />
+                  <circle class="hm-ring" r={starR(n.r) + 7} />
                 </g>
-                <circle class="hm-dot" cx={n.x} cy={n.y} r={n.r} />
+                <circle class="hm-dot" cx={n.x} cy={n.y} r={starR(n.r)} />
               </a>
             ))
           }
@@ -1276,6 +1273,57 @@ const ray = (r: number) => {
     }
     :root:not([data-theme='light']) .hm-wash {
       opacity: 0.12;
+    }
+  }
+
+  /* ---- 별(다시): 별자리 지도처럼. 빛살 없이 또렷한 점, 그 둘레에 책의 색으로 번지는 빛, 고른 별에는 가는 고리 ---- */
+  .hm-dot,
+  .hm-node.is-near .hm-dot,
+  .hm-node:hover .hm-dot,
+  .hm-node.is-on .hm-dot {
+    transform: none;
+  }
+  .hm-node.is-near .hm-dot,
+  .hm-node:hover .hm-dot {
+    transform: scale(1.25);
+  }
+  .hm-node.is-on .hm-dot {
+    transform: scale(1.45);
+  }
+  .hm-halo {
+    opacity: 0.75;
+    filter: blur(4px);
+  }
+  .hm-ring {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 1;
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scale(0.5);
+    transition:
+      opacity 0.3s,
+      transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .hm-node.is-on .hm-ring {
+    opacity: 0.9;
+    transform: none;
+  }
+  .hm-node.is-near .hm-ring {
+    opacity: 0.28;
+    transform: scale(0.8);
+  }
+  @keyframes hm-breathe {
+    50% {
+      opacity: 0.25;
+      scale: 0.75;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .hm-halo {
+      transform-box: fill-box;
+      transform-origin: center;
     }
   }
 
