@@ -25,7 +25,8 @@ interface Turn {
 
 const ruleRect = () => {
   const r = rule()?.getBoundingClientRect();
-  return r ? { x: r.left, y: r.top, w: r.width } : null;
+  // 스크롤해서 줄이 화면 밖에 있으면 적지 않는다(다음 화면의 줄은 왼쪽에서 새로 그어진다)
+  return r && r.bottom > 0 && r.top < innerHeight ? { x: r.left, y: r.top, w: r.width } : null;
 };
 const note = (wait: number) => sessionStorage.setItem(KEY, JSON.stringify({ t: Date.now() + wait, rule: ruleRect() }));
 const read = (): Turn | null => {
@@ -38,8 +39,13 @@ const read = (): Turn | null => {
 
 /** 떠날 때 빠지는 것: 책에서는 글줄들(구분선은 남는다), 그 밖의 화면에서는 내용 전체 */
 const leaving = (): HTMLElement[] => {
-  // 글 옆의 목차와 조회 수 줄도 함께 빠진다(이것만 남으면 글이 사라진 자리에 따로 떠 보인다)
-  const lines = [...document.querySelectorAll<HTMLElement>('.sheet .rise, .sheet .meta-stats, .toc-aside')];
+  // 글줄만이 아니라 글 아래의 시리즈 목록, 연결된 글, 이전·다음 글, 댓글과 옆의 목차도 함께 빠진다
+  // (글 맨 아래에서 다음 글을 눌렀을 때 그 자리에 보이던 것이 그대로 남았다가 뚝 끊기지 않게)
+  const lines = [
+    ...document.querySelectorAll<HTMLElement>(
+      '.sheet .rise, .sheet .meta-stats, .toc-aside, .post > :not(.rule):not(.post-header):not(.rise):not(script):not(span)',
+    ),
+  ];
   if (lines.length > 0) return lines;
   const main = document.querySelector<HTMLElement>('main');
   return main ? [main] : [];

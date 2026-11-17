@@ -145,9 +145,16 @@ const postUrl = (id: string) => withBase(`/posts/${id}/`);
       tip.dataset.below = fy < 0.16 ? '1' : '';
     };
 
+    const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let lit = '';
+    let shown = '';
+    // 지도 위의 표시(점, 선, 이름표)만 바꾼다. 마우스를 올렸을 때는 여기까지만 한다.
     const paint = (id: string) => {
       const n = byId.get(id);
       if (!n) return;
+      // 다른 점으로 옮겨 갈 때만 이름표가 미끄러져 간다(끌거나 확대할 때는 점에 붙어 있어야 한다)
+      tip.classList.toggle('is-glide', lit !== '' && lit !== id);
+      lit = id;
       const near = new Set(n.conns.map((c) => c.id));
       for (const d of dots) {
         const did = d.dataset.id!;
@@ -159,7 +166,14 @@ const postUrl = (id: string) => withBase(`/posts/${id}/`);
 
       tipNode = n;
       placeTip();
+    };
 
+    // 옆 칸의 내용을 바꾼다. 점을 눌러 골랐을 때만 한다(올릴 때마다 칸이 바뀌면 어지럽다).
+    const fill = (id: string) => {
+      const n = byId.get(id);
+      if (!n || shown === id) return;
+      const first = shown === '';
+      shown = id;
       const url = `${base}${n.id}/`;
       const title = el('h3', '');
       const titleLink = el('a', '', n.title);
@@ -189,11 +203,37 @@ const postUrl = (id: string) => withBase(`/posts/${id}/`);
         parts.push(el('p', 'hm-conns-head', `이어진 글 ${n.conns.length}편`), list);
       }
       panel.replaceChildren(...parts);
+      panel.scrollTop = 0;
+      if (first || calm) return;
+      // 새 내용은 한 줄씩 올라온다. 이어진 글은 하나씩 따라온다.
+      const rows = [...parts.slice(0, 5), ...panel.querySelectorAll<HTMLElement>('.hm-conns li')];
+      rows.forEach((row, k) =>
+        row.animate(
+          [
+            { opacity: 0, transform: 'translateY(10px)' },
+            { opacity: 1, transform: 'none' },
+          ],
+          { duration: 420, delay: Math.min(k, 9) * 35, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' },
+        ),
+      );
     };
 
     const pick = (id: string) => {
+      const again = selected === id && shown === id;
       selected = id;
       paint(id);
+      fill(id);
+      // 고른 점에서 고리가 한 번 퍼진다
+      const dot = dots.find((d) => d.dataset.id === id)?.querySelector('.hm-dot');
+      if (!calm && !again) {
+        dot?.animate(
+          [
+            { strokeWidth: 10, strokeOpacity: 0.2 },
+            { strokeWidth: 2.5, strokeOpacity: 1 },
+          ],
+          { duration: 520, easing: 'ease-out' },
+        );
+      }
     };
 
     for (const d of dots) {
@@ -239,6 +279,32 @@ const postUrl = (id: string) => withBase(`/posts/${id}/`);
       view.y = py - ((view.w * FH) / FW) * cy;
       apply();
     };
+    // 단추와 두 번 누르기로 바꿀 때는 뚝 바뀌지 않고 이어서 움직인다(휠과 끌기는 손을 바로 따라간다)
+    let zoomRaf = 0;
+    const glideTo = (to: { x: number; y: number; w: number }) => {
+      cancelAnimationFrame(zoomRaf);
+      if (calm) {
+        Object.assign(view, to);
+        return apply();
+      }
+      const from = { ...view };
+      const t0 = performance.now();
+      const step = (now: number) => {
+        const p = Math.min(1, (now - t0) / 320);
+        const k = 1 - Math.pow(1 - p, 3);
+        view.w = from.w + (to.w - from.w) * k;
+        view.x = from.x + (to.x - from.x) * k;
+        view.y = from.y + (to.y - from.y) * k;
+        apply();
+        if (p < 1) zoomRaf = requestAnimationFrame(step);
+      };
+      zoomRaf = requestAnimationFrame(step);
+    };
+    const glideZoom = (factor: number, cx = 0.5, cy = 0.5) => {
+      const h = (view.w * FH) / FW;
+      const w = Math.min(FW, Math.max(FW / 5, view.w * factor));
+      glideTo({ w, x: view.x + view.w * cx - w * cx, y: view.y + h * cy - ((w * FH) / FW) * cy });
+    };
     const at = (e: MouseEvent) => {
       const r = svg.getBoundingClientRect();
       return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height] as const;
@@ -246,13 +312,9 @@ const postUrl = (id: string) => withBase(`/posts/${id}/`);
     zoomBox.hidden = false;
     zoomBox.addEventListener('click', (e) => {
       const z = (e.target as HTMLElement).closest<HTMLElement>('button')?.dataset.z;
-      if (z === 'in') zoomAt(0.7);
-      if (z === 'out') zoomAt(1 / 0.7);
-      if (z === 'fit') {
-        view.x = view.y = 0;
-        view.w = FW;
-        apply();
-      }
+      if (z === 'in') glideZoom(0.7);
+      if (z === 'out') glideZoom(1 / 0.7);
+      if (z === 'fit') glideTo({ x: 0, y: 0, w: FW });
     });
     svg.addEventListener(
       'wheel',
@@ -265,7 +327,7 @@ const postUrl = (id: string) => withBase(`/posts/${id}/`);
     );
     svg.addEventListener('dblclick', (e) => {
       if ((e.target as Element).closest('.hm-node')) return;
-      zoomAt(0.6, ...at(e));
+      glideZoom(0.6, ...at(e));
     });
     // 끌기: 점을 잡으면 그 점이 따라오고(선도 함께), 빈 곳을 잡으면 확대한 지도가 움직인다.
     const linesOf = new Map<string, { line: SVGLineElement; end: 1 | 2 }[]>();
@@ -812,5 +874,54 @@ const postUrl = (id: string) => withBase(`/posts/${id}/`);
     display: flex;
     width: fit-content;
     margin-left: auto;
+  }
+
+  /* ---- 고르고 올릴 때의 움직임: 점은 살짝 커지고, 선과 이름표는 이어서 바뀐다 ---- */
+  .hm-dot {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition:
+      opacity 0.25s ease,
+      transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+      stroke-width 0.25s ease;
+  }
+  .hm-node.is-near .hm-dot {
+    transform: scale(1.12);
+  }
+  .hm-node:hover .hm-dot {
+    transform: scale(1.22);
+  }
+  .hm-node.is-on .hm-dot {
+    transform: scale(1.35);
+  }
+  .hm-edges line {
+    transition:
+      opacity 0.3s ease,
+      stroke-width 0.3s ease;
+  }
+  .hm-tip.is-glide {
+    transition:
+      left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+      top 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .hm-go {
+    transition: color 0.2s;
+  }
+  .hm-conns li {
+    transition:
+      background-color 0.2s,
+      translate 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .hm-conns li:hover {
+    background-color: color-mix(in srgb, var(--c) 9%, var(--surface));
+    translate: 3px 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hm-dot,
+    .hm-edges line,
+    .hm-tip.is-glide,
+    .hm-conns li {
+      transition: none;
+    }
   }
 </style>

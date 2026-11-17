@@ -28,6 +28,8 @@ const categories = await getCategories();
 // 이 빌드의 커밋 sha — '보러 가기'가 새 빌드가 실제로 떴는지 확인하는 표식(deploy-toast.confirmLive).
 // GitHub Actions 빌드에선 GITHUB_SHA가 곧 발행 커밋이고, 로컬 dev에선 빈 값(확인은 라이브에서만 의미).
 const buildSha = process.env.GITHUB_SHA ?? '';
+// 지금 보고 있는 메뉴에 표시를 한다
+const here = (path: string) => (Astro.url.pathname.startsWith(withBase(path)) ? 'page' : undefined);
 ---
 
 <!doctype html>
@@ -145,11 +147,11 @@ const buildSha = process.env.GITHUB_SHA ?? '';
         <div class="header-actions">
           <nav class="nav-desktop" aria-label="주 메뉴">
             <a class="write-link" href={withBase('/write/')} hidden>글쓰기</a>
-            <a href={withBase('/search/')}>검색</a>
-            <a href={withBase('/graph/')}>그래프</a>
-            <a href={withBase('/glossary/')}>용어 사전</a>
+            <a href={withBase('/search/')} aria-current={here('/search/')}>검색</a>
+            <a href={withBase('/graph/')} aria-current={here('/graph/')}>그래프</a>
+            <a href={withBase('/glossary/')} aria-current={here('/glossary/')}>용어 사전</a>
             <div class="cat-dd">
-              <button type="button" class="cat-dd-btn" aria-haspopup="true" aria-expanded="false">
+              <button type="button" class="cat-dd-btn" aria-haspopup="true" aria-expanded="false" data-current={here('/categories/')}>
                 카테고리<span class="caret" aria-hidden="true"></span>
               </button>
               <div class="cat-dd-menu" role="menu" hidden>
@@ -163,7 +165,7 @@ const buildSha = process.env.GITHUB_SHA ?? '';
                 }
               </div>
             </div>
-            <a href={withBase('/about/')}>About</a>
+            <a href={withBase('/about/')} aria-current={here('/about/')}>About</a>
           </nav>
 
           <button
@@ -181,7 +183,9 @@ const buildSha = process.env.GITHUB_SHA ?? '';
               stroke-width="2"
               stroke-linecap="round"
             >
-              <path d="M4 7h16M4 12h16M4 17h16"></path>
+              <path class="l1" d="M4 7h16"></path>
+              <path class="l2" d="M4 12h16"></path>
+              <path class="l3" d="M4 17h16"></path>
             </svg>
           </button>
 
@@ -192,10 +196,10 @@ const buildSha = process.env.GITHUB_SHA ?? '';
       <!-- 모바일: 메뉴 + 카테고리를 한 패널에 모은다(헤더 밖 absolute라 폭을 늘리지 않는다) -->
       <div id="mobile-menu" class="mobile-menu" role="navigation" aria-label="모바일 메뉴" hidden>
         <a class="write-link" href={withBase('/write/')} hidden>글쓰기</a>
-        <a href={withBase('/search/')}>검색</a>
-        <a href={withBase('/graph/')}>그래프</a>
-        <a href={withBase('/glossary/')}>용어 사전</a>
-        <a href={withBase('/about/')}>About</a>
+        <a href={withBase('/search/')} aria-current={here('/search/')}>검색</a>
+        <a href={withBase('/graph/')} aria-current={here('/graph/')}>그래프</a>
+        <a href={withBase('/glossary/')} aria-current={here('/glossary/')}>용어 사전</a>
+        <a href={withBase('/about/')} aria-current={here('/about/')}>About</a>
         <div class="mm-sep"></div>
         <p class="mm-label">카테고리</p>
         {
@@ -697,6 +701,116 @@ const buildSha = process.env.GITHUB_SHA ?? '';
     grid-column: 1;
     grid-row: 1;
     justify-self: start;
+  }
+
+  /* 메뉴: 테두리 하나로 묶은 띠 안에 글자만 둔다. 올리면 옅은 바탕이 깔리고, 지금 화면의 메뉴는 짙게 채운다 */
+  .site-header .nav-desktop {
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface);
+  }
+
+  .site-header .nav-desktop > a,
+  .site-header .nav-desktop > :global(a.write-link),
+  .site-header .cat-dd-btn {
+    height: 30px;
+    padding: 0 13px;
+    border: 0;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+
+  .site-header .nav-desktop > a:hover,
+  .site-header .nav-desktop > :global(a.write-link:hover),
+  .site-header .cat-dd-btn:hover,
+  .site-header .cat-dd-btn[aria-expanded='true'] {
+    background-color: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text);
+  }
+
+  .site-header .nav-desktop > a[aria-current='page'],
+  .site-header .cat-dd-btn[data-current='page'] {
+    background-color: var(--text);
+    color: var(--bg);
+  }
+
+  .site-header .cat-dd-btn .caret {
+    margin-left: 0.15rem;
+  }
+
+  /* 펼치는 메뉴는 누른 단추 쪽(왼쪽)에서 열린다 */
+  .site-header .cat-dd-menu {
+    left: 0;
+    right: auto;
+    top: calc(100% + 0.6rem);
+    border-radius: 14px;
+    background-color: var(--surface);
+  }
+
+  .site-header .mobile-menu {
+    left: 0.8rem;
+    right: auto;
+    min-width: 13rem;
+    border-radius: 14px;
+    background-color: var(--surface);
+    transform-origin: 1rem 0;
+  }
+
+  .site-header .mobile-menu a[aria-current='page'] {
+    background-color: color-mix(in srgb, var(--text) 8%, transparent);
+    font-weight: 700;
+  }
+
+  @keyframes menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.97);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .site-header .cat-dd-menu:not([hidden]),
+    .site-header .mobile-menu:not([hidden]) {
+      animation: menu-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+  }
+
+  /* 햄버거: 열리면 가위표로 바뀐다 */
+  .site-header .nav-toggle {
+    width: 36px;
+    height: 36px;
+    margin-left: -6px;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+  }
+
+  .site-header .nav-toggle:hover,
+  .site-header .nav-toggle[aria-expanded='true'] {
+    background-color: color-mix(in srgb, var(--text) 8%, transparent);
+  }
+
+  .site-header .nav-toggle svg path {
+    transform-box: view-box;
+    transform-origin: center;
+    transition:
+      transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 0.15s;
+  }
+
+  .site-header .nav-toggle[aria-expanded='true'] .l1 {
+    transform: translateY(5px) rotate(45deg);
+  }
+
+  .site-header .nav-toggle[aria-expanded='true'] .l2 {
+    opacity: 0;
+  }
+
+  .site-header .nav-toggle[aria-expanded='true'] .l3 {
+    transform: translateY(-5px) rotate(-45deg);
   }
 
   .site-header :global(.theme-toggle) {

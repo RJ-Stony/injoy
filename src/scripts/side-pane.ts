@@ -5,6 +5,7 @@
  * Ctrl/⌘/Shift 클릭과 가운데 클릭은 건드리지 않아 새 탭으로 열 수 있다.
  */
 
+const WIDTH_KEY = 'injoy:pane-w';
 const LINKS = '.prose a.wiki-link, .prereq a, .connections a[href*="/posts/"]';
 
 export function initSidePane(): void {
@@ -57,7 +58,45 @@ export function initSidePane(): void {
       fullEl.href = path;
     });
 
-    pane.append(bar, frame);
+    // 왼쪽 경계를 끌어 너비를 바꾼다(창 크기를 조절하듯이). 두 번 누르면 처음 너비로 돌아간다.
+    const grip = document.createElement('div');
+    grip.className = 'side-pane-grip';
+    grip.tabIndex = 0;
+    grip.setAttribute('role', 'separator');
+    grip.setAttribute('aria-orientation', 'vertical');
+    grip.setAttribute('aria-label', '옆 칸 너비 조절');
+    const setWidth = (px: number | null) => {
+      if (px === null) {
+        root.style.removeProperty('--pane-w');
+        localStorage.removeItem(WIDTH_KEY);
+        return;
+      }
+      const w = Math.round(Math.max(360, px));
+      // 읽던 글이 너무 좁아지지 않게 왼쪽에 720px은 남긴다(머리말의 메뉴가 들어갈 폭)(창을 줄였을 때도)
+      root.style.setProperty('--pane-w', `min(${w}px, calc(100vw - 720px))`);
+      localStorage.setItem(WIDTH_KEY, String(w));
+    };
+    const saved = Number(localStorage.getItem(WIDTH_KEY));
+    if (saved > 0) setWidth(saved);
+    grip.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      grip.setPointerCapture(e.pointerId);
+      root.dataset.resizing = 'true'; // 끄는 동안 iframe이 마우스를 가져가지 않게 한다(global.css)
+    });
+    grip.addEventListener('pointermove', (e) => {
+      if (root.dataset.resizing) setWidth(root.clientWidth - e.clientX);
+    });
+    const stop = () => delete root.dataset.resizing;
+    grip.addEventListener('pointerup', stop);
+    grip.addEventListener('pointercancel', stop);
+    grip.addEventListener('dblclick', () => setWidth(null));
+    grip.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      setWidth(pane!.offsetWidth + (e.key === 'ArrowLeft' ? 32 : -32));
+    });
+
+    pane.append(grip, bar, frame);
     document.body.append(pane);
   };
 

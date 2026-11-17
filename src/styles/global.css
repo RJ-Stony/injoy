@@ -1326,6 +1326,53 @@ a:hover {
   }
 }
 
+/* 옆 칸의 왼쪽 경계: 끌어서 너비를 바꾸는 손잡이. 평소에는 경계선만 보이고 올리면 강조색 줄이 나타난다 */
+.side-pane-grip {
+  display: none;
+}
+
+@media (min-width: 1100px) {
+  .side-pane-grip {
+    display: block;
+    position: absolute;
+    left: -6px;
+    top: 0;
+    bottom: 0;
+    width: 12px;
+    z-index: 2;
+    cursor: col-resize;
+    touch-action: none;
+    outline: none;
+  }
+
+  .side-pane-grip::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: var(--accent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .side-pane-grip:hover::after,
+  .side-pane-grip:focus-visible::after,
+  html[data-resizing] .side-pane-grip::after {
+    opacity: 1;
+  }
+}
+
+html[data-resizing] {
+  cursor: col-resize;
+  user-select: none;
+}
+
+html[data-resizing] .side-pane iframe {
+  pointer-events: none;
+}
+
 html[data-pane] .site-header,
 html[data-pane] .site-footer,
 html[data-pane] .post-nav,
