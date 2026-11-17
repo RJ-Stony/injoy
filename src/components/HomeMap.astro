@@ -8,6 +8,20 @@ const map = await getHomeMap();
 const at = new Map(map.nodes.map((n) => [n.id, n]));
 const first = map.nodes[0]; // 최신 글
 const postUrl = (id: string) => withBase(`/posts/${id}/`);
+// 바탕의 잔별: 난수를 쓰지 않고 번호에서 자리를 만든다(빌드할 때마다 같은 하늘이 나온다)
+const frac = (v: number) => v - Math.floor(v);
+const dust = Array.from({ length: 90 }, (_, i) => ({
+  x: Math.round(frac(Math.sin(i * 12.9898) * 43758.5453) * MAP_W),
+  y: Math.round(frac(Math.sin(i * 78.233) * 12543.123) * MAP_H),
+  r: (0.6 + frac(Math.sin(i * 3.7) * 9123.7) * 1.1).toFixed(2),
+  twinkle: i % 4 === 0,
+  delay: (frac(Math.sin(i * 5.1) * 331.7) * 5).toFixed(1),
+}));
+// 글 하나가 별 하나: 네 갈래로 뻗는 빛살의 모양(가운데가 잘록한 네 꼭지 별)
+const ray = (r: number) => {
+  const R = (r * 2.5).toFixed(1);
+  return `M0,-${R} Q0,0 ${R},0 Q0,0 0,${R} Q0,0 -${R},0 Q0,0 0,-${R} Z`;
+};
 ---
 
 <section class="hm" id="graph" aria-label="그래프">
@@ -41,6 +55,13 @@ const postUrl = (id: string) => withBase(`/posts/${id}/`);
         <g class="hm-wash" filter="url(#hm-blur)" aria-hidden="true">
           {map.nodes.map((n) => <circle cx={n.x} cy={n.y} r="46" fill={n.hue} data-w={n.id} />)}
         </g>
+        <g class="hm-dust" aria-hidden="true">
+          {
+            dust.map((d) => (
+              <circle cx={d.x} cy={d.y} r={d.r} class={d.twinkle ? 'tw' : undefined} style={`--dl: ${d.delay}s`} />
+            ))
+          }
+        </g>
         <g class="hm-edges" aria-hidden="true">
           {
             map.edges.map((e) => (
@@ -58,7 +79,7 @@ const postUrl = (id: string) => withBase(`/posts/${id}/`);
         </g>
         <g class="hm-nodes">
           {
-            map.nodes.map((n) => (
+            map.nodes.map((n, i) => (
               <a
                 class="hm-node"
                 href={postUrl(n.id)}
@@ -67,6 +88,9 @@ const postUrl = (id: string) => withBase(`/posts/${id}/`);
                 style={`--hue: ${n.hue}`}
               >
                 <circle class="hm-hit" cx={n.x} cy={n.y} r={Math.max(n.r + 6, 13)} />
+                <g class="hm-ray-at" transform={`translate(${n.x} ${n.y})`}>
+                  <path class="hm-ray" d={ray(n.r)} style={`--dl: ${((i * 0.37) % 4).toFixed(2)}s`} />
+                </g>
                 <circle class="hm-dot" cx={n.x} cy={n.y} r={n.r} />
               </a>
             ))
@@ -218,7 +242,7 @@ const postUrl = (id: string) => withBase(`/posts/${id}/`);
           if (c.note) item.title = c.note; // 관계의 설명은 마우스를 올리면 보인다(칸을 글로 채우지 않는다)
           list.append(item);
         }
-        parts.push(el('p', 'hm-conns-head', `이어진 글 ${n.conns.length}편`), list);
+        parts.push(el('p', 'hm-conns-head', `연결된 글 ${n.conns.length}편`), list);
       }
       panel.replaceChildren(...parts);
       panel.scrollTop = 0;
@@ -360,6 +384,7 @@ const postUrl = (id: string) => withBase(`/posts/${id}/`);
       n.x = Math.min(FW - 12, Math.max(12, x));
       n.y = Math.min(FH - 12, Math.max(12, y));
       const el = dots.find((d) => d.dataset.id === id)!;
+      el.querySelector('.hm-ray-at')?.setAttribute('transform', `translate(${n.x} ${n.y})`);
       for (const c of el.querySelectorAll('circle')) {
         c.setAttribute('cx', String(n.x));
         c.setAttribute('cy', String(n.y));
@@ -1094,6 +1119,60 @@ const postUrl = (id: string) => withBase(`/posts/${id}/`);
   .hm-zoom button,
   .hm-zoom button + button {
     border-radius: 50%;
+  }
+
+  /* ---- 별자리: 글은 별, 연결은 별자리의 선. 바탕에는 잔별이 깔리고 몇 개는 느리게 반짝인다 ---- */
+  .hm-canvas {
+    background-image: none;
+  }
+  .hm-dust circle {
+    fill: var(--text);
+    opacity: 0.22;
+  }
+  .hm-ray {
+    fill: color-mix(in srgb, var(--hue) 62%, var(--text));
+    opacity: 0.85;
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .hm-node:hover .hm-ray,
+  .hm-node.is-near .hm-ray {
+    transform: scale(1.25);
+  }
+  .hm-node.is-on .hm-ray {
+    fill: var(--text);
+    transform: scale(1.55) rotate(45deg);
+  }
+  .hm-dot {
+    filter: drop-shadow(0 0 3.5px color-mix(in srgb, var(--hue) 80%, transparent));
+  }
+  .hm-edges line,
+  .hm.has-pick .hm-edges line {
+    stroke-width: 0.8;
+    opacity: 0.3;
+  }
+  @keyframes hm-twinkle {
+    50% {
+      opacity: 0.75;
+      scale: 1.5;
+    }
+  }
+  @keyframes hm-glint {
+    50% {
+      opacity: 0.45;
+      scale: 0.82;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .hm-dust .tw {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: hm-twinkle 4.6s ease-in-out var(--dl) infinite;
+    }
+    .hm-node:not(.is-on):not(:hover) .hm-ray {
+      animation: hm-glint 4.2s ease-in-out var(--dl) infinite;
+    }
   }
 
   /* 옆 칸은 내용만큼 길어진다(칸 안에 스크롤이 생기지 않는다). 칸이 지도보다 길면 지도가 따라 내려온다 */
