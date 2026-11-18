@@ -9,13 +9,13 @@ draft: false
 series: "하네스 엔지니어링"
 ---
 
-지금까지 만든 하네스는 [Claude Code](https://docs.claude.com/en/docs/claude-code) 위에서만 동작했다. 그런데 사내에서는 [Codex](https://github.com/openai/codex)(OpenAI의 코딩 에이전트)도 함께 사용하고 있었기 때문에, Codex용 하네스도 자연스럽게 필요해졌다. 문제는 두 도구의 **런타임**(runtime; AI가 실제로 도는 실행 환경)이 다르다는 것이었다. 하네스를 Codex에서도 사용하려면, 같은 로직을 Codex의 방식으로 다시 구현해야 했다.
+지금까지 만든 하네스는 [Claude Code](https://docs.claude.com/en/docs/claude-code) 위에서만 동작했다. 그런데 사내에서는 [Codex](https://github.com/openai/codex)(OpenAI의 코딩 에이전트)도 회사 공용 계정으로 함께 사용하고 있었다. 마침 Claude Opus 4.8과 GPT-5.5의 성능이 엎치락뒤치락하던 때여서, Codex 쪽에도 하네스가 필요하겠다고 생각했다. 문제는 두 도구의 **런타임**(runtime; AI가 실제로 도는 실행 환경)이 다르다는 것이었다. 하네스를 Codex에서도 사용하려면, 같은 로직을 Codex의 방식으로 다시 구현해야 했다.
 
 ## 그 전에는 무엇에 묶여 있었나
 
 기존 하네스는 Claude Code의 구조에 묶여 있었다. 역할별 에이전트는 `agents/*.md`(YAML 머리말이 붙은 마크다운)로 정의했고, 워크플로우는 `/harness:plan` 같은 스킬로 호출했다. 세션이 시작될 때, 사용자가 입력할 때, 파일을 편집하기 직전에 실행되는 훅도 Claude Code의 훅 규격(`hooks.json`)에 맞춰져 있었다. 흐름 자체는 런타임과 무관했지만, **그 흐름을 호출하는 방법이 전부 Claude Code 전용**이었던 것이다.
 
-Codex에는 이런 구조가 없거나, 있더라도 사용하는 방법이 달랐다. 에이전트는 마크다운이 아니라 **TOML**(키=값 형식의 설정 파일)로 작성하고, 슬래시 커맨드라는 개념 자체가 없다. 그래서 단순히 복사해서 붙여 넣는 것으로는 해결되지 않았다.
+Codex에는 이런 구조가 없거나, 있더라도 사용하는 방법이 달랐다. 에이전트는 마크다운이 아니라 **TOML**(키=값 형식의 설정 파일)로 작성하고, 슬래시 커맨드라는 개념 자체가 없다. 그래서 단순히 복사해서 붙여 넣는 것으로는 해결되지 않았다. 두 환경이 이렇게 다르다 보니, Claude와 Codex를 병렬로 이용하게 되면 맞춰야 할 규격이 꽤 많겠다는 생각이 들었다.
 
 ## 표면은 유지하고 내부만 다르게
 
@@ -60,7 +60,7 @@ sandbox_mode = "read-only"            # 파일을 못 고친다 [!code highlight
 model_reasoning_effort = "low"        # 검증은 무거운 추론이 필요 없다
 ```
 
-이렇게 만든 Codex용 파일들은 하나의 플러그인 매니페스트가 묶는다. 스킬, 훅, 도구의 경로를 이 파일 하나에 적고, 버전은 Claude 쪽과 같은 숫자로 맞춰서 두 런타임이 버전을 따로 가지지 않도록 했다.
+이렇게 만든 Codex용 파일들은 하나의 플러그인 매니페스트가 묶는다. 스킬, 훅, 도구의 경로를 이 파일 하나에 적고, 버전은 Claude 쪽과 같은 숫자로 맞춰서 두 런타임이 버전을 따로 가지지 않도록 했다. 아래에서는 버전 필드를 생략하고 경로만 보여 준다.
 
 ```json codex/.codex-plugin/plugin.json
 {
@@ -76,12 +76,12 @@ model_reasoning_effort = "low"        # 검증은 무거운 추론이 필요 없
 ```mermaid
 flowchart TD
     subgraph Claude["Claude Code"]
-        C1["memory-loader (md+YAML)"]
+        C1["memory-loader"]
         C2["pipeline-injector"]
         C3["preedit-guard"]
     end
     subgraph Codex["Codex"]
-        D1["codex-memory-loader (toml)"]
+        D1["codex-memory-loader"]
         D2["codex-pipeline-injector"]
         D3["codex-preedit-guard"]
     end
@@ -107,7 +107,7 @@ export function memoryDir(cwd = process.cwd()) {
 }
 ```
 
-저장 위치를 코드 한 곳에서 관리하도록 한 이 정리는 사소해 보여도 중요했다. 나중에 [[harness-7-snowflake|메모리를 팀이 공유할 수 있도록 옮길 때]], 이 한 곳만 바꾸면 되었기 때문이다. 당장 필요해서가 아니라, 다음 확장을 위해 미리 준비해 둔 것이다.
+저장 위치를 코드 한 곳에서 관리하도록 한 이 정리는 사소해 보여도 중요했다. 나중에 [[harness-7-snowflake|메모리를 팀이 공유할 수 있도록 옮길 때]], 이 한 곳만 바꾸면 되었기 때문이다. 이때에도 팀 공유는 하고 싶었다. 기록을 공유하게 되면 같은 문제를 같은 방안으로 해결할 수 있고, 거기에서 인사이트도 얻어낼 수 있다고 보았기 때문이다. 다만 개인정보나 개인적인 대화처럼 처리해야 할 것이 많아 보였고, 그 처리가 정말 어려울 것이라고 생각했다. 그래서 당장 하지는 않고, 다음 확장을 위해 미리 준비해 둔 것이다.
 
 ## 결론
 

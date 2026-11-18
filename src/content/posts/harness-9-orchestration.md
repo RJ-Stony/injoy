@@ -69,11 +69,11 @@ flowchart LR
     I --> M["메인 Claude가 전문가처럼 응답"]
 ```
 
-이 흐름이 우리 하네스의 `pipeline-injector.mjs`가 이미 하고 있던 일과 똑같다는 것을 알게 되었을 때, 방향이 조금은 잡혔다. **우리는 이미 이 방법을 사용**하고 있었다.
+이 흐름이 우리 하네스의 `pipeline-injector.mjs`가 이미 하고 있던 일과 똑같다는 것을 알게 되었을 때, 방향이 조금은 잡혔다. 반갑기도 했다. 적어도 내 가설과 설계가 맞았다는 뜻이었기 때문이다. **우리는 이미 이 방법을 사용**하고 있었다.
 
 ## 내가 잘못 이해했던 OMC
 
-세 번째 갈래를 살펴보기 전에, 내가 가장 크게 잘못 이해했던 것부터 바로잡아야겠다. [[harness-1-benchmarking|처음 벤치마킹을 했던 글]]에서 나는 OMC(Oh-My-Claudecode)를 "라우터가 작업을 쪼개 권한이 분리된 서브에이전트들에게 강제로 위임"한다고만 적었다. 그때 내가 이해한 구조는, 플러그인 안에 라우터가 들어 있고 플러그인의 `CLAUDE.md`를 단일 진입점으로 삼아서 흐름이 진행된다는 것이었다. 그런데 그 이해가 틀렸었다.
+세 번째 갈래를 살펴보기 전에, 내가 가장 크게 잘못 이해했던 것부터 바로잡아야겠다. [[harness-1-benchmarking|처음 벤치마킹을 했던 글]]에서 나는 OMC(Oh-My-Claudecode)를 "라우터가 작업을 쪼개 권한이 분리된 서브에이전트들에게 강제로 위임"한다고만 적었다. 그때 내가 이해한 구조는, 플러그인 안에 라우터가 들어 있고 플러그인의 `CLAUDE.md`를 단일 진입점으로 삼아서 흐름이 진행된다는 것이었다. 그런데 그 이해가 틀렸었다. OMC를 직접 설치한 뒤에 `CLAUDE.md`를 읽어 보고서야 그것을 알게 되었다.
 
 실제 OMC는 **샌드박스 바깥에서 사용자의 실제 프로젝트 디렉토리로 침투한다.** 여기에는 이유가 있다. Claude Code에는 "플러그인 내부의 설정 파일(`CLAUDE.md` 등)은 무시하라"는 기본 규칙이 있다. 그래서 플러그인 안에 라우팅 방법을 아무리 적어 두어도 적용되지 않는다. OMC는 이 격리를 우회하기 위해서, `omc setup`을 실행할 때 사용자가 실제로 작업하는 디렉토리에 자신의 설정을 심는다. 심는 것은 아래의 두 가지이다.
 
@@ -103,7 +103,7 @@ flowchart TD
     K -->|"additionalContext 주입"| F["메인 Claude = 강제 오케스트레이터"]
 ```
 
-정리하면, 그때의 나는 OMC의 "강제 위임"이 플러그인 안에서 일어난다고 보았지만, 실제로는 **사용자의 작업 공간을 변조**해서 일어나게 하는 것이었다. 이것은 우리가 이 방식을 채택하지 않은 이유이기도 하다. 사내 도구가 사용자의 `CLAUDE.md`를 말없이 덮어쓰는 것은, [[harness-8-trimming|지난 글]]에서 세운 기준("사람의 동의 없이 돌이키기 어려운 일을 하지 않는다")에 정면으로 어긋나기 때문이었다.
+정리하면, 그때의 나는 OMC의 "강제 위임"이 플러그인 안에서 일어난다고 보았지만, 실제로는 **사용자의 작업 공간을 변조**해서 일어나게 하는 것이었다. 이것은 우리가 이 방식을 채택하지 않은 이유이기도 하다. 사내 도구가 사용자의 `CLAUDE.md`를 말없이 덮어쓰는 것은, [[harness-1-benchmarking|첫 글]]에서 가져온 기준(되돌리기 어려운 행동을 하기 전에 사람에게 묻는다)에 정면으로 어긋나기 때문이었다.
 
 ## 가장 무거운 방법인 ruflo
 
@@ -148,6 +148,6 @@ flowchart LR
 
 처음의 벤치마킹이 "잘 쓰고 있는 하네스를 처음 뜯어본" 기록이었다면, 이번 글은 같은 일을 더 깊이 다시 한 기록이다. 그사이에 보는 눈이 달라졌다. 그때는 기능의 목록과 규모를 보고 판단했고, 이번에는 라우팅이 어디서 어떻게 일어나는지를 보았다. 그러자 그때 OMC를 잘못 읽었던 것도 드러나게 되었다.
 
-기준은 [[harness-8-trimming|지난 글]]과 같았다. <u>AI가 멋대로 건너뛸 수 있는 일은 단단히 잡되, 무거운 것은 버린다.</u> 데몬도, 사용자의 디렉토리를 변조하는 방식도 버리고, 들여다보이는 훅 라우팅만 가져오면 될 것 같다. 내 블로그이자 사내 도구라는 두 마음이 같은 결론을 가리킨 것이, 이번에는 꽤 다행이었다.
+기준은 [[harness-8-trimming|지난 글]]과 같았다. <u>AI가 DoD를 다 채우지 않고 끝낼 수 있는 일은 단단히 잡되, 무거운 것은 버린다.</u> 데몬도, 사용자의 디렉토리를 변조하는 방식도 버리고, 들여다보이는 훅 라우팅만 가져오면 될 것 같다.
 
 참고한 글은 Anthropic의 [Building Effective Agents](https://www.anthropic.com/engineering/building-effective-agents), Claude Code의 [서브에이전트](https://code.claude.com/docs/en/sub-agents)와 [agent-teams](https://code.claude.com/docs/en/agent-teams) 문서, 그리고 [agent-teams(wshobson)](https://github.com/wshobson/agents/tree/main/plugins/agent-teams), [SuperClaude](https://github.com/SuperClaude-Org/SuperClaude_Framework), [OMC](https://github.com/Yeachan-Heo/oh-my-claudecode), [ruflo](https://github.com/ruvnet/ruflo)의 코드이다. 같이 확인해보면 좋을 것 같다. ☺️
